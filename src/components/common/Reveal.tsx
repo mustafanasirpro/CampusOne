@@ -23,9 +23,16 @@ export function Reveal({
       window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
       !("IntersectionObserver" in window)
     ) {
-      element.classList.add("reveal-visible");
       return;
     }
+
+    const bounds = element.getBoundingClientRect();
+    const isInitiallyVisible =
+      bounds.bottom > 0 && bounds.top < window.innerHeight * 0.92;
+
+    if (isInitiallyVisible) return;
+
+    element.classList.add("reveal-pending");
 
     const observer = new IntersectionObserver(
       ([entry]) => {
@@ -52,4 +59,3 @@ export function Reveal({
     </div>
   );
 }
-

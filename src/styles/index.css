@@ -75,11 +75,16 @@ button:disabled,
 }
 
 .reveal {
-  opacity: 0;
-  transform: translateY(22px);
+  opacity: 1;
+  transform: translateY(0);
   transition:
     opacity 650ms ease,
     transform 650ms ease;
+}
+
+.reveal.reveal-pending {
+  opacity: 0;
+  transform: translateY(22px);
 }
 
 .reveal.reveal-visible {

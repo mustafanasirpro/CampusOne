@@ -8,8 +8,12 @@ export function PublicLayout() {
     <div className="min-h-screen bg-slate-50">
       <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-18 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
-          <CampusOneLogo className="sm:hidden" compact />
-          <CampusOneLogo className="hidden sm:inline-flex" />
+          <span className="sm:hidden">
+            <CampusOneLogo compact />
+          </span>
+          <span className="hidden sm:block">
+            <CampusOneLogo />
+          </span>
           <nav
             aria-label="Landing page sections"
             className="ml-10 hidden items-center gap-1 lg:flex"
