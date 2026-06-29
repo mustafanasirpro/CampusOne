@@ -1,8 +1,9 @@
-import { Bell, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { Avatar, Button, useToast } from "@/components/common";
+import { Avatar, Button } from "@/components/common";
 import { CampusOneLogo } from "@/components/layout/CampusOneLogo";
+import { NotificationMenu } from "@/components/layout/NotificationMenu";
 import { paths } from "@/routes/paths";
 
 export interface MobileNavbarProps {
@@ -10,8 +11,6 @@ export interface MobileNavbarProps {
 }
 
 export function MobileNavbar({ onMenuClick }: MobileNavbarProps) {
-  const { showToast } = useToast();
-
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur lg:hidden">
       <Button
@@ -28,21 +27,9 @@ export function MobileNavbar({ onMenuClick }: MobileNavbarProps) {
         Campus<span className="text-brand-600">One</span>
       </span>
       <div className="ml-auto flex items-center gap-1">
-        <Button
-          aria-label="Notifications"
-          onClick={() =>
-            showToast({
-              message: "Notifications will appear here in the content phase.",
-              title: "All caught up",
-            })
-          }
-          size="icon"
-          variant="ghost"
-        >
-          <Bell className="size-5" />
-        </Button>
+        <NotificationMenu />
         <Link aria-label="Open profile" className="rounded-full" to={paths.profile}>
-          <Avatar name="CampusOne Student" size="sm" />
+          <Avatar name="Ali Khan" size="sm" />
         </Link>
       </div>
     </header>

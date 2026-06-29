@@ -1,13 +1,8 @@
-import { Bell } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import {
-  Avatar,
-  Button,
-  SearchBar,
-  useToast,
-} from "@/components/common";
+import { Avatar, SearchBar, useToast } from "@/components/common";
+import { NotificationMenu } from "@/components/layout/NotificationMenu";
 import { paths } from "@/routes/paths";
 
 export function Navbar() {
@@ -18,7 +13,7 @@ export function Navbar() {
     showToast({
       title: "Search ready",
       message: value
-        ? `Global search will look for “${value}” when page content is connected.`
+        ? `Searching CampusOne for “${value}” in this frontend demo.`
         : "Type something to search across CampusOne.",
     });
   };
@@ -29,28 +24,17 @@ export function Navbar() {
         className="max-w-xl"
         onSearch={handleSearch}
         onValueChange={setSearchValue}
+        placeholder="Search notes, discussions, events..."
         value={searchValue}
       />
       <div className="ml-auto flex items-center gap-2">
-        <Button
-          aria-label="Notifications"
-          onClick={() =>
-            showToast({
-              message: "The notifications panel will be connected in the content phase.",
-              title: "No new notifications",
-            })
-          }
-          size="icon"
-          variant="ghost"
-        >
-          <Bell className="size-5" />
-        </Button>
+        <NotificationMenu />
         <Link
           aria-label="Open profile"
           className="ml-1 rounded-full"
           to={paths.profile}
         >
-          <Avatar name="CampusOne Student" />
+          <Avatar name="Ali Khan" />
         </Link>
       </div>
     </header>
