@@ -5,4 +5,5 @@ export * from "./MobileNavbar";
 export * from "./Navbar";
 export * from "./NotificationMenu";
 export * from "./PublicLayout";
+export * from "./ProfileMenu";
 export * from "./Sidebar";

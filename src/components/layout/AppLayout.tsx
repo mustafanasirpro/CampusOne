@@ -20,6 +20,12 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50">
+      <a
+        className="fixed left-4 top-3 z-[70] -translate-y-20 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-xl transition focus:translate-y-0"
+        href="#main-content"
+      >
+        Skip to main content
+      </a>
       <Sidebar className="fixed inset-y-0 left-0 z-40 hidden lg:flex" />
 
       <div
@@ -61,7 +67,10 @@ export function AppLayout() {
       <div className="lg:pl-72">
         <Navbar />
         <MobileNavbar onMenuClick={() => setIsMobileMenuOpen(true)} />
-        <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">
+        <main
+          className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8"
+          id="main-content"
+        >
           <Outlet />
         </main>
       </div>

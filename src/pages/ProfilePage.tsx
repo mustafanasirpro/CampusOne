@@ -426,7 +426,15 @@ export function ProfilePage() {
                         </div>
                         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
                           <div
-                            className={cn("h-full rounded-full", tone.progress)}
+                            aria-label={`${achievement.name} progress`}
+                            aria-valuemax={100}
+                            aria-valuemin={0}
+                            aria-valuenow={achievement.progress}
+                            className={cn(
+                              "h-full rounded-full transition-[width] duration-700 ease-out",
+                              tone.progress,
+                            )}
+                            role="progressbar"
                             style={{ width: `${achievement.progress}%` }}
                           />
                         </div>

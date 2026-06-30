@@ -6,6 +6,12 @@ import { paths } from "@/routes/paths";
 export function PublicLayout() {
   return (
     <div className="min-h-screen bg-slate-50">
+      <a
+        className="fixed left-4 top-3 z-[70] -translate-y-20 rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-xl transition focus:translate-y-0"
+        href="#main-content"
+      >
+        Skip to main content
+      </a>
       <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-18 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
           <span className="sm:hidden">
@@ -56,7 +62,7 @@ export function PublicLayout() {
           </nav>
         </div>
       </header>
-      <main>
+      <main id="main-content">
         <Outlet />
       </main>
     </div>

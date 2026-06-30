@@ -1,9 +1,9 @@
 import { Menu } from "lucide-react";
-import { Link } from "react-router-dom";
 
-import { Avatar, Button } from "@/components/common";
+import { Button } from "@/components/common";
 import { CampusOneLogo } from "@/components/layout/CampusOneLogo";
 import { NotificationMenu } from "@/components/layout/NotificationMenu";
+import { ProfileMenu } from "@/components/layout/ProfileMenu";
 import { paths } from "@/routes/paths";
 
 export interface MobileNavbarProps {
@@ -28,11 +28,8 @@ export function MobileNavbar({ onMenuClick }: MobileNavbarProps) {
       </span>
       <div className="ml-auto flex items-center gap-1">
         <NotificationMenu />
-        <Link aria-label="Open profile" className="rounded-full" to={paths.profile}>
-          <Avatar name="Ali Khan" size="sm" />
-        </Link>
+        <ProfileMenu compact />
       </div>
     </header>
   );
 }
-

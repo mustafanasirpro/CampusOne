@@ -35,7 +35,7 @@ export function Tabs<T extends string>({
           <button
             aria-selected={isActive}
             className={cn(
-              "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition",
+              "inline-flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition duration-200 active:scale-[0.98]",
               isActive
                 ? "bg-white text-slate-950 shadow-sm"
                 : "text-slate-500 hover:text-slate-800",
@@ -64,4 +64,3 @@ export function Tabs<T extends string>({
     </div>
   );
 }
-

@@ -2,8 +2,11 @@ import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { paths } from "@/routes/paths";
+import { useDocumentTitle } from "@/utils/useDocumentTitle";
 
 export function NotFoundPage() {
+  useDocumentTitle("Page not found · CampusOne");
+
   return (
     <main className="grid min-h-screen place-items-center bg-slate-50 p-6 text-center">
       <div>
@@ -27,4 +30,3 @@ export function NotFoundPage() {
     </main>
   );
 }
-

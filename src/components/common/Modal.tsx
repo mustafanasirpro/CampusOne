@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { useEffect, useId, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { Button } from "@/components/common/Button";
@@ -35,21 +35,55 @@ export function Modal({
 }: ModalProps) {
   const titleId = useId();
   const descriptionId = useId();
+  const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
 
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const focusableSelector =
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
+      if (event.key !== "Tab" || !modalRef.current) return;
+
+      const focusableElements = Array.from(
+        modalRef.current.querySelectorAll<HTMLElement>(focusableSelector),
+      );
+      if (focusableElements.length === 0) {
+        event.preventDefault();
+        modalRef.current.focus();
+        return;
+      }
+
+      const firstElement = focusableElements[0];
+      const lastElement = focusableElements[focusableElements.length - 1];
+
+      if (event.shiftKey && document.activeElement === firstElement) {
+        event.preventDefault();
+        lastElement.focus();
+      } else if (!event.shiftKey && document.activeElement === lastElement) {
+        event.preventDefault();
+        firstElement.focus();
+      }
     };
 
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", handleKeyDown);
+    const frame = window.requestAnimationFrame(() => {
+      const preferredFocus =
+        modalRef.current?.querySelector<HTMLElement>("[autofocus]") ??
+        modalRef.current?.querySelector<HTMLElement>(focusableSelector);
+      (preferredFocus ?? modalRef.current)?.focus();
+    });
 
     return () => {
+      window.cancelAnimationFrame(frame);
       document.body.style.overflow = originalOverflow;
       document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocused?.focus();
     };
   }, [isOpen, onClose]);
 
@@ -65,13 +99,15 @@ export function Modal({
     >
       <button
         aria-label="Close modal"
-        className="absolute inset-0 cursor-default bg-slate-950/50 backdrop-blur-[2px]"
+        className="animate-backdrop-in absolute inset-0 cursor-default bg-slate-950/50 backdrop-blur-[2px]"
         onClick={onClose}
         type="button"
       />
       <div
+        ref={modalRef}
+        tabIndex={-1}
         className={cn(
-          "relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl",
+          "animate-modal-in relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-2xl",
           sizeClasses[size],
         )}
       >
@@ -107,4 +143,3 @@ export function Modal({
     document.body,
   );
 }
-

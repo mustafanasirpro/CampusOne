@@ -20,8 +20,9 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div
+      role="status"
       className={cn(
-        "flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white/60 p-8 text-center",
+        "flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center sm:p-8",
         className,
       )}
     >
@@ -36,4 +37,3 @@ export function EmptyState({
     </div>
   );
 }
-

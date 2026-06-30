@@ -199,7 +199,12 @@ export function DashboardPage() {
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-brand-400 to-emerald-400"
+                  aria-label="Weekly study goal"
+                  aria-valuemax={100}
+                  aria-valuemin={0}
+                  aria-valuenow={dashboardStudent.weeklyGoal}
+                  className="h-full rounded-full bg-gradient-to-r from-brand-400 to-emerald-400 transition-[width] duration-700 ease-out"
+                  role="progressbar"
                   style={{ width: `${dashboardStudent.weeklyGoal}%` }}
                 />
               </div>

@@ -10,5 +10,7 @@ export * from "./PageHeader";
 export * from "./Reveal";
 export * from "./SearchBar";
 export * from "./SectionTitle";
+export * from "./Skeleton";
+export * from "./Switch";
 export * from "./Tabs";
 export * from "./Toast";

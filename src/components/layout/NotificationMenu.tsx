@@ -5,6 +5,8 @@ import {
   CheckCheck,
   FileText,
   MessageSquareText,
+  ShoppingBag,
+  Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -18,6 +20,7 @@ const notificationIcons = {
   discussion: MessageSquareText,
   event: CalendarDays,
   internship: BriefcaseBusiness,
+  marketplace: ShoppingBag,
 };
 
 const notificationTones = {
@@ -25,10 +28,24 @@ const notificationTones = {
   discussion: "bg-emerald-50 text-emerald-600",
   event: "bg-amber-50 text-amber-600",
   internship: "bg-sky-50 text-sky-600",
+  marketplace: "bg-violet-50 text-violet-600",
 };
+
+const notificationCategories = [
+  "All",
+  "Academic",
+  "Campus",
+  "Career",
+  "Marketplace",
+] as const;
+
+type NotificationCategory = (typeof notificationCategories)[number];
 
 export function NotificationMenu() {
   const [isOpen, setIsOpen] = useState(false);
+  const [notifications, setNotifications] = useState(dashboardNotifications);
+  const [activeCategory, setActiveCategory] =
+    useState<NotificationCategory>("All");
   const [readIds, setReadIds] = useState(
     () =>
       new Set(
@@ -41,10 +58,19 @@ export function NotificationMenu() {
   const { showToast } = useToast();
   const unreadCount = useMemo(
     () =>
-      dashboardNotifications.filter(
+      notifications.filter(
         (notification) => !readIds.has(notification.id),
       ).length,
-    [readIds],
+    [notifications, readIds],
+  );
+  const visibleNotifications = useMemo(
+    () =>
+      activeCategory === "All"
+        ? notifications
+        : notifications.filter(
+            (notification) => notification.category === activeCategory,
+          ),
+    [activeCategory, notifications],
   );
 
   useEffect(() => {
@@ -74,17 +100,31 @@ export function NotificationMenu() {
 
   const markAllRead = () => {
     setReadIds(
-      new Set(
-        dashboardNotifications.map((notification) => notification.id),
-      ),
+      new Set(notifications.map((notification) => notification.id)),
     );
+    showToast({
+      title: "All caught up",
+      message: "Every notification has been marked as read.",
+      variant: "success",
+    });
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
+    setReadIds(new Set());
+    setActiveCategory("All");
+    showToast({
+      title: "Notifications cleared",
+      message: "Your demo notification inbox is now empty.",
+      variant: "success",
+    });
   };
 
   return (
     <div className="relative" ref={containerRef}>
       <Button
         aria-expanded={isOpen}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-label={`Notifications, ${unreadCount} unread`}
         className="relative"
         onClick={() => setIsOpen((current) => !current)}
@@ -102,8 +142,8 @@ export function NotificationMenu() {
       {isOpen ? (
         <div
           aria-label="Notifications"
-          className="fixed left-4 right-4 top-16 z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/10 sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-96"
-          role="menu"
+          className="animate-dropdown-in fixed left-4 right-4 top-16 z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-950/10 sm:absolute sm:left-auto sm:right-0 sm:top-12 sm:w-[26rem]"
+          role="dialog"
         >
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3.5">
             <div>
@@ -136,8 +176,35 @@ export function NotificationMenu() {
             </div>
           </div>
 
+          {notifications.length > 0 ? (
+            <div
+              aria-label="Notification categories"
+              className="flex gap-1 overflow-x-auto border-b border-slate-100 px-3 py-2"
+            >
+              {notificationCategories.map((category) => {
+                const isActive = activeCategory === category;
+                return (
+                  <button
+                    aria-pressed={isActive}
+                    className={cn(
+                      "shrink-0 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition",
+                      isActive
+                        ? "bg-brand-50 text-brand-700"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+                    )}
+                    key={category}
+                    onClick={() => setActiveCategory(category)}
+                    type="button"
+                  >
+                    {category}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
           <div className="max-h-[min(28rem,calc(100vh-9rem))] overflow-y-auto p-2">
-            {dashboardNotifications.map((notification) => {
+            {visibleNotifications.map((notification) => {
               const Icon = notificationIcons[notification.kind];
               const isRead = readIds.has(notification.id);
 
@@ -157,7 +224,6 @@ export function NotificationMenu() {
                       message: notification.message,
                     });
                   }}
-                  role="menuitem"
                   type="button"
                 >
                   <span
@@ -192,25 +258,51 @@ export function NotificationMenu() {
                 </button>
               );
             })}
+            {visibleNotifications.length === 0 ? (
+              <div className="grid min-h-44 place-items-center px-6 py-8 text-center">
+                <div>
+                  <span className="mx-auto grid size-11 place-items-center rounded-2xl bg-slate-100 text-slate-400">
+                    <Bell className="size-5" />
+                  </span>
+                  <p className="mt-3 text-sm font-semibold text-slate-800">
+                    No notifications here
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    {notifications.length === 0
+                      ? "New campus updates will appear here."
+                      : `You have no ${activeCategory.toLowerCase()} updates.`}
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </div>
 
-          <div className="border-t border-slate-100 p-2">
-            <button
-              className="w-full rounded-xl px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
-              onClick={() =>
-                showToast({
-                  title: "Notifications",
-                  message: "You are viewing all current demo notifications.",
-                })
-              }
-              type="button"
-            >
-              View all notifications
-            </button>
-          </div>
+          {notifications.length > 0 ? (
+            <div className="flex items-center justify-between gap-2 border-t border-slate-100 p-2">
+              <button
+                className="rounded-xl px-3 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50"
+                onClick={() =>
+                  showToast({
+                    title: "Notifications",
+                    message: "You are viewing all current demo notifications.",
+                  })
+                }
+                type="button"
+              >
+                View all notifications
+              </button>
+              <button
+                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+                onClick={clearNotifications}
+                type="button"
+              >
+                <Trash2 className="size-3.5" />
+                Clear all
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
   );
 }
-

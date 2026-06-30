@@ -447,7 +447,12 @@ export function LeaderboardPage() {
                   </div>
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-brand-400 to-emerald-400"
+                      aria-label="Progress to next level"
+                      aria-valuemax={100}
+                      aria-valuemin={0}
+                      aria-valuenow={myGamificationProgress.progress}
+                      className="h-full rounded-full bg-gradient-to-r from-brand-400 to-emerald-400 transition-[width] duration-700 ease-out"
+                      role="progressbar"
                       style={{ width: `${myGamificationProgress.progress}%` }}
                     />
                   </div>
@@ -553,7 +558,15 @@ export function LeaderboardPage() {
                       </div>
                       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
                         <div
-                          className={cn("h-full rounded-full", tone.progress)}
+                          aria-label={`${achievement.name} progress`}
+                          aria-valuemax={100}
+                          aria-valuemin={0}
+                          aria-valuenow={achievement.progress}
+                          className={cn(
+                            "h-full rounded-full transition-[width] duration-700 ease-out",
+                            tone.progress,
+                          )}
+                          role="progressbar"
                           style={{ width: `${achievement.progress}%` }}
                         />
                       </div>
@@ -624,10 +637,15 @@ export function LeaderboardPage() {
                     </div>
                     <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
                       <div
+                        aria-label={`${challenge.title} progress`}
+                        aria-valuemax={100}
+                        aria-valuemin={0}
+                        aria-valuenow={Math.round(progress)}
                         className={cn(
-                          "h-full rounded-full transition-all",
+                          "h-full rounded-full transition-[width] duration-700 ease-out",
                           complete ? "bg-emerald-500" : "bg-brand-500",
                         )}
+                        role="progressbar"
                         style={{ width: `${progress}%` }}
                       />
                     </div>
@@ -733,7 +751,12 @@ export function LeaderboardPage() {
                         </div>
                         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-brand-500 to-emerald-500"
+                            aria-label={`${department.department} relative XP`}
+                            aria-valuemax={100}
+                            aria-valuemin={0}
+                            aria-valuenow={Math.round(relativeProgress)}
+                            className="h-full rounded-full bg-gradient-to-r from-brand-500 to-emerald-500 transition-[width] duration-700 ease-out"
+                            role="progressbar"
                             style={{ width: `${relativeProgress}%` }}
                           />
                         </div>

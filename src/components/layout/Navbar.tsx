@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 
-import { Avatar, SearchBar, useToast } from "@/components/common";
+import { SearchBar, useToast } from "@/components/common";
 import { NotificationMenu } from "@/components/layout/NotificationMenu";
-import { paths } from "@/routes/paths";
+import { ProfileMenu } from "@/components/layout/ProfileMenu";
 
 export function Navbar() {
   const [searchValue, setSearchValue] = useState("");
@@ -29,15 +28,8 @@ export function Navbar() {
       />
       <div className="ml-auto flex items-center gap-2">
         <NotificationMenu />
-        <Link
-          aria-label="Open profile"
-          className="ml-1 rounded-full"
-          to={paths.profile}
-        >
-          <Avatar name="Ali Khan" />
-        </Link>
+        <ProfileMenu />
       </div>
     </header>
   );
 }
-

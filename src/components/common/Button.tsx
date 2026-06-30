@@ -44,7 +44,7 @@ export function Button({
   return (
     <button
       className={cn(
-        "inline-flex shrink-0 items-center justify-center font-semibold transition-colors duration-150",
+        "inline-flex shrink-0 items-center justify-center font-semibold transition duration-150 active:scale-[0.98]",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500",
         "disabled:pointer-events-none disabled:opacity-50",
         variantClasses[variant],
@@ -60,4 +60,3 @@ export function Button({
     </button>
   );
 }
-

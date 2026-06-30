@@ -45,6 +45,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  overflow-x: hidden;
 }
 
 button,
@@ -67,6 +68,11 @@ button:disabled,
 ::selection {
   color: #312e81;
   background: #e0e7ff;
+}
+
+* {
+  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-width: thin;
 }
 
 :focus-visible {
@@ -107,6 +113,69 @@ button:disabled,
   animation: campus-float 5s ease-in-out infinite;
 }
 
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes content-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-modal-in {
+  animation: modal-in 180ms ease-out;
+}
+
+.animate-backdrop-in {
+  animation: backdrop-in 160ms ease-out;
+}
+
+.animate-dropdown-in {
+  animation: dropdown-in 160ms ease-out;
+  transform-origin: top right;
+}
+
+.animate-content-in {
+  animation: content-in 220ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -119,6 +188,13 @@ button:disabled,
   }
 
   .animate-campus-float {
+    animation: none;
+  }
+
+  .animate-modal-in,
+  .animate-backdrop-in,
+  .animate-dropdown-in,
+  .animate-content-in {
     animation: none;
   }
 }

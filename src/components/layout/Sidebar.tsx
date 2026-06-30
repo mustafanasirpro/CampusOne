@@ -28,6 +28,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
 
   return (
     <aside
+      aria-label="CampusOne application sidebar"
       className={cn(
         "flex h-full w-72 flex-col border-r border-slate-200 bg-white",
         className,
@@ -49,10 +50,10 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
             <NavLink
               className={({ isActive }) =>
                 cn(
-                  "flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
+                  "group relative flex h-11 items-center gap-3 overflow-hidden rounded-xl px-3 text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
+                    ? "bg-brand-50 text-brand-700 shadow-sm shadow-brand-900/5"
+                    : "text-slate-600 hover:translate-x-0.5 hover:bg-slate-50 hover:text-slate-950",
                 )
               }
               key={item.path}
@@ -61,10 +62,15 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
             >
               {({ isActive }) => (
                 <>
+                  {isActive ? (
+                    <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-brand-600" />
+                  ) : null}
                   <item.icon
                     className={cn(
-                      "size-[19px]",
-                      isActive ? "text-brand-600" : "text-slate-400",
+                      "size-[19px] transition-colors",
+                      isActive
+                        ? "text-brand-600"
+                        : "text-slate-400 group-hover:text-slate-600",
                     )}
                   />
                   <span>{item.label}</span>
@@ -81,18 +87,32 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
             <NavLink
               className={({ isActive }) =>
                 cn(
-                  "flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
+                  "group relative flex h-11 items-center gap-3 overflow-hidden rounded-xl px-3 text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
+                    ? "bg-brand-50 text-brand-700 shadow-sm shadow-brand-900/5"
+                    : "text-slate-600 hover:translate-x-0.5 hover:bg-slate-50 hover:text-slate-950",
                 )
               }
               key={item.path}
               onClick={onNavigate}
               to={item.path}
             >
-              <item.icon className="size-[19px]" />
-              <span>{item.label}</span>
+              {({ isActive }) => (
+                <>
+                  {isActive ? (
+                    <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-brand-600" />
+                  ) : null}
+                  <item.icon
+                    className={cn(
+                      "size-[19px] transition-colors",
+                      isActive
+                        ? "text-brand-600"
+                        : "text-slate-400 group-hover:text-slate-600",
+                    )}
+                  />
+                  <span>{item.label}</span>
+                </>
+              )}
             </NavLink>
           ))}
         </div>
