@@ -6,6 +6,8 @@ import com.campusone.academic.repository.DepartmentRepository;
 import com.campusone.academic.repository.UniversityRepository;
 import com.campusone.auth.repository.RefreshTokenRepository;
 import com.campusone.user.repository.RoleRepository;
+import com.campusone.user.repository.SkillRepository;
+import com.campusone.user.repository.UserPreferenceRepository;
 import com.campusone.user.repository.UserRepository;
 import java.time.Clock;
 import org.junit.jupiter.api.Test;
@@ -32,6 +34,12 @@ class SecurityApplicationContextTest {
 
     @MockitoBean
     private RefreshTokenRepository refreshTokenRepository;
+
+    @MockitoBean
+    private SkillRepository skillRepository;
+
+    @MockitoBean
+    private UserPreferenceRepository userPreferenceRepository;
 
     @Autowired
     private SecurityConfig securityConfig;

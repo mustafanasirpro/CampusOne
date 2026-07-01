@@ -5,7 +5,8 @@ Spring Boot foundation for the CampusOne university community platform.
 ## Current scope
 
 The backend currently contains the Phase 0 foundation, Phase 1 core domain
-model, Phase 2 authentication MVP, and Phase 3 refresh-token authentication:
+model, Phase 2 authentication MVP, Phase 3 refresh-token authentication, and
+Phase 4 user profiles:
 
 - Users, roles, universities, departments, courses, and student profiles
 - PostgreSQL schema managed by Flyway
@@ -15,7 +16,10 @@ model, Phase 2 authentication MVP, and Phase 3 refresh-token authentication:
 - Hashed, PostgreSQL-backed refresh-token sessions with rotation
 - Persistent failed-login throttling and temporary account lockout
 - Exact-origin CORS and browser request-origin validation
-- Registration, login, refresh, logout, and authenticated current-user endpoints
+- Registration, login, refresh, and logout endpoints
+- Authenticated profile editing with validated academic selections
+- Normalized student skills and personal display preferences
+- Public and private student profile visibility
 - Consistent validation, authentication, authorization, and API error responses
 
 Email verification, password recovery, and CampusOne business modules are
@@ -23,24 +27,21 @@ intentionally not implemented yet.
 
 ## Development Status
 
-### ✅ Completed
+### Completed
 
 - Backend Foundation (Phase 0)
 - Core Academic Domain (Phase 1)
 - Authentication & JWT (Phase 2)
 - Refresh Token Authentication (Phase 3)
+- User Profile Module (Phase 4)
 - Java 21 development environment
 - Maven build and test pipeline
 - JWT configuration validation
 - Security configuration
 
-### 🚧 In Progress
+### Upcoming
 
-- PostgreSQL local database setup
-- Backend startup verification
-
-### 🔜 Upcoming
-
+- Academic Directory Enhancements (Phase 5)
 - Multi-session management
 - Email Verification
 - Password Reset
@@ -187,5 +188,8 @@ mvn clean verify
 - Refresh access token: `POST http://localhost:8080/api/v1/auth/refresh`
 - Logout current session: `POST http://localhost:8080/api/v1/auth/logout`
 - Current user: `GET http://localhost:8080/api/v1/users/me`
+- Update current profile: `PATCH http://localhost:8080/api/v1/users/me`
+- Replace current skills: `PUT http://localhost:8080/api/v1/users/me/skills`
+- Public profile: `GET http://localhost:8080/api/v1/profiles/{userId}`
 - OpenAPI JSON: `http://localhost:8080/api/v1/openapi`
 - Swagger UI: `http://localhost:8080/api/v1/swagger-ui`

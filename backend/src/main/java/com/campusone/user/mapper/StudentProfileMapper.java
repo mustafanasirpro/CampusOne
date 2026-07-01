@@ -29,6 +29,13 @@ public class StudentProfileMapper {
                 profile.getSemester(),
                 profile.getBio(),
                 profile.getAvatarUrl(),
+                profile.getCoverImageUrl(),
+                profile.getLocation(),
+                profile.getSkills().stream()
+                        .map(skill -> skill.getName())
+                        .sorted(String.CASE_INSENSITIVE_ORDER)
+                        .toList(),
+                profile.getVisibility(),
                 profile.getTotalXp());
     }
 }

@@ -27,4 +27,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     })
     @Query("select u from User u where u.id = :userId")
     Optional<User> findDetailedById(@Param("userId") UUID userId);
+
+    @EntityGraph(attributePaths = {
+        "studentProfile",
+        "studentProfile.university",
+        "studentProfile.department",
+        "studentProfile.skills"
+    })
+    @Query("select u from User u where u.id = :userId")
+    Optional<User> findProfileById(@Param("userId") UUID userId);
 }

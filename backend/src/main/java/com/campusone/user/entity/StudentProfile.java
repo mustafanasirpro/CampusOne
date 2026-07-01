@@ -9,7 +9,11 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Max;
@@ -19,6 +23,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "student_profiles")
@@ -61,6 +68,26 @@ public class StudentProfile {
     @Size(max = 2048)
     @Column(name = "avatar_url", length = 2048)
     private String avatarUrl;
+
+    @Size(max = 2048)
+    @Column(name = "cover_image_url", length = 2048)
+    private String coverImageUrl;
+
+    @Size(max = 100)
+    @Column(length = 100)
+    private String location;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private ProfileVisibility visibility = ProfileVisibility.PUBLIC;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "student_skills",
+            joinColumns = @JoinColumn(name = "student_profile_id"),
+            inverseJoinColumns = @JoinColumn(name = "skill_id"))
+    private Set<Skill> skills = new LinkedHashSet<>();
 
     @PositiveOrZero
     @Column(name = "total_xp", nullable = false)
@@ -143,6 +170,39 @@ public class StudentProfile {
 
     public void setAvatarUrl(String avatarUrl) {
         this.avatarUrl = avatarUrl;
+    }
+
+    public String getCoverImageUrl() {
+        return coverImageUrl;
+    }
+
+    public void setCoverImageUrl(String coverImageUrl) {
+        this.coverImageUrl = coverImageUrl;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public void setLocation(String location) {
+        this.location = location;
+    }
+
+    public ProfileVisibility getVisibility() {
+        return visibility;
+    }
+
+    public void setVisibility(ProfileVisibility visibility) {
+        this.visibility = visibility;
+    }
+
+    public Set<Skill> getSkills() {
+        return skills;
+    }
+
+    public void replaceSkills(Collection<Skill> replacementSkills) {
+        skills.clear();
+        skills.addAll(replacementSkills);
     }
 
     public long getTotalXp() {

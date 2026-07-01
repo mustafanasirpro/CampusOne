@@ -21,6 +21,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -52,6 +53,18 @@ public class GlobalExceptionHandler {
                 HttpStatus.BAD_REQUEST,
                 "MALFORMED_REQUEST",
                 "The request body is malformed or unreadable.",
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ErrorResponse> handleMalformedPathParameter(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.BAD_REQUEST,
+                "MALFORMED_REQUEST",
+                "A path or query parameter has an invalid value.",
                 request,
                 Map.of());
     }

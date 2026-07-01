@@ -58,6 +58,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/health")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/profiles/**")
+                        .permitAll()
                         .requestMatchers(
                                 "/api/v1/openapi/**",
                                 "/api/v1/swagger-ui/**",

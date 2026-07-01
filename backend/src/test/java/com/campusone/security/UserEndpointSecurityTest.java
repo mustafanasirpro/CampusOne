@@ -1,6 +1,8 @@
 package com.campusone.security;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -47,5 +50,23 @@ class UserEndpointSecurityTest {
                 .andExpect(jsonPath("$.code").value("AUTH_UNAUTHORIZED"))
                 .andExpect(jsonPath("$.message")
                         .value("Authentication is required to access this resource."));
+    }
+
+    @Test
+    void updateCurrentUser_withoutAuthentication_returnsUnauthorized() throws Exception {
+        mockMvc.perform(patch("/api/v1/users/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_UNAUTHORIZED"));
+    }
+
+    @Test
+    void replaceSkills_withoutAuthentication_returnsUnauthorized() throws Exception {
+        mockMvc.perform(put("/api/v1/users/me/skills")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"skills\":[]}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_UNAUTHORIZED"));
     }
 }
