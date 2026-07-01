@@ -41,6 +41,8 @@ springdoc:
 
 app:
   jwt:
+    # Standard Base64 encoding of at least 32 cryptographically random bytes.
+    # Raw text and Base64URL values are intentionally rejected at startup.
     secret: ${JWT_SECRET}
     issuer: ${JWT_ISSUER:campusone-backend}
     access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}

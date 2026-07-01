@@ -52,7 +52,7 @@ public class StudentProfile {
     @Min(1)
     @Max(8)
     @Column(nullable = false)
-    private int semester;
+    private short semester;
 
     @Size(max = 500)
     @Column(length = 500)
@@ -79,7 +79,7 @@ public class StudentProfile {
         this.university = university;
         this.department = department;
         this.fullName = fullName;
-        this.semester = semester;
+        this.semester = (short) semester;
     }
 
     public UUID getId() {
@@ -126,7 +126,7 @@ public class StudentProfile {
     }
 
     public void setSemester(int semester) {
-        this.semester = semester;
+        this.semester = (short) semester;
     }
 
     public String getBio() {

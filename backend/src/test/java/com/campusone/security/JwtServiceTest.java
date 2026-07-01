@@ -75,6 +75,29 @@ class JwtServiceTest {
                 .isInstanceOf(ExpiredJwtException.class);
     }
 
+    @Test
+    void constructor_base64UrlOrRawSecret_reportsClearConfigurationError() {
+        properties.setSecret("not_a_standard_base64_secret");
+
+        assertThatThrownBy(() -> serviceAt(ISSUED_AT))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET is invalid")
+                .hasMessageContaining("standard Base64")
+                .hasMessageContaining("Base64URL");
+    }
+
+    @Test
+    void constructor_shortDecodedSecret_rejectsWeakHs256Key() {
+        properties.setSecret(Base64.getEncoder().encodeToString(
+                "too-short".getBytes(UTF_8)));
+
+        assertThatThrownBy(() -> serviceAt(ISSUED_AT))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET is too weak")
+                .hasMessageContaining("32 random bytes")
+                .hasMessageContaining("256 bits");
+    }
+
     private JwtService serviceAt(Instant instant) {
         return new JwtService(
                 properties,

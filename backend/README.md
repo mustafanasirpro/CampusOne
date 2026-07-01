@@ -34,9 +34,29 @@ The application reads its PostgreSQL connection exclusively from:
 
 JWT signing uses:
 
-- `JWT_SECRET`: Base64-encoded secret containing at least 32 random bytes
+- `JWT_SECRET`: standard Base64 encoding of at least 32 cryptographically
+  random bytes
 - `JWT_ISSUER`: optional; defaults to `campusone-backend`
 - `JWT_ACCESS_TOKEN_TTL`: optional; defaults to `15m`
+
+Generate a different JWT secret for every environment. PowerShell:
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+[Convert]::ToBase64String($bytes)
+```
+
+Or with OpenSSL:
+
+```shell
+openssl rand -base64 32
+```
+
+`JWT_SECRET` must use standard Base64. Raw passphrases and Base64URL values
+containing `_` or `-` are rejected at startup. The value in `.env.example` is
+public development data and must not be reused as a real secret.
 
 For local development, copy the names from `.env.example` into your shell or IDE
 run configuration. Do not commit real credentials.
@@ -47,7 +67,7 @@ PowerShell example:
 $env:DB_URL = "jdbc:postgresql://localhost:5432/campusone"
 $env:DB_USERNAME = "campusone"
 $env:DB_PASSWORD = "<your-local-password>"
-$env:JWT_SECRET = "<base64-encoded-32-byte-or-longer-secret>"
+$env:JWT_SECRET = "<generated-standard-base64-secret>"
 mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 

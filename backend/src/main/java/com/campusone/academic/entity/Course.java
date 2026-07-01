@@ -45,7 +45,7 @@ public class Course {
     @Min(1)
     @Max(8)
     @Column(name = "recommended_semester")
-    private Integer recommendedSemester;
+    private Short recommendedSemester;
 
     @Column(nullable = false)
     private boolean active = true;
@@ -88,11 +88,12 @@ public class Course {
     }
 
     public Integer getRecommendedSemester() {
-        return recommendedSemester;
+        return recommendedSemester == null ? null : recommendedSemester.intValue();
     }
 
     public void setRecommendedSemester(Integer recommendedSemester) {
-        this.recommendedSemester = recommendedSemester;
+        this.recommendedSemester =
+                recommendedSemester == null ? null : recommendedSemester.shortValue();
     }
 
     public boolean isActive() {

@@ -3,10 +3,10 @@ package com.campusone.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Date;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -21,6 +21,7 @@ public class JwtService {
     private static final String USER_ID_CLAIM = "userId";
     private static final String EMAIL_CLAIM = "email";
     private static final String ROLES_CLAIM = "roles";
+    private static final int MINIMUM_HS256_KEY_BYTES = 32;
 
     private final JwtProperties properties;
     private final Clock clock;
@@ -100,17 +101,27 @@ public class JwtService {
     }
 
     private SecretKey createSigningKey(String encodedSecret) {
+        if (encodedSecret == null || encodedSecret.isBlank()) {
+            throw new IllegalStateException(
+                    "JWT_SECRET is required and must contain a standard Base64-encoded key.");
+        }
+
+        byte[] keyBytes;
         try {
-            byte[] keyBytes = Decoders.BASE64.decode(encodedSecret);
-            if (keyBytes.length < 32) {
-                throw new IllegalStateException(
-                        "JWT_SECRET must decode to at least 32 bytes for HS256.");
-            }
-            return Keys.hmacShaKeyFor(keyBytes);
+            keyBytes = Base64.getDecoder().decode(encodedSecret.trim());
         } catch (IllegalArgumentException exception) {
             throw new IllegalStateException(
-                    "JWT_SECRET must be a valid Base64-encoded value.", exception);
+                    "JWT_SECRET is invalid. Expected standard Base64, not a raw string "
+                            + "or Base64URL value. Generate it from at least 32 random bytes.",
+                    exception);
         }
+
+        if (keyBytes.length < MINIMUM_HS256_KEY_BYTES) {
+            throw new IllegalStateException(
+                    "JWT_SECRET is too weak. Its decoded key must contain at least 32 random "
+                            + "bytes (256 bits) for HS256.");
+        }
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     private Set<String> readRoles(Object claimValue) {
