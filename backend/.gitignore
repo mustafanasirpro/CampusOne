@@ -3,4 +3,8 @@ target/
 .vscode/
 *.iml
 *.log
+logs/
 .env
+.pgdata/
+pgdata/
+postgres-data/
