@@ -55,16 +55,11 @@ public class RefreshTokenCookieFactory {
     }
 
     private ResponseCookie.ResponseCookieBuilder baseCookie(String value) {
-        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie
+        return ResponseCookie
                 .from(properties.getRefreshTokenCookieName(), value)
                 .httpOnly(true)
                 .secure(properties.isCookieSecure())
                 .sameSite(SAME_SITE)
                 .path(COOKIE_PATH);
-        if (properties.getCookieDomain() != null
-                && !properties.getCookieDomain().isBlank()) {
-            builder.domain(properties.getCookieDomain().trim());
-        }
-        return builder;
     }
 }

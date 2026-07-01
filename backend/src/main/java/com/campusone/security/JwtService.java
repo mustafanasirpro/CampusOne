@@ -1,6 +1,7 @@
 package com.campusone.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -21,6 +22,8 @@ public class JwtService {
     private static final String USER_ID_CLAIM = "userId";
     private static final String EMAIL_CLAIM = "email";
     private static final String ROLES_CLAIM = "roles";
+    private static final String TOKEN_TYPE_CLAIM = "tokenType";
+    private static final String ACCESS_TOKEN_TYPE = "access";
     private static final int MINIMUM_HS256_KEY_BYTES = 32;
 
     private final JwtProperties properties;
@@ -42,25 +45,38 @@ public class JwtService {
                 .type("JWT")
                 .and()
                 .issuer(properties.getIssuer())
+                .audience()
+                .add(properties.getAudience())
+                .and()
                 .subject(principal.getUserId().toString())
                 .issuedAt(Date.from(issuedAt))
                 .expiration(Date.from(expiresAt))
                 .claim(USER_ID_CLAIM, principal.getUserId().toString())
                 .claim(EMAIL_CLAIM, principal.getUsername())
                 .claim(ROLES_CLAIM, principal.getRoleNames().stream().sorted().toList())
+                .claim(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                 .signWith(signingKey, Jwts.SIG.HS256)
                 .compact();
     }
 
     public AccessTokenClaims parseAccessToken(String token) {
         try {
-            Claims claims = Jwts.parser()
+            Jws<Claims> parsedToken = Jwts.parser()
                     .clock(() -> Date.from(clock.instant()))
                     .verifyWith(signingKey)
                     .requireIssuer(properties.getIssuer())
+                    .requireAudience(properties.getAudience())
+                    .require(TOKEN_TYPE_CLAIM, ACCESS_TOKEN_TYPE)
                     .build()
-                    .parseSignedClaims(token)
-                    .getPayload();
+                    .parseSignedClaims(token);
+            if (!Jwts.SIG.HS256.getId().equals(
+                    parsedToken.getHeader().getAlgorithm())) {
+                throw new JwtException("JWT signing algorithm is invalid.");
+            }
+            if (!"JWT".equals(parsedToken.getHeader().getType())) {
+                throw new JwtException("JWT type is invalid.");
+            }
+            Claims claims = parsedToken.getPayload();
 
             UUID subject = UUID.fromString(claims.getSubject());
             UUID claimedUserId = UUID.fromString(claims.get(USER_ID_CLAIM, String.class));
@@ -93,6 +109,7 @@ public class JwtService {
             CampusOneUserPrincipal principal) {
         return claims.userId().equals(principal.getUserId())
                 && claims.email().equalsIgnoreCase(principal.getUsername())
+                && claims.roles().equals(principal.getRoleNames())
                 && principal.isEnabled();
     }
 

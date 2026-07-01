@@ -7,11 +7,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.campusone.user.entity.AccountStatus;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Base64;
+import java.util.Date;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +36,7 @@ class JwtServiceTest {
         properties.setSecret(Base64.getEncoder().encodeToString(
                 "0123456789abcdef0123456789abcdef".getBytes(UTF_8)));
         properties.setIssuer("campusone-backend-test");
+        properties.setAudience("campusone-api-test");
         properties.setAccessTokenTtl(Duration.ofMinutes(15));
         principal = new CampusOneUserPrincipal(
                 USER_ID,
@@ -73,6 +78,84 @@ class JwtServiceTest {
 
         assertThatThrownBy(() -> serviceAfterExpiry.parseAccessToken(token))
                 .isInstanceOf(ExpiredJwtException.class);
+    }
+
+    @Test
+    void parseAccessToken_wrongAudience_rejectsToken() {
+        String token = serviceAt(ISSUED_AT).generateAccessToken(principal);
+        properties.setAudience("another-api");
+
+        assertThatThrownBy(() -> serviceAt(ISSUED_AT).parseAccessToken(token))
+                .isInstanceOf(JwtException.class);
+    }
+
+    @Test
+    void parseAccessToken_nonHs256Algorithm_rejectsToken() {
+        byte[] keyBytes = "0123456789abcdef0123456789abcdef"
+                .repeat(2)
+                .getBytes(UTF_8);
+        properties.setSecret(Base64.getEncoder().encodeToString(keyBytes));
+        String token = Jwts.builder()
+                .header()
+                .type("JWT")
+                .and()
+                .issuer(properties.getIssuer())
+                .audience()
+                .add(properties.getAudience())
+                .and()
+                .subject(USER_ID.toString())
+                .issuedAt(Date.from(ISSUED_AT))
+                .expiration(Date.from(ISSUED_AT.plus(Duration.ofMinutes(15))))
+                .claim("userId", USER_ID.toString())
+                .claim("email", "ali.khan@example.com")
+                .claim("roles", List.of("STUDENT"))
+                .claim("tokenType", "access")
+                .signWith(Keys.hmacShaKeyFor(keyBytes), Jwts.SIG.HS512)
+                .compact();
+
+        assertThatThrownBy(() -> serviceAt(ISSUED_AT).parseAccessToken(token))
+                .isInstanceOf(JwtException.class);
+    }
+
+    @Test
+    void parseAccessToken_wrongHeaderType_rejectsToken() {
+        byte[] keyBytes = Base64.getDecoder().decode(properties.getSecret());
+        String token = Jwts.builder()
+                .header()
+                .type("refresh+jwt")
+                .and()
+                .issuer(properties.getIssuer())
+                .audience()
+                .add(properties.getAudience())
+                .and()
+                .subject(USER_ID.toString())
+                .issuedAt(Date.from(ISSUED_AT))
+                .expiration(Date.from(ISSUED_AT.plus(Duration.ofMinutes(15))))
+                .claim("userId", USER_ID.toString())
+                .claim("email", "ali.khan@example.com")
+                .claim("roles", List.of("STUDENT"))
+                .claim("tokenType", "access")
+                .signWith(Keys.hmacShaKeyFor(keyBytes), Jwts.SIG.HS256)
+                .compact();
+
+        assertThatThrownBy(() -> serviceAt(ISSUED_AT).parseAccessToken(token))
+                .isInstanceOf(JwtException.class)
+                .hasMessageContaining("type");
+    }
+
+    @Test
+    void isAccessTokenValid_rolesChanged_rejectsStaleToken() {
+        JwtService jwtService = serviceAt(ISSUED_AT);
+        AccessTokenClaims claims =
+                jwtService.parseAccessToken(jwtService.generateAccessToken(principal));
+        CampusOneUserPrincipal changedPrincipal = new CampusOneUserPrincipal(
+                USER_ID,
+                "ali.khan@example.com",
+                "$2a$12$encoded-password",
+                AccountStatus.ACTIVE,
+                Set.of("ADMIN"));
+
+        assertThat(jwtService.isAccessTokenValid(claims, changedPrincipal)).isFalse();
     }
 
     @Test

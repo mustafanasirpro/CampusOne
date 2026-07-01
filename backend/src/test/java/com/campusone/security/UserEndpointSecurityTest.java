@@ -2,6 +2,7 @@ package com.campusone.security;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.campusone.user.controller.UserController;
@@ -41,6 +42,8 @@ class UserEndpointSecurityTest {
     void getCurrentUser_withoutAuthentication_returnsUnauthorized() throws Exception {
         mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isUnauthorized())
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("X-Frame-Options", "DENY"))
                 .andExpect(jsonPath("$.code").value("AUTH_UNAUTHORIZED"))
                 .andExpect(jsonPath("$.message")
                         .value("Authentication is required to access this resource."));

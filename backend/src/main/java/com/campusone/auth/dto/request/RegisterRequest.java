@@ -1,6 +1,7 @@
 package com.campusone.auth.dto.request;
 
 import com.campusone.common.util.EmailNormalizer;
+import com.campusone.common.validation.Utf8ByteLength;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -22,6 +23,7 @@ public record RegisterRequest(
 
         @NotBlank
         @Size(min = 8, max = 72)
+        @Utf8ByteLength(max = 72)
         @Pattern(
                 regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$",
                 message = "must contain an uppercase letter, a lowercase letter, and a digit")

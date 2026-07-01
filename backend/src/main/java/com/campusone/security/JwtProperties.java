@@ -17,6 +17,9 @@ public class JwtProperties {
     @NotBlank
     private String issuer = "campusone-backend";
 
+    @NotBlank
+    private String audience = "campusone-api";
+
     @NotNull
     private Duration accessTokenTtl = Duration.ofMinutes(15);
 
@@ -41,6 +44,14 @@ public class JwtProperties {
 
     public void setIssuer(String issuer) {
         this.issuer = issuer;
+    }
+
+    public String getAudience() {
+        return audience;
+    }
+
+    public void setAudience(String audience) {
+        this.audience = audience;
     }
 
     public Duration getAccessTokenTtl() {

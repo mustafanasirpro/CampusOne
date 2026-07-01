@@ -18,6 +18,7 @@ import com.campusone.auth.dto.response.UserSummaryResponse;
 import com.campusone.auth.mapper.AuthMapper;
 import com.campusone.common.exception.DuplicateEmailException;
 import com.campusone.common.exception.InvalidAcademicSelectionException;
+import com.campusone.config.AuthSessionProperties;
 import com.campusone.security.CampusOneUserPrincipal;
 import com.campusone.security.JwtService;
 import com.campusone.user.entity.AccountStatus;
@@ -31,6 +32,10 @@ import com.campusone.user.repository.UserRepository;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -77,12 +82,20 @@ class AuthServiceTest {
     private RefreshTokenService refreshTokenService;
 
     private AuthService authService;
+    private Clock clock;
+    private AuthSessionProperties authSessionProperties;
     private University university;
     private Department department;
     private Role studentRole;
 
     @BeforeEach
     void setUp() {
+        clock = Clock.fixed(
+                Instant.parse("2026-07-01T12:00:00Z"),
+                ZoneOffset.UTC);
+        authSessionProperties = new AuthSessionProperties();
+        authSessionProperties.setMaxLoginAttempts(5);
+        authSessionProperties.setAccountLockDuration(Duration.ofMinutes(15));
         authService = new AuthService(
                 userRepository,
                 roleRepository,
@@ -92,7 +105,9 @@ class AuthServiceTest {
                 authenticationManager,
                 jwtService,
                 refreshTokenService,
-                new AuthMapper(new RoleMapper()));
+                new AuthMapper(new RoleMapper()),
+                authSessionProperties,
+                clock);
         university = new University("COMSATS University Islamabad", "COMSATS", "Islamabad");
         department = new Department(university, "Computer Science", "CS");
         studentRole = new Role(RoleName.STUDENT);
@@ -167,6 +182,10 @@ class AuthServiceTest {
                         null,
                         principal.getAuthorities());
         User user = userWithProfile();
+        user.recordFailedLogin(
+                clock.instant(),
+                5,
+                Duration.ofMinutes(15));
 
         when(authenticationManager.authenticate(any())).thenReturn(authentication);
         when(userRepository.findDetailedById(USER_ID)).thenReturn(Optional.of(user));
@@ -189,6 +208,8 @@ class AuthServiceTest {
         assertThat(result.refreshToken()).isEqualTo("A".repeat(43));
         assertThat(result.refreshTokenExpiresAt())
                 .isEqualTo(java.time.Instant.parse("2026-07-08T12:00:00Z"));
+        assertThat(user.getFailedLoginAttempts()).isZero();
+        assertThat(user.getLockedUntil()).isNull();
 
         ArgumentCaptor<UsernamePasswordAuthenticationToken> authenticationCaptor =
                 ArgumentCaptor.forClass(UsernamePasswordAuthenticationToken.class);
@@ -208,6 +229,26 @@ class AuthServiceTest {
 
         verify(jwtService, never()).generateAccessToken(any());
         verify(refreshTokenService, never()).issue(any());
+    }
+
+    @Test
+    void login_repeatedWrongPassword_locksKnownAccountTemporarily() {
+        User user = userWithProfile();
+        when(authenticationManager.authenticate(any()))
+                .thenThrow(new BadCredentialsException("Bad credentials"));
+        when(userRepository.findByEmailIgnoreCase("ali.khan@example.com"))
+                .thenReturn(Optional.of(user));
+
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertThatThrownBy(() -> authService.login(
+                    new LoginRequest("ali.khan@example.com", "WrongPass1")))
+                    .isInstanceOf(BadCredentialsException.class);
+        }
+
+        assertThat(user.getFailedLoginAttempts()).isEqualTo(5);
+        assertThat(user.getLockedUntil())
+                .isEqualTo(clock.instant().plus(Duration.ofMinutes(15)));
+        assertThat(user.isLoginLockedAt(clock.instant())).isTrue();
     }
 
     @Test

@@ -11,11 +11,23 @@ spring:
   flyway:
     enabled: false
 
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
 app:
   jwt:
     secret: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
     issuer: campusone-backend-test
+    audience: campusone-api-test
     access-token-ttl: 15m
   auth:
     refresh-token-ttl: 7d
     cookie-secure: false
+    max-login-attempts: 5
+    account-lock-duration: 15m
+  cors:
+    allowed-origins:
+      - http://localhost:5173

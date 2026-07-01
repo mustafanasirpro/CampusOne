@@ -13,6 +13,8 @@ model, Phase 2 authentication MVP, and Phase 3 refresh-token authentication:
 - BCrypt password storage with the CampusOne password policy
 - Stateless, 15-minute HS256 JWT access tokens
 - Hashed, PostgreSQL-backed refresh-token sessions with rotation
+- Persistent failed-login throttling and temporary account lockout
+- Exact-origin CORS and browser request-origin validation
 - Registration, login, refresh, logout, and authenticated current-user endpoints
 - Consistent validation, authentication, authorization, and API error responses
 
@@ -64,15 +66,26 @@ The application reads its PostgreSQL connection from:
 - `DB_USERNAME`
 - `DB_PASSWORD`
 
+Flyway defaults to the same values locally. Production can use a separate
+migration role by setting `FLYWAY_URL`, `FLYWAY_USERNAME`, and
+`FLYWAY_PASSWORD`, while keeping the runtime `DB_*` role limited to required
+DML privileges. Production JDBC URLs should require certificate-verified TLS,
+for example PostgreSQL `sslmode=verify-full`.
+
 JWT signing uses:
 
 - `JWT_SECRET`: standard Base64 encoding of at least 32 cryptographically
   random bytes
 - `JWT_ISSUER`: optional; defaults to `campusone-backend`
+- `JWT_AUDIENCE`: optional; defaults to `campusone-api`
 - `JWT_ACCESS_TOKEN_TTL`: optional; defaults to `15m`
 - `REFRESH_TOKEN_TTL_DAYS`: optional; defaults to `7`
 - `AUTH_COOKIE_SECURE`: defaults to `true`; set to `false` only for local HTTP
-- `AUTH_COOKIE_DOMAIN`: optional; blank creates a host-only cookie
+- `REFRESH_TOKEN_CLEANUP_INTERVAL`: optional; defaults to `24h`
+- `MAX_LOGIN_ATTEMPTS`: optional; defaults to `5`
+- `ACCOUNT_LOCK_MINUTES`: optional; defaults to `15`
+- `CORS_ALLOWED_ORIGINS`: required comma-separated exact frontend origins
+- `OPENAPI_ENABLED`: defaults to `false`; enable only in trusted environments
 
 Generate a different JWT secret for every environment. PowerShell:
 
@@ -140,15 +153,25 @@ $env:DB_URL = "jdbc:postgresql://localhost:5432/campusone"
 $env:DB_USERNAME = "campusone"
 $env:DB_PASSWORD = "<your-local-password>"
 $env:JWT_SECRET = "<generated-standard-base64-secret>"
+$env:JWT_AUDIENCE = "campusone-api"
 $env:REFRESH_TOKEN_TTL_DAYS = "7"
 $env:AUTH_COOKIE_SECURE = "false"
+$env:CORS_ALLOWED_ORIGINS = "http://localhost:5173"
+$env:OPENAPI_ENABLED = "true"
 mvn spring-boot:run
 ```
 
 Refresh tokens are never returned in JSON or stored in plaintext. Login places
 the opaque token in an HttpOnly, `SameSite=Strict` cookie scoped to
-`/api/v1/auth`; PostgreSQL stores only its SHA-256 hash. Set
+`/api/v1/auth`; the cookie is always host-only, and PostgreSQL stores only its
+SHA-256 hash. Set
 `AUTH_COOKIE_SECURE=true` in every HTTPS environment.
+
+Unsafe browser requests are accepted only from exact configured origins (or
+the API's own origin). This origin check complements the refresh cookie's
+`SameSite=Strict` policy. Wildcard CORS origins are intentionally rejected.
+Swagger and OpenAPI are disabled by default; production deployments should
+leave `OPENAPI_ENABLED=false`.
 
 ## Verification
 

@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -165,5 +166,39 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.code").value("AUTH_REFRESH_TOKEN_INVALID"))
                 .andExpect(jsonPath("$.message")
                         .value("The refresh token is missing, expired, revoked, or invalid."));
+    }
+
+    @Test
+    void login_malformedJson_returnsControlledBadRequest() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MALFORMED_REQUEST"));
+    }
+
+    @Test
+    void login_unsupportedContentType_returnsControlledResponse() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("email=ali.khan@example.com&password=SecurePass1"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"));
+    }
+
+    @Test
+    void login_untrustedBrowserOrigin_isRejectedBeforeAuthentication() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .header("Origin", "https://attacker.example")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "ali.khan@example.com",
+                                  "password": "SecurePass1"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+
+        verify(authService, never()).login(any());
     }
 }

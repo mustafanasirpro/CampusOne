@@ -23,7 +23,6 @@ class RefreshTokenCookieFactoryTest {
     void setUp() {
         AuthSessionProperties properties = new AuthSessionProperties();
         properties.setCookieSecure(true);
-        properties.setCookieDomain("campusone.example");
         cookieFactory = new RefreshTokenCookieFactory(
                 properties,
                 Clock.fixed(NOW, ZoneOffset.UTC));
@@ -41,7 +40,7 @@ class RefreshTokenCookieFactoryTest {
         assertThat(cookie.isSecure()).isTrue();
         assertThat(cookie.getSameSite()).isEqualTo("Strict");
         assertThat(cookie.getPath()).isEqualTo("/api/v1/auth");
-        assertThat(cookie.getDomain()).isEqualTo("campusone.example");
+        assertThat(cookie.getDomain()).isNull();
         assertThat(cookie.getMaxAge()).isEqualTo(Duration.ofDays(7));
     }
 

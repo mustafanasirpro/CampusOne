@@ -21,6 +21,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -74,6 +75,12 @@ public class User {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "failed_login_attempts", nullable = false)
+    private int failedLoginAttempts;
+
+    @Column(name = "locked_until")
+    private Instant lockedUntil;
+
     protected User() {
     }
 
@@ -108,6 +115,33 @@ public class User {
 
     public void removeRole(Role role) {
         roles.remove(role);
+    }
+
+    public void recordFailedLogin(
+            Instant now,
+            int maximumAttempts,
+            Duration lockDuration) {
+        if (isLoginLockedAt(now)) {
+            return;
+        }
+        if (lockedUntil != null) {
+            failedLoginAttempts = 0;
+            lockedUntil = null;
+        }
+
+        failedLoginAttempts++;
+        if (failedLoginAttempts >= maximumAttempts) {
+            lockedUntil = now.plus(lockDuration);
+        }
+    }
+
+    public void resetFailedLoginAttempts() {
+        failedLoginAttempts = 0;
+        lockedUntil = null;
+    }
+
+    public boolean isLoginLockedAt(Instant instant) {
+        return lockedUntil != null && lockedUntil.isAfter(instant);
     }
 
     public UUID getId() {
@@ -167,5 +201,13 @@ public class User {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    public int getFailedLoginAttempts() {
+        return failedLoginAttempts;
+    }
+
+    public Instant getLockedUntil() {
+        return lockedUntil;
     }
 }

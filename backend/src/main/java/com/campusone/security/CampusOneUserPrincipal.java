@@ -3,6 +3,7 @@ package com.campusone.security;
 import com.campusone.user.entity.AccountStatus;
 import com.campusone.user.entity.User;
 import java.io.Serial;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -24,6 +25,7 @@ public class CampusOneUserPrincipal implements UserDetails {
     private final AccountStatus accountStatus;
     private final Set<String> roleNames;
     private final List<GrantedAuthority> authorities;
+    private final Instant lockedUntil;
 
     public CampusOneUserPrincipal(
             UUID userId,
@@ -31,10 +33,21 @@ public class CampusOneUserPrincipal implements UserDetails {
             String passwordHash,
             AccountStatus accountStatus,
             Set<String> roleNames) {
+        this(userId, email, passwordHash, accountStatus, roleNames, null);
+    }
+
+    public CampusOneUserPrincipal(
+            UUID userId,
+            String email,
+            String passwordHash,
+            AccountStatus accountStatus,
+            Set<String> roleNames,
+            Instant lockedUntil) {
         this.userId = userId;
         this.email = email;
         this.passwordHash = passwordHash;
         this.accountStatus = accountStatus;
+        this.lockedUntil = lockedUntil;
         this.roleNames = roleNames.stream()
                 .sorted()
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
@@ -54,7 +67,8 @@ public class CampusOneUserPrincipal implements UserDetails {
                 user.getEmail(),
                 user.getPasswordHash(),
                 user.getAccountStatus(),
-                roles);
+                roles,
+                user.getLockedUntil());
     }
 
     public UUID getUserId() {
@@ -87,7 +101,7 @@ public class CampusOneUserPrincipal implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return lockedUntil == null || !lockedUntil.isAfter(Instant.now());
     }
 
     @Override

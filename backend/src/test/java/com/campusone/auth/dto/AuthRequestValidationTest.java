@@ -58,4 +58,19 @@ class AuthRequestValidationTest {
         assertThat(request.email()).isEqualTo("ali.khan@example.com");
         assertThat(request.password()).isEqualTo(" PasswordWithSpace1 ");
     }
+
+    @Test
+    void registerRequest_passwordOverBcryptUtf8Limit_failsValidation() {
+        RegisterRequest request = new RegisterRequest(
+                "Ali Khan",
+                "ali.khan@example.com",
+                "Secure1" + "é".repeat(33),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                4);
+
+        assertThat(validator.validate(request))
+                .anyMatch(violation -> violation.getPropertyPath().toString().equals("password")
+                        && violation.getMessage().contains("72 bytes"));
+    }
 }

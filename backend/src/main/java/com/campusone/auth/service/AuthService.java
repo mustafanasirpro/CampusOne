@@ -14,6 +14,7 @@ import com.campusone.common.exception.InvalidRefreshTokenException;
 import com.campusone.common.exception.InvalidAcademicSelectionException;
 import com.campusone.common.exception.ResourceNotFoundException;
 import com.campusone.common.util.EmailNormalizer;
+import com.campusone.config.AuthSessionProperties;
 import com.campusone.security.CampusOneUserPrincipal;
 import com.campusone.security.JwtService;
 import com.campusone.user.entity.AccountStatus;
@@ -23,15 +24,22 @@ import com.campusone.user.entity.StudentProfile;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.RoleRepository;
 import com.campusone.user.repository.UserRepository;
+import java.time.Clock;
+import java.time.Instant;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AuthService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -42,6 +50,8 @@ public class AuthService {
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
     private final AuthMapper authMapper;
+    private final AuthSessionProperties authSessionProperties;
+    private final Clock clock;
 
     public AuthService(
             UserRepository userRepository,
@@ -52,7 +62,9 @@ public class AuthService {
             AuthenticationManager authenticationManager,
             JwtService jwtService,
             RefreshTokenService refreshTokenService,
-            AuthMapper authMapper) {
+            AuthMapper authMapper,
+            AuthSessionProperties authSessionProperties,
+            Clock clock) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.universityRepository = universityRepository;
@@ -62,6 +74,8 @@ public class AuthService {
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
         this.authMapper = authMapper;
+        this.authSessionProperties = authSessionProperties;
+        this.clock = clock;
     }
 
     @Transactional
@@ -108,18 +122,26 @@ public class AuthService {
         return authMapper.toUserSummary(savedUser);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = AuthenticationException.class)
     public AuthenticationResult login(LoginRequest request) {
         String normalizedEmail = EmailNormalizer.normalize(request.email());
-        Authentication authentication = authenticationManager.authenticate(
-                UsernamePasswordAuthenticationToken.unauthenticated(
-                        normalizedEmail,
-                        request.password()));
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    UsernamePasswordAuthenticationToken.unauthenticated(
+                            normalizedEmail,
+                            request.password()));
+        } catch (AuthenticationException exception) {
+            recordFailedLogin(normalizedEmail);
+            throw exception;
+        }
         CampusOneUserPrincipal principal =
                 (CampusOneUserPrincipal) authentication.getPrincipal();
 
         User user = userRepository.findDetailedById(principal.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User"));
+        user.resetFailedLoginAttempts();
+        LOGGER.info("Authentication succeeded for user {}", user.getId());
         IssuedRefreshToken refreshToken = refreshTokenService.issue(user);
         return authenticationResult(principal, user, refreshToken);
     }
@@ -149,5 +171,24 @@ public class AuthService {
                 response,
                 refreshToken.token(),
                 refreshToken.expiresAt());
+    }
+
+    private void recordFailedLogin(String normalizedEmail) {
+        Instant now = clock.instant();
+        userRepository.findByEmailIgnoreCase(normalizedEmail)
+                .ifPresentOrElse(user -> {
+                    boolean alreadyLocked = user.isLoginLockedAt(now);
+                    user.recordFailedLogin(
+                            now,
+                            authSessionProperties.getMaxLoginAttempts(),
+                            authSessionProperties.getAccountLockDuration());
+                    if (!alreadyLocked && user.isLoginLockedAt(now)) {
+                        LOGGER.warn(
+                                "Account locked after repeated authentication failures for user {}",
+                                user.getId());
+                    } else {
+                        LOGGER.info("Authentication failed for user {}", user.getId());
+                    }
+                }, () -> LOGGER.info("Authentication failed for an unknown account"));
     }
 }

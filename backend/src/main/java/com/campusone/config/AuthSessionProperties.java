@@ -3,6 +3,7 @@ package com.campusone.config;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
@@ -19,13 +20,24 @@ public class AuthSessionProperties {
 
     private boolean cookieSecure = true;
 
-    private String cookieDomain;
+    @Positive
+    private int maxLoginAttempts = 5;
+
+    @NotNull
+    private Duration accountLockDuration = Duration.ofMinutes(15);
 
     @AssertTrue(message = "refresh token TTL must be greater than zero")
     public boolean isRefreshTokenTtlPositive() {
         return refreshTokenTtl != null
                 && !refreshTokenTtl.isZero()
                 && !refreshTokenTtl.isNegative();
+    }
+
+    @AssertTrue(message = "account lock duration must be greater than zero")
+    public boolean isAccountLockDurationPositive() {
+        return accountLockDuration != null
+                && !accountLockDuration.isZero()
+                && !accountLockDuration.isNegative();
     }
 
     public Duration getRefreshTokenTtl() {
@@ -52,11 +64,19 @@ public class AuthSessionProperties {
         this.cookieSecure = cookieSecure;
     }
 
-    public String getCookieDomain() {
-        return cookieDomain;
+    public int getMaxLoginAttempts() {
+        return maxLoginAttempts;
     }
 
-    public void setCookieDomain(String cookieDomain) {
-        this.cookieDomain = cookieDomain;
+    public void setMaxLoginAttempts(int maxLoginAttempts) {
+        this.maxLoginAttempts = maxLoginAttempts;
+    }
+
+    public Duration getAccountLockDuration() {
+        return accountLockDuration;
+    }
+
+    public void setAccountLockDuration(Duration accountLockDuration) {
+        this.accountLockDuration = accountLockDuration;
     }
 }
