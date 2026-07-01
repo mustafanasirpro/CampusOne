@@ -2,12 +2,18 @@
 
 Spring Boot foundation for the CampusOne university community platform.
 
-## Phase 0 scope
+## Current scope
 
-This phase contains application configuration, empty domain packages, temporary
-permit-all security, OpenAPI configuration, and one public health endpoint. It
-does not contain authentication, business modules, entities, repositories, or
-application database migrations.
+The backend currently contains the Phase 0 foundation and Phase 1 core domain
+model:
+
+- Users, roles, universities, departments, courses, and student profiles
+- PostgreSQL schema managed by Flyway
+- Repository interfaces, response DTOs, and manual mappers
+- Temporary permit-all security and one public health endpoint
+
+Authentication and CampusOne business modules are intentionally not implemented
+yet.
 
 ## Requirements
 

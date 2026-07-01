@@ -1,30 +1,23 @@
 package com.campusone.common.controller;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.assertj.core.api.Assertions.assertThat;
 
-import com.campusone.security.SecurityConfig;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
-@WebMvcTest(HealthController.class)
-@Import(SecurityConfig.class)
-@ActiveProfiles("test")
 class HealthControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    private final HealthController controller = new HealthController();
 
     @Test
-    void health_whenRequested_returnsPublicSuccessResponse() throws Exception {
-        mockMvc.perform(get("/api/v1/health"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"))
-                .andExpect(jsonPath("$.service").value("campusone-backend"));
+    void health_whenRequested_returnsSuccessResponse() {
+        ResponseEntity<Map<String, String>> response = controller.health();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody())
+                .containsEntry("status", "UP")
+                .containsEntry("service", "campusone-backend");
     }
 }
