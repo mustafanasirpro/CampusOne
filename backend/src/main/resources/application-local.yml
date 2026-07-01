@@ -3,6 +3,21 @@ spring:
     activate:
       on-profile: local
 
+springdoc:
+  api-docs:
+    enabled: ${OPENAPI_ENABLED:true}
+  swagger-ui:
+    enabled: ${OPENAPI_ENABLED:true}
+
+app:
+  auth:
+    # Local development uses HTTP. Production keeps the secure base default.
+    cookie-secure: ${AUTH_COOKIE_SECURE:false}
+  cors:
+    # This fallback exists only in the local profile. All other profiles must
+    # provide an explicit trusted-origin list.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
 logging:
   level:
     com.campusone: DEBUG

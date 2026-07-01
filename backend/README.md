@@ -85,7 +85,8 @@ JWT signing uses:
 - `REFRESH_TOKEN_CLEANUP_INTERVAL`: optional; defaults to `24h`
 - `MAX_LOGIN_ATTEMPTS`: optional; defaults to `5`
 - `ACCOUNT_LOCK_MINUTES`: optional; defaults to `15`
-- `CORS_ALLOWED_ORIGINS`: required comma-separated exact frontend origins
+- `CORS_ALLOWED_ORIGINS`: required comma-separated exact frontend origins in
+  production; the `local` profile defaults to `http://localhost:5173`
 - `OPENAPI_ENABLED`: defaults to `false`; enable only in trusted environments
 
 Generate a different JWT secret for every environment. PowerShell:
@@ -113,7 +114,9 @@ Spring Boot resolves operating-system environment variables automatically, but
 does not load `.env` files by default. CampusOne uses Spring Boot's native
 `spring.config.import` support to optionally load `backend/.env` as a properties
 file. Operating-system environment variables still take precedence over values
-from `.env`.
+from `.env`. The Maven `spring-boot:run` goal activates the `local` profile
+automatically. The example also sets `SPRING_PROFILES_ACTIVE=local` for IDE
+launches and direct local JAR execution.
 
 From the repository root:
 
@@ -129,6 +132,15 @@ Edit `.env` and replace:
   migrate that database.
 - `JWT_SECRET` with a newly generated Base64 secret. Never use the public
   example value outside local development.
+
+The local profile provides development-only defaults for:
+
+- `CORS_ALLOWED_ORIGINS=http://localhost:5173`
+- `AUTH_COOKIE_SECURE=false`
+- `OPENAPI_ENABLED=true`
+
+They are not packaged as production defaults. Without the `local` profile,
+startup still requires an explicit non-empty `CORS_ALLOWED_ORIGINS` value.
 
 For the default values in `.env.example`, PostgreSQL should have a database
 named `campusone` and a login named `campusone`. One possible setup from an
@@ -153,6 +165,7 @@ variables, set the same names there and do not create `.env`:
 $env:DB_URL = "jdbc:postgresql://localhost:5432/campusone"
 $env:DB_USERNAME = "campusone"
 $env:DB_PASSWORD = "<your-local-password>"
+$env:SPRING_PROFILES_ACTIVE = "local"
 $env:JWT_SECRET = "<generated-standard-base64-secret>"
 $env:JWT_AUDIENCE = "campusone-api"
 $env:REFRESH_TOKEN_TTL_DAYS = "7"
@@ -171,8 +184,9 @@ SHA-256 hash. Set
 Unsafe browser requests are accepted only from exact configured origins (or
 the API's own origin). This origin check complements the refresh cookie's
 `SameSite=Strict` policy. Wildcard CORS origins are intentionally rejected.
-Swagger and OpenAPI are disabled by default; production deployments should
-leave `OPENAPI_ENABLED=false`.
+Swagger and OpenAPI are enabled by default only in the local profile. Production
+deployments should leave `OPENAPI_ENABLED=false`, avoid the `local` profile, and
+set `CORS_ALLOWED_ORIGINS` explicitly.
 
 ## Verification
 

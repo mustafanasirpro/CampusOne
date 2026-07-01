@@ -1,6 +1,10 @@
 spring:
   application:
     name: campusone-backend
+  profiles:
+    # Allows the imported .env properties file to use the conventional
+    # environment-variable name. Maven's run goal overrides this with local.
+    active: ${SPRING_PROFILES_ACTIVE:}
   config:
     # Spring Boot does not load .env automatically. This extension hint treats
     # backend/.env as a standard properties file when running from /backend.
