@@ -109,6 +109,18 @@ public class GlobalExceptionHandler {
                 Map.of());
     }
 
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    ResponseEntity<ErrorResponse> handleInvalidRefreshToken(
+            InvalidRefreshTokenException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.UNAUTHORIZED,
+                "AUTH_REFRESH_TOKEN_INVALID",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ErrorResponse> handleAccessDenied(
             AccessDeniedException exception,

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.campusone.academic.repository.DepartmentRepository;
 import com.campusone.academic.repository.UniversityRepository;
+import com.campusone.auth.repository.RefreshTokenRepository;
 import com.campusone.user.repository.RoleRepository;
 import com.campusone.user.repository.UserRepository;
 import java.time.Clock;
@@ -28,6 +29,9 @@ class SecurityApplicationContextTest {
 
     @MockitoBean
     private DepartmentRepository departmentRepository;
+
+    @MockitoBean
+    private RefreshTokenRepository refreshTokenRepository;
 
     @Autowired
     private SecurityConfig securityConfig;

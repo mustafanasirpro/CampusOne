@@ -1,6 +1,7 @@
 package com.campusone.security;
 
 import com.campusone.user.entity.AccountStatus;
+import com.campusone.user.entity.User;
 import java.io.Serial;
 import java.util.Collection;
 import java.util.Comparator;
@@ -42,6 +43,18 @@ public class CampusOneUserPrincipal implements UserDetails {
                 .sorted(Comparator.comparing(GrantedAuthority::getAuthority))
                 .map(GrantedAuthority.class::cast)
                 .toList();
+    }
+
+    public static CampusOneUserPrincipal from(User user) {
+        Set<String> roles = user.getRoles().stream()
+                .map(role -> role.getName().name())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        return new CampusOneUserPrincipal(
+                user.getId(),
+                user.getEmail(),
+                user.getPasswordHash(),
+                user.getAccountStatus(),
+                roles);
     }
 
     public UUID getUserId() {

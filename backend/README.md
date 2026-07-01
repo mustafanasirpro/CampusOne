@@ -5,18 +5,19 @@ Spring Boot foundation for the CampusOne university community platform.
 ## Current scope
 
 The backend currently contains the Phase 0 foundation, Phase 1 core domain
-model, and Phase 2 authentication MVP:
+model, Phase 2 authentication MVP, and Phase 3 refresh-token authentication:
 
 - Users, roles, universities, departments, courses, and student profiles
 - PostgreSQL schema managed by Flyway
 - Repository interfaces, response DTOs, and manual mappers
 - BCrypt password storage with the CampusOne password policy
 - Stateless, 15-minute HS256 JWT access tokens
-- Registration, login, and authenticated current-user endpoints
+- Hashed, PostgreSQL-backed refresh-token sessions with rotation
+- Registration, login, refresh, logout, and authenticated current-user endpoints
 - Consistent validation, authentication, authorization, and API error responses
 
-Refresh tokens, logout, email verification, password recovery, and CampusOne
-business modules are intentionally not implemented yet.
+Email verification, password recovery, and CampusOne business modules are
+intentionally not implemented yet.
 
 ## Development Status
 
@@ -25,6 +26,7 @@ business modules are intentionally not implemented yet.
 - Backend Foundation (Phase 0)
 - Core Academic Domain (Phase 1)
 - Authentication & JWT (Phase 2)
+- Refresh Token Authentication (Phase 3)
 - Java 21 development environment
 - Maven build and test pipeline
 - JWT configuration validation
@@ -37,8 +39,7 @@ business modules are intentionally not implemented yet.
 
 ### 🔜 Upcoming
 
-- Refresh Token Authentication
-- Session Management
+- Multi-session management
 - Email Verification
 - Password Reset
 - Notes Module
@@ -69,6 +70,9 @@ JWT signing uses:
   random bytes
 - `JWT_ISSUER`: optional; defaults to `campusone-backend`
 - `JWT_ACCESS_TOKEN_TTL`: optional; defaults to `15m`
+- `REFRESH_TOKEN_TTL_DAYS`: optional; defaults to `7`
+- `AUTH_COOKIE_SECURE`: defaults to `true`; set to `false` only for local HTTP
+- `AUTH_COOKIE_DOMAIN`: optional; blank creates a host-only cookie
 
 Generate a different JWT secret for every environment. PowerShell:
 
@@ -136,8 +140,15 @@ $env:DB_URL = "jdbc:postgresql://localhost:5432/campusone"
 $env:DB_USERNAME = "campusone"
 $env:DB_PASSWORD = "<your-local-password>"
 $env:JWT_SECRET = "<generated-standard-base64-secret>"
+$env:REFRESH_TOKEN_TTL_DAYS = "7"
+$env:AUTH_COOKIE_SECURE = "false"
 mvn spring-boot:run
 ```
+
+Refresh tokens are never returned in JSON or stored in plaintext. Login places
+the opaque token in an HttpOnly, `SameSite=Strict` cookie scoped to
+`/api/v1/auth`; PostgreSQL stores only its SHA-256 hash. Set
+`AUTH_COOKIE_SECURE=true` in every HTTPS environment.
 
 ## Verification
 
@@ -150,6 +161,8 @@ mvn clean verify
 - Health: `GET http://localhost:8080/api/v1/health`
 - Register: `POST http://localhost:8080/api/v1/auth/register`
 - Login: `POST http://localhost:8080/api/v1/auth/login`
+- Refresh access token: `POST http://localhost:8080/api/v1/auth/refresh`
+- Logout current session: `POST http://localhost:8080/api/v1/auth/logout`
 - Current user: `GET http://localhost:8080/api/v1/users/me`
 - OpenAPI JSON: `http://localhost:8080/api/v1/openapi`
 - Swagger UI: `http://localhost:8080/api/v1/swagger-ui`

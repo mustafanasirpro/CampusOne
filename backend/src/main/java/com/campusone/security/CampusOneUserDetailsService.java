@@ -3,9 +3,7 @@ package com.campusone.security;
 import com.campusone.common.util.EmailNormalizer;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -37,14 +35,6 @@ public class CampusOneUserDetailsService implements UserDetailsService {
     }
 
     private CampusOneUserPrincipal toPrincipal(User user) {
-        Set<String> roles = user.getRoles().stream()
-                .map(role -> role.getName().name())
-                .collect(Collectors.toUnmodifiableSet());
-        return new CampusOneUserPrincipal(
-                user.getId(),
-                user.getEmail(),
-                user.getPasswordHash(),
-                user.getAccountStatus(),
-                roles);
+        return CampusOneUserPrincipal.from(user);
     }
 }

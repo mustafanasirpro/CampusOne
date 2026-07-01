@@ -1,5 +1,6 @@
 package com.campusone.security;
 
+import com.campusone.config.AuthSessionProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -18,7 +19,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableConfigurationProperties(JwtProperties.class)
+@EnableConfigurationProperties({JwtProperties.class, AuthSessionProperties.class})
 public class SecurityConfig {
 
     @Bean
@@ -41,7 +42,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/register",
-                                "/api/v1/auth/login")
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/refresh",
+                                "/api/v1/auth/logout")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/health")
                         .permitAll()

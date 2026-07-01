@@ -73,6 +73,9 @@ class AuthServiceTest {
     @Mock
     private JwtService jwtService;
 
+    @Mock
+    private RefreshTokenService refreshTokenService;
+
     private AuthService authService;
     private University university;
     private Department department;
@@ -88,6 +91,7 @@ class AuthServiceTest {
                 passwordEncoder,
                 authenticationManager,
                 jwtService,
+                refreshTokenService,
                 new AuthMapper(new RoleMapper()));
         university = new University("COMSATS University Islamabad", "COMSATS", "Islamabad");
         department = new Department(university, "Computer Science", "CS");
@@ -168,15 +172,23 @@ class AuthServiceTest {
         when(userRepository.findDetailedById(USER_ID)).thenReturn(Optional.of(user));
         when(jwtService.generateAccessToken(principal)).thenReturn("signed.jwt.token");
         when(jwtService.getAccessTokenTtlSeconds()).thenReturn(900L);
+        when(refreshTokenService.issue(user)).thenReturn(new IssuedRefreshToken(
+                "A".repeat(43),
+                java.time.Instant.parse("2026-07-08T12:00:00Z"),
+                user));
 
-        AuthResponse response = authService.login(
+        AuthenticationResult result = authService.login(
                 new LoginRequest("  ALI.KHAN@EXAMPLE.COM ", "SecurePass1"));
+        AuthResponse response = result.response();
 
         assertThat(response.accessToken()).isEqualTo("signed.jwt.token");
         assertThat(response.expiresIn()).isEqualTo(900);
         assertThat(response.user().fullName()).isEqualTo("Ali Khan");
         assertThat(response.user().email()).isEqualTo("ali.khan@example.com");
         assertThat(response.user().roles()).containsExactly("STUDENT");
+        assertThat(result.refreshToken()).isEqualTo("A".repeat(43));
+        assertThat(result.refreshTokenExpiresAt())
+                .isEqualTo(java.time.Instant.parse("2026-07-08T12:00:00Z"));
 
         ArgumentCaptor<UsernamePasswordAuthenticationToken> authenticationCaptor =
                 ArgumentCaptor.forClass(UsernamePasswordAuthenticationToken.class);
@@ -195,6 +207,33 @@ class AuthServiceTest {
                 .isInstanceOf(BadCredentialsException.class);
 
         verify(jwtService, never()).generateAccessToken(any());
+        verify(refreshTokenService, never()).issue(any());
+    }
+
+    @Test
+    void refresh_validSession_rotatesRefreshTokenAndIssuesAccessToken() {
+        User user = userWithProfile();
+        IssuedRefreshToken rotatedToken = new IssuedRefreshToken(
+                "B".repeat(43),
+                java.time.Instant.parse("2026-07-08T12:00:00Z"),
+                user);
+        when(refreshTokenService.rotate("A".repeat(43))).thenReturn(rotatedToken);
+        when(jwtService.generateAccessToken(any())).thenReturn("new.access.token");
+        when(jwtService.getAccessTokenTtlSeconds()).thenReturn(900L);
+
+        AuthenticationResult result = authService.refresh("A".repeat(43));
+
+        assertThat(result.response().accessToken()).isEqualTo("new.access.token");
+        assertThat(result.response().user().email()).isEqualTo("ali.khan@example.com");
+        assertThat(result.refreshToken()).isEqualTo("B".repeat(43));
+        verify(refreshTokenService).rotate("A".repeat(43));
+    }
+
+    @Test
+    void logout_currentSession_revokesOnlyPresentedRefreshToken() {
+        authService.logout("A".repeat(43));
+
+        verify(refreshTokenService).revoke("A".repeat(43));
     }
 
     private RegisterRequest registrationRequest() {

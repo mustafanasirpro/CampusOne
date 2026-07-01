@@ -10,6 +10,7 @@ import com.campusone.auth.dto.response.AuthResponse;
 import com.campusone.auth.dto.response.UserSummaryResponse;
 import com.campusone.auth.mapper.AuthMapper;
 import com.campusone.common.exception.DuplicateEmailException;
+import com.campusone.common.exception.InvalidRefreshTokenException;
 import com.campusone.common.exception.InvalidAcademicSelectionException;
 import com.campusone.common.exception.ResourceNotFoundException;
 import com.campusone.common.util.EmailNormalizer;
@@ -39,6 +40,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
     private final AuthMapper authMapper;
 
     public AuthService(
@@ -49,6 +51,7 @@ public class AuthService {
             PasswordEncoder passwordEncoder,
             AuthenticationManager authenticationManager,
             JwtService jwtService,
+            RefreshTokenService refreshTokenService,
             AuthMapper authMapper) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -57,6 +60,7 @@ public class AuthService {
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
         this.authMapper = authMapper;
     }
 
@@ -104,8 +108,8 @@ public class AuthService {
         return authMapper.toUserSummary(savedUser);
     }
 
-    @Transactional(readOnly = true)
-    public AuthResponse login(LoginRequest request) {
+    @Transactional
+    public AuthenticationResult login(LoginRequest request) {
         String normalizedEmail = EmailNormalizer.normalize(request.email());
         Authentication authentication = authenticationManager.authenticate(
                 UsernamePasswordAuthenticationToken.unauthenticated(
@@ -116,10 +120,34 @@ public class AuthService {
 
         User user = userRepository.findDetailedById(principal.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User"));
-        String accessToken = jwtService.generateAccessToken(principal);
-        return new AuthResponse(
-                accessToken,
+        IssuedRefreshToken refreshToken = refreshTokenService.issue(user);
+        return authenticationResult(principal, user, refreshToken);
+    }
+
+    @Transactional(noRollbackFor = InvalidRefreshTokenException.class)
+    public AuthenticationResult refresh(String rawRefreshToken) {
+        IssuedRefreshToken refreshToken = refreshTokenService.rotate(rawRefreshToken);
+        User user = refreshToken.user();
+        CampusOneUserPrincipal principal = CampusOneUserPrincipal.from(user);
+        return authenticationResult(principal, user, refreshToken);
+    }
+
+    @Transactional
+    public void logout(String rawRefreshToken) {
+        refreshTokenService.revoke(rawRefreshToken);
+    }
+
+    private AuthenticationResult authenticationResult(
+            CampusOneUserPrincipal principal,
+            User user,
+            IssuedRefreshToken refreshToken) {
+        AuthResponse response = new AuthResponse(
+                jwtService.generateAccessToken(principal),
                 jwtService.getAccessTokenTtlSeconds(),
                 authMapper.toUserSummary(user));
+        return new AuthenticationResult(
+                response,
+                refreshToken.token(),
+                refreshToken.expiresAt());
     }
 }

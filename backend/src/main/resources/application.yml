@@ -50,3 +50,8 @@ app:
     secret: ${JWT_SECRET:}
     issuer: ${JWT_ISSUER:campusone-backend}
     access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+  auth:
+    refresh-token-ttl: ${REFRESH_TOKEN_TTL_DAYS:7}d
+    refresh-token-cookie-name: campusone_refresh_token
+    cookie-secure: ${AUTH_COOKIE_SECURE:true}
+    cookie-domain: ${AUTH_COOKIE_DOMAIN:}
