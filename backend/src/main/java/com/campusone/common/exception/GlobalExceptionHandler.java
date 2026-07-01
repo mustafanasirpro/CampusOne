@@ -1,0 +1,172 @@
+package com.campusone.common.exception;
+
+import com.campusone.common.dto.ErrorResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ResponseEntity<ErrorResponse> handleValidation(
+            MethodArgumentNotValidException exception,
+            HttpServletRequest request) {
+        Map<String, List<String>> fieldErrors = new LinkedHashMap<>();
+        exception.getBindingResult().getFieldErrors().forEach(fieldError ->
+                fieldErrors.computeIfAbsent(fieldError.getField(), ignored -> new ArrayList<>())
+                        .add(fieldError.getDefaultMessage()));
+
+        return response(
+                HttpStatus.BAD_REQUEST,
+                "VALIDATION_FAILED",
+                "One or more fields are invalid.",
+                request,
+                fieldErrors);
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    ResponseEntity<ErrorResponse> handleConstraintViolation(
+            ConstraintViolationException exception,
+            HttpServletRequest request) {
+        Map<String, List<String>> fieldErrors = new LinkedHashMap<>();
+        exception.getConstraintViolations().forEach(violation ->
+                fieldErrors.computeIfAbsent(
+                                violation.getPropertyPath().toString(),
+                                ignored -> new ArrayList<>())
+                        .add(violation.getMessage()));
+
+        return response(
+                HttpStatus.BAD_REQUEST,
+                "VALIDATION_FAILED",
+                "One or more fields are invalid.",
+                request,
+                fieldErrors);
+    }
+
+    @ExceptionHandler(DuplicateEmailException.class)
+    ResponseEntity<ErrorResponse> handleDuplicateEmail(
+            DuplicateEmailException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.CONFLICT,
+                "AUTH_EMAIL_ALREADY_EXISTS",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    ResponseEntity<ErrorResponse> handleResourceNotFound(
+            ResourceNotFoundException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.NOT_FOUND,
+                "RESOURCE_NOT_FOUND",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(InvalidAcademicSelectionException.class)
+    ResponseEntity<ErrorResponse> handleInvalidAcademicSelection(
+            InvalidAcademicSelectionException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                "INVALID_ACADEMIC_SELECTION",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ErrorResponse> handleAuthentication(
+            AuthenticationException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.UNAUTHORIZED,
+                "AUTH_INVALID_CREDENTIALS",
+                "The email or password is incorrect.",
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<ErrorResponse> handleAccessDenied(
+            AccessDeniedException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.FORBIDDEN,
+                "ACCESS_DENIED",
+                "You do not have permission to perform this action.",
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<ErrorResponse> handleDataIntegrity(
+            DataIntegrityViolationException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.CONFLICT,
+                "RESOURCE_CONFLICT",
+                "The request conflicts with existing data.",
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ErrorResponse> handleUnexpected(
+            Exception exception,
+            HttpServletRequest request) {
+        LOGGER.error(
+                "Unexpected request failure at path {} with trace ID {}",
+                request.getRequestURI(),
+                request.getRequestId(),
+                exception);
+        return response(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "INTERNAL_ERROR",
+                "An unexpected error occurred.",
+                request,
+                Map.of());
+    }
+
+    private ResponseEntity<ErrorResponse> response(
+            HttpStatus status,
+            String code,
+            String message,
+            HttpServletRequest request,
+            Map<String, List<String>> fieldErrors) {
+        ErrorResponse body = new ErrorResponse(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                code,
+                message,
+                request.getRequestURI(),
+                request.getRequestId(),
+                fieldErrors);
+        return ResponseEntity.status(status)
+                .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                .body(body);
+    }
+}

@@ -38,3 +38,9 @@ springdoc:
     path: /api/v1/swagger-ui
     operations-sorter: method
     tags-sorter: alpha
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    issuer: ${JWT_ISSUER:campusone-backend}
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
