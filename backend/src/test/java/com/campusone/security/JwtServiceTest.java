@@ -87,6 +87,16 @@ class JwtServiceTest {
     }
 
     @Test
+    void constructor_missingSecret_reportsClearConfigurationError() {
+        properties.setSecret(" ");
+
+        assertThatThrownBy(() -> serviceAt(ISSUED_AT))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET is required")
+                .hasMessageContaining("standard Base64");
+    }
+
+    @Test
     void constructor_shortDecodedSecret_rejectsWeakHs256Key() {
         properties.setSecret(Base64.getEncoder().encodeToString(
                 "too-short".getBytes(UTF_8)));

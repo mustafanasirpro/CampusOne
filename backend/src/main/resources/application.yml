@@ -1,6 +1,10 @@
 spring:
   application:
     name: campusone-backend
+  config:
+    # Spring Boot does not load .env automatically. This extension hint treats
+    # backend/.env as a standard properties file when running from /backend.
+    import: optional:file:.env[.properties]
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
@@ -43,6 +47,6 @@ app:
   jwt:
     # Standard Base64 encoding of at least 32 cryptographically random bytes.
     # Raw text and Base64URL values are intentionally rejected at startup.
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:}
     issuer: ${JWT_ISSUER:campusone-backend}
     access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}

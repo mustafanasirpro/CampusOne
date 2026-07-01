@@ -11,7 +11,7 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "app.jwt")
 public class JwtProperties {
 
-    @NotBlank
+    @NotBlank(message = "JWT_SECRET is required and must contain a standard Base64-encoded key")
     private String secret;
 
     @NotBlank
