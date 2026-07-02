@@ -29,4 +29,4 @@ Examples:
 2. Implement one logical task.
 3. Run tests.
 4. Commit with a meaningful message.
-5. Push to Gij tHub.
+5. Push to Git Hub.

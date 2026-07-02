@@ -1,0 +1,278 @@
+package com.campusone.note.controller;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.campusone.academic.dto.response.CourseResponse;
+import com.campusone.note.dto.request.CreateNoteRequest;
+import com.campusone.note.dto.response.FileMetadataResponse;
+import com.campusone.note.dto.response.NoteDetailResponse;
+import com.campusone.note.dto.response.NotePageResponse;
+import com.campusone.note.dto.response.NoteUploaderResponse;
+import com.campusone.note.entity.FileAssetStatus;
+import com.campusone.note.entity.NoteFileType;
+import com.campusone.note.entity.NoteModerationStatus;
+import com.campusone.note.entity.NoteVisibility;
+import com.campusone.note.entity.StorageProvider;
+import com.campusone.note.service.NoteService;
+import com.campusone.security.CampusOneUserDetailsService;
+import com.campusone.security.CampusOneUserPrincipal;
+import com.campusone.security.JwtAuthenticationFilter;
+import com.campusone.security.JwtService;
+import com.campusone.security.RestAccessDeniedHandler;
+import com.campusone.security.RestAuthenticationEntryPoint;
+import com.campusone.security.SecurityConfig;
+import com.campusone.security.SecurityErrorResponseWriter;
+import com.campusone.user.entity.AccountStatus;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+@WebMvcTest(NoteController.class)
+@ActiveProfiles("test")
+@Import({
+    SecurityConfig.class,
+    JwtAuthenticationFilter.class,
+    RestAuthenticationEntryPoint.class,
+    RestAccessDeniedHandler.class,
+    SecurityErrorResponseWriter.class
+})
+class NoteControllerTest {
+
+    private static final UUID USER_ID = UUID.fromString(
+            "10000000-0000-4000-8000-000000000001");
+    private static final UUID NOTE_ID = UUID.fromString(
+            "20000000-0000-4000-8000-000000000001");
+    private static final UUID COURSE_ID = UUID.fromString(
+            "30000000-0000-4000-8000-000000000001");
+    private static final UUID DEPARTMENT_ID = UUID.fromString(
+            "40000000-0000-4000-8000-000000000001");
+    private static final Instant NOW = Instant.parse("2026-07-02T12:00:00Z");
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockitoBean
+    private NoteService noteService;
+
+    @MockitoBean
+    private JwtService jwtService;
+
+    @MockitoBean
+    private CampusOneUserDetailsService userDetailsService;
+
+    private UsernamePasswordAuthenticationToken authentication;
+    private NoteDetailResponse detailResponse;
+
+    @BeforeEach
+    void setUp() {
+        CampusOneUserPrincipal principal = new CampusOneUserPrincipal(
+                USER_ID,
+                "student@example.com",
+                "$2a$12$encoded-password",
+                AccountStatus.ACTIVE,
+                Set.of("STUDENT"));
+        authentication = UsernamePasswordAuthenticationToken.authenticated(
+                principal,
+                null,
+                principal.getAuthorities());
+        detailResponse = detailResponse();
+    }
+
+    @Test
+    void listPublicNotes_withoutAuthentication_isPublic() throws Exception {
+        when(noteService.listPublicNotes(
+                null,
+                null,
+                0,
+                20,
+                com.campusone.note.dto.request.NoteSort.NEWEST))
+                .thenReturn(new NotePageResponse(
+                        List.of(),
+                        0,
+                        20,
+                        0,
+                        0,
+                        true,
+                        true));
+
+        mockMvc.perform(get("/api/v1/notes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    void getNote_withoutAuthentication_passesAnonymousViewer() throws Exception {
+        when(noteService.getNote(NOTE_ID, null)).thenReturn(detailResponse);
+
+        mockMvc.perform(get("/api/v1/notes/{noteId}", NOTE_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(NOTE_ID.toString()));
+
+        verify(noteService).getNote(NOTE_ID, null);
+    }
+
+    @Test
+    void myNotes_withoutAuthentication_isUnauthorized() throws Exception {
+        mockMvc.perform(get("/api/v1/notes/my"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_UNAUTHORIZED"));
+    }
+
+    @Test
+    void createNote_withoutAuthentication_isUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/v1/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateJson()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_UNAUTHORIZED"));
+    }
+
+    @Test
+    void createNote_authenticatedValidRequest_returnsCreated() throws Exception {
+        when(noteService.createNote(eq(USER_ID), any(CreateNoteRequest.class)))
+                .thenReturn(detailResponse);
+
+        mockMvc.perform(post("/api/v1/notes")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateJson()))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(
+                        "Location",
+                        "/api/v1/notes/" + NOTE_ID))
+                .andExpect(jsonPath("$.moderationStatus").value("PENDING"));
+    }
+
+    @Test
+    void createNote_invalidRequest_returnsValidationErrors() throws Exception {
+        mockMvc.perform(post("/api/v1/notes")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "courseId": "%s",
+                                  "title": "Bad",
+                                  "description": "short",
+                                  "teacherName": "A",
+                                  "semester": 9,
+                                  "fileType": "PDF",
+                                  "tags": ["A"],
+                                  "file": {
+                                    "storageProvider": "MINIO",
+                                    "bucketName": "notes",
+                                    "objectKey": "notes/test.pdf",
+                                    "originalFilename": "test.pdf",
+                                    "mimeType": "application/pdf",
+                                    "sizeBytes": 0
+                                  }
+                                }
+                                """.formatted(COURSE_ID)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors.title").exists())
+                .andExpect(jsonPath("$.fieldErrors.semester").exists())
+                .andExpect(jsonPath("$.fieldErrors['file.sizeBytes']").exists());
+
+        verify(noteService, never())
+                .createNote(eq(USER_ID), any(CreateNoteRequest.class));
+    }
+
+    @Test
+    void updateNote_withoutAuthentication_isUnauthorized() throws Exception {
+        mockMvc.perform(patch("/api/v1/notes/{noteId}", NOTE_ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Updated OOP Notes\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private String validCreateJson() {
+        return """
+                {
+                  "courseId": "%s",
+                  "title": "Complete OOP Notes",
+                  "description": "Detailed object oriented programming lecture notes.",
+                  "teacherName": "Dr. Ahmed Khan",
+                  "semester": 4,
+                  "fileType": "PDF",
+                  "visibility": "PUBLIC",
+                  "tags": ["OOP", "Java"],
+                  "file": {
+                    "storageProvider": "MINIO",
+                    "bucketName": "campusone-notes",
+                    "objectKey": "notes/oop.pdf",
+                    "originalFilename": "oop-notes.pdf",
+                    "mimeType": "application/pdf",
+                    "sizeBytes": 4096,
+                    "checksumSha256": "%s"
+                  }
+                }
+                """.formatted(COURSE_ID, "a".repeat(64));
+    }
+
+    private NoteDetailResponse detailResponse() {
+        return new NoteDetailResponse(
+                NOTE_ID,
+                "Complete OOP Notes",
+                "Detailed object oriented programming lecture notes.",
+                "Dr. Ahmed Khan",
+                new CourseResponse(
+                        COURSE_ID,
+                        DEPARTMENT_ID,
+                        "CS-201",
+                        "Object Oriented Programming",
+                        4,
+                        true),
+                4,
+                NoteFileType.PDF,
+                NoteVisibility.PUBLIC,
+                NoteModerationStatus.PENDING,
+                null,
+                new NoteUploaderResponse(
+                        USER_ID,
+                        "Ali Khan",
+                        null,
+                        "COMSATS University Islamabad"),
+                new FileMetadataResponse(
+                        UUID.fromString(
+                                "50000000-0000-4000-8000-000000000001"),
+                        StorageProvider.MINIO,
+                        "oop-notes.pdf",
+                        "application/pdf",
+                        4096,
+                        FileAssetStatus.PENDING,
+                        NOW),
+                List.of(),
+                0,
+                new BigDecimal("0.00"),
+                0,
+                false,
+                null,
+                1,
+                NOW,
+                NOW,
+                null);
+    }
+}

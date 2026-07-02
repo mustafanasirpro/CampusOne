@@ -136,6 +136,18 @@ public class GlobalExceptionHandler {
                 Map.of());
     }
 
+    @ExceptionHandler(InvalidNoteStateException.class)
+    ResponseEntity<ErrorResponse> handleInvalidNoteState(
+            InvalidNoteStateException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.CONFLICT,
+                "INVALID_NOTE_STATE",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
     @ExceptionHandler(AuthenticationException.class)
     ResponseEntity<ErrorResponse> handleAuthentication(
             AuthenticationException exception,

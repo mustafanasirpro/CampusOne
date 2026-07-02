@@ -3,8 +3,17 @@ package com.campusone.security;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.campusone.academic.repository.DepartmentRepository;
+import com.campusone.academic.repository.CourseRepository;
 import com.campusone.academic.repository.UniversityRepository;
 import com.campusone.auth.repository.RefreshTokenRepository;
+import com.campusone.note.repository.FileAssetRepository;
+import com.campusone.note.repository.NoteBookmarkRepository;
+import com.campusone.note.repository.NoteDownloadEventRepository;
+import com.campusone.note.repository.NoteModerationActionRepository;
+import com.campusone.note.repository.NoteRatingRepository;
+import com.campusone.note.repository.NoteRepository;
+import com.campusone.note.repository.NoteVersionRepository;
+import com.campusone.note.repository.TagRepository;
 import com.campusone.user.repository.RoleRepository;
 import com.campusone.user.repository.SkillRepository;
 import com.campusone.user.repository.UserPreferenceRepository;
@@ -33,6 +42,9 @@ class SecurityApplicationContextTest {
     private DepartmentRepository departmentRepository;
 
     @MockitoBean
+    private CourseRepository courseRepository;
+
+    @MockitoBean
     private RefreshTokenRepository refreshTokenRepository;
 
     @MockitoBean
@@ -40,6 +52,30 @@ class SecurityApplicationContextTest {
 
     @MockitoBean
     private UserPreferenceRepository userPreferenceRepository;
+
+    @MockitoBean
+    private NoteRepository noteRepository;
+
+    @MockitoBean
+    private FileAssetRepository fileAssetRepository;
+
+    @MockitoBean
+    private TagRepository tagRepository;
+
+    @MockitoBean
+    private NoteVersionRepository noteVersionRepository;
+
+    @MockitoBean
+    private NoteRatingRepository noteRatingRepository;
+
+    @MockitoBean
+    private NoteBookmarkRepository noteBookmarkRepository;
+
+    @MockitoBean
+    private NoteDownloadEventRepository noteDownloadEventRepository;
+
+    @MockitoBean
+    private NoteModerationActionRepository noteModerationActionRepository;
 
     @Autowired
     private SecurityConfig securityConfig;
