@@ -1,8 +1,7 @@
 package com.campusone.security;
 
-import com.campusone.config.AuthSessionProperties;
-import com.campusone.config.CorsProperties;
 import java.util.List;
+
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -22,6 +21,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import com.campusone.config.AuthSessionProperties;
+import com.campusone.config.CorsProperties;
 
 @Configuration
 @EnableConfigurationProperties({
@@ -66,7 +68,16 @@ public class SecurityConfig {
                                 "/api/v1/notes",
                                 "/api/v1/notes/*")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/discussions/questions/my")
+                        .authenticated()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/discussions/questions",
+                                "/api/v1/discussions/questions/*",
+                                "/api/v1/discussions/questions/*/answers")
+                        .permitAll()
                         .requestMatchers(
+                                "/v3/api-docs/**",
                                 "/api/v1/openapi/**",
                                 "/api/v1/swagger-ui/**",
                                 "/swagger-ui/**",

@@ -119,6 +119,8 @@ CREATE INDEX idx_discussion_questions_created_at
     ON discussion_questions (created_at DESC);
 CREATE INDEX idx_discussion_questions_vote_score
     ON discussion_questions (vote_score DESC);
+CREATE INDEX idx_discussion_questions_answer_count
+    ON discussion_questions (answer_count DESC);
 CREATE INDEX idx_discussion_questions_deleted
     ON discussion_questions (deleted);
 CREATE INDEX idx_discussion_questions_accepted_answer_id
