@@ -30,3 +30,10 @@ Examples:
 3. Run tests.
 4. Commit with a meaningful message.
 5. Push to Git Hub.
+
+## Pull Request Guidelines
+
+- Keep pull requests focused on a single feature or fix.
+- Ensure all tests pass before submitting.
+- Use clear commit messages following the project conventions.
+- Update documentation when behavior or APIs change.
