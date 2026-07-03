@@ -76,6 +76,15 @@ public class SecurityConfig {
                                 "/api/v1/discussions/questions/*",
                                 "/api/v1/discussions/questions/*/answers")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/events/my",
+                                "/api/v1/events/joined",
+                                "/api/v1/events/*/participants/me")
+                        .authenticated()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/events",
+                                "/api/v1/events/*")
+                        .permitAll()
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/api/v1/openapi/**",
