@@ -85,6 +85,15 @@ public class SecurityConfig {
                                 "/api/v1/events",
                                 "/api/v1/events/*")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/internships/my",
+                                "/api/v1/internships/saved",
+                                "/api/v1/internships/*/save/me")
+                        .authenticated()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/internships",
+                                "/api/v1/internships/*")
+                        .permitAll()
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/api/v1/openapi/**",
