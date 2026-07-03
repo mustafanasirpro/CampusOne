@@ -94,6 +94,11 @@ public class SecurityConfig {
                                 "/api/v1/internships",
                                 "/api/v1/internships/*")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/search",
+                                "/api/v1/search/suggestions",
+                                "/api/v1/search/types")
+                        .permitAll()
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/api/v1/openapi/**",
