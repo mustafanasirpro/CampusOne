@@ -1,6 +1,7 @@
 package com.campusone.moderation.service;
 
 import com.campusone.common.exception.ResourceNotFoundException;
+import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.moderation.dto.request.CreateReportRequest;
 import com.campusone.moderation.dto.response.ContentReportDetailResponse;
 import com.campusone.moderation.dto.response.ContentReportPageResponse;
@@ -12,6 +13,7 @@ import com.campusone.moderation.entity.ReportStatus;
 import com.campusone.moderation.exception.DuplicateActiveReportException;
 import com.campusone.moderation.mapper.ModerationMapper;
 import com.campusone.moderation.repository.ContentReportRepository;
+import com.campusone.moderation.repository.ModeratorRepository;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.util.EnumSet;
@@ -33,15 +35,21 @@ public class ModerationReportService {
 
     private final ContentReportRepository reportRepository;
     private final UserRepository userRepository;
+    private final ModeratorRepository moderatorRepository;
     private final ModerationMapper moderationMapper;
+    private final CommunityIntegrationService integrationService;
 
     public ModerationReportService(
             ContentReportRepository reportRepository,
             UserRepository userRepository,
-            ModerationMapper moderationMapper) {
+            ModeratorRepository moderatorRepository,
+            ModerationMapper moderationMapper,
+            CommunityIntegrationService integrationService) {
         this.reportRepository = reportRepository;
         this.userRepository = userRepository;
+        this.moderatorRepository = moderatorRepository;
         this.moderationMapper = moderationMapper;
+        this.integrationService = integrationService;
     }
 
     @Transactional
@@ -66,8 +74,12 @@ public class ModerationReportService {
                 request.reason(),
                 request.details());
         try {
-            return moderationMapper.toReportDetail(
-                    reportRepository.saveAndFlush(report));
+            ContentReport savedReport = reportRepository.saveAndFlush(report);
+            integrationService.moderationReportCreated(
+                    userId,
+                    moderatorRepository.findActiveModeratorUserIds(),
+                    savedReport.getId());
+            return moderationMapper.toReportDetail(savedReport);
         } catch (DataIntegrityViolationException exception) {
             throw new DuplicateActiveReportException();
         }

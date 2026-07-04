@@ -1,6 +1,7 @@
 package com.campusone.moderation.service;
 
 import com.campusone.common.exception.ResourceNotFoundException;
+import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.moderation.dto.request.DismissReportRequest;
 import com.campusone.moderation.dto.request.ResolveReportRequest;
 import com.campusone.moderation.dto.response.ContentReportDetailResponse;
@@ -38,6 +39,7 @@ public class ModerationAdminService {
     private final ModeratorAuthorizationService authorizationService;
     private final ModerationMapper moderationMapper;
     private final ObjectMapper objectMapper;
+    private final CommunityIntegrationService integrationService;
     private final Clock clock;
 
     public ModerationAdminService(
@@ -46,12 +48,14 @@ public class ModerationAdminService {
             ModeratorAuthorizationService authorizationService,
             ModerationMapper moderationMapper,
             ObjectMapper objectMapper,
+            CommunityIntegrationService integrationService,
             Clock clock) {
         this.reportRepository = reportRepository;
         this.actionRepository = actionRepository;
         this.authorizationService = authorizationService;
         this.moderationMapper = moderationMapper;
         this.objectMapper = objectMapper;
+        this.integrationService = integrationService;
         this.clock = clock;
     }
 
@@ -155,6 +159,11 @@ public class ModerationAdminService {
                 request.resolutionNote(),
                 previousStatus,
                 ReportStatus.RESOLVED);
+        integrationService.moderationReportReviewed(
+                report.getReporter().getId(),
+                moderatorUserId,
+                reportId,
+                true);
         return moderationMapper.toReportDetail(report);
     }
 
@@ -187,6 +196,11 @@ public class ModerationAdminService {
                 request.resolutionNote(),
                 previousStatus,
                 ReportStatus.DISMISSED);
+        integrationService.moderationReportReviewed(
+                report.getReporter().getId(),
+                moderatorUserId,
+                reportId,
+                false);
         return moderationMapper.toReportDetail(report);
     }
 
