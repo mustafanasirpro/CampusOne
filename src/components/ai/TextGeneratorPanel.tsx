@@ -137,7 +137,11 @@ export function TextGeneratorPanel({ kind }: { kind: GeneratorKind }) {
               />
             ) : null}
             {error ? <ErrorMessage message={error} /> : null}
-            <Button className="w-fit" loading={isLoading} type="submit">
+            <Button
+              className="w-full sm:w-fit"
+              loading={isLoading}
+              type="submit"
+            >
               <WandSparkles className="size-4" />
               {config.button}
             </Button>
