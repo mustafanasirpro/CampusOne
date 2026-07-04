@@ -1,4 +1,5 @@
 import type { GlobalSearchType } from "@/types/search";
+import { formatDate } from "@/utils/format";
 
 export function searchTypeLabel(type: GlobalSearchType) {
   return {
@@ -11,8 +12,5 @@ export function searchTypeLabel(type: GlobalSearchType) {
 }
 
 export function formatSearchDate(value: string) {
-  return new Intl.DateTimeFormat("en-PK", {
-    dateStyle: "medium",
-  }).format(new Date(value));
+  return formatDate(value);
 }
-
