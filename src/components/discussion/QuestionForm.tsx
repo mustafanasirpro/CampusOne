@@ -225,7 +225,12 @@ export function QuestionForm(props: QuestionFormProps) {
       </Card>
 
       <div className="flex justify-end">
-        <Button loading={props.isSubmitting} size="lg" type="submit">
+        <Button
+          className="w-full sm:w-auto"
+          loading={props.isSubmitting}
+          size="lg"
+          type="submit"
+        >
           <Save className="size-4" />
           {props.isSubmitting ? "Saving question" : props.submitLabel}
         </Button>
@@ -233,4 +238,3 @@ export function QuestionForm(props: QuestionFormProps) {
     </form>
   );
 }
-
