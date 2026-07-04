@@ -1,6 +1,7 @@
 package com.campusone.discussion.service;
 
 import com.campusone.common.exception.ResourceNotFoundException;
+import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.discussion.dto.request.CreateAnswerRequest;
 import com.campusone.discussion.dto.request.CreateQuestionRequest;
 import com.campusone.discussion.dto.request.QuestionSort;
@@ -50,6 +51,7 @@ public class DiscussionService {
     private final DiscussionAnswerVoteRepository answerVoteRepository;
     private final UserRepository userRepository;
     private final DiscussionMapper discussionMapper;
+    private final CommunityIntegrationService integrationService;
 
     public DiscussionService(
             DiscussionQuestionRepository questionRepository,
@@ -57,13 +59,15 @@ public class DiscussionService {
             DiscussionQuestionVoteRepository questionVoteRepository,
             DiscussionAnswerVoteRepository answerVoteRepository,
             UserRepository userRepository,
-            DiscussionMapper discussionMapper) {
+            DiscussionMapper discussionMapper,
+            CommunityIntegrationService integrationService) {
         this.questionRepository = questionRepository;
         this.answerRepository = answerRepository;
         this.questionVoteRepository = questionVoteRepository;
         this.answerVoteRepository = answerVoteRepository;
         this.userRepository = userRepository;
         this.discussionMapper = discussionMapper;
+        this.integrationService = integrationService;
     }
 
     @Transactional
@@ -77,6 +81,7 @@ public class DiscussionService {
                         request.title(),
                         request.body(),
                         request.category()));
+        integrationService.discussionQuestionCreated(userId, question.getId());
         return discussionMapper.toQuestionDetail(
                 question,
                 null,
@@ -166,6 +171,11 @@ public class DiscussionService {
         DiscussionAnswer answer = answerRepository.save(
                 new DiscussionAnswer(question, author, request.body()));
         question.incrementAnswerCount();
+        integrationService.discussionAnswerCreated(
+                userId,
+                question.getAuthor().getId(),
+                questionId,
+                answer.getId());
         return discussionMapper.toAnswer(answer, null, true);
     }
 
@@ -338,6 +348,13 @@ public class DiscussionService {
             requireAnswerForUpdate(previousAcceptedAnswerId, questionId);
         }
         question.acceptAnswer(answer);
+        if (!answerId.equals(previousAcceptedAnswerId)) {
+            integrationService.discussionAnswerAccepted(
+                    answer.getAuthor().getId(),
+                    question.getAuthor().getId(),
+                    questionId,
+                    answerId);
+        }
         return toQuestionDetail(question, userId);
     }
 
