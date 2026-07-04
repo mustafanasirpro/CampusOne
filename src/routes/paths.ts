@@ -20,7 +20,15 @@ export const paths = {
   marketplaceEdit: (listingId: string) =>
     `/marketplace/${listingId}/edit`,
   internships: "/internships",
+  internshipNew: "/internships/new",
+  internshipDetail: (internshipId: string) =>
+    `/internships/${internshipId}`,
+  internshipEdit: (internshipId: string) =>
+    `/internships/${internshipId}/edit`,
   events: "/events",
+  eventNew: "/events/new",
+  eventDetail: (eventId: string) => `/events/${eventId}`,
+  eventEdit: (eventId: string) => `/events/${eventId}/edit`,
   notifications: "/notifications",
   search: "/search",
   leaderboard: "/leaderboard",
