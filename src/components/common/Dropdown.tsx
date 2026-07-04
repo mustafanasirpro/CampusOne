@@ -29,7 +29,7 @@ export function Dropdown({
       <span className="relative">
         <select
           className={cn(
-            "h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-400 focus:ring-4 focus:ring-brand-100",
+            "h-10 w-full appearance-none rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-9 text-sm text-slate-700 outline-none transition hover:border-slate-300 focus:border-brand-400 focus:ring-4 focus:ring-brand-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400",
             className,
           )}
           {...props}
@@ -49,4 +49,3 @@ export function Dropdown({
     </label>
   );
 }
-
