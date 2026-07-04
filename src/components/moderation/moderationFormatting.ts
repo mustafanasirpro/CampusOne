@@ -4,6 +4,7 @@ import type {
   ReportReason,
   ReportStatus,
 } from "@/types/moderation";
+import { formatDateTime } from "@/utils/format";
 
 export const moderationTargetOptions: Array<{
   label: string;
@@ -62,11 +63,7 @@ export const moderationActionOptions: Array<{
 ];
 
 export function formatModerationDate(value: string | null) {
-  if (!value) return "Not available";
-  return new Intl.DateTimeFormat("en-PK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value, "Not available");
 }
 
 export function shortModerationId(value: string) {
