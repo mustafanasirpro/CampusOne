@@ -9,8 +9,10 @@ export const paths = {
   marketplace: "/marketplace",
   internships: "/internships",
   events: "/events",
+  notifications: "/notifications",
+  search: "/search",
   leaderboard: "/leaderboard",
   assistant: "/ai-assistant",
+  admin: "/admin",
   settings: "/settings",
 } as const;
-
