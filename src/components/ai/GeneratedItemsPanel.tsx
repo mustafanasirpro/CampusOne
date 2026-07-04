@@ -103,6 +103,9 @@ export function GeneratedItemsPanel() {
     try {
       await deleteGeneratedItem(item.id);
       if (selected?.id === item.id) setSelected(null);
+      if (result?.content.length === 1 && page > 0) {
+        setPage((value) => Math.max(0, value - 1));
+      }
       setIsLoading(true);
       setRefreshKey((value) => value + 1);
       showToast({
@@ -258,4 +261,3 @@ export function GeneratedItemsPanel() {
     </div>
   );
 }
-
