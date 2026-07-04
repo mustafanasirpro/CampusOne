@@ -50,7 +50,7 @@ export function LoginPage() {
 
     if (!form.email.trim()) {
       nextErrors.email = "Enter your email address.";
-    } else if (!emailPattern.test(form.email)) {
+    } else if (!emailPattern.test(form.email.trim())) {
       nextErrors.email = "Enter a valid email address.";
     }
 
@@ -72,7 +72,8 @@ export function LoginPage() {
         password: form.password,
       });
       const destination =
-        locationState?.from?.startsWith("/") === true
+        locationState?.from?.startsWith("/") === true &&
+        !locationState.from.startsWith("//")
           ? locationState.from
           : paths.dashboard;
       navigate(destination, { replace: true });
