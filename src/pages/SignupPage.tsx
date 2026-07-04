@@ -1,13 +1,17 @@
 import {
   ArrowRight,
   Check,
+  GraduationCap,
   LockKeyhole,
   Mail,
+  School,
   UserRound,
 } from "lucide-react";
 import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 
-import { Button, useToast } from "@/components/common";
+import { useAuth } from "@/auth/useAuth";
+import { Button, ErrorMessage } from "@/components/common";
 import {
   CheckboxField,
   FormField,
@@ -21,36 +25,20 @@ import { useDocumentTitle } from "@/utils/useDocumentTitle";
 
 interface SignupForm {
   confirmPassword: string;
-  department: string;
+  departmentId: string;
   email: string;
   fullName: string;
   password: string;
   semester: string;
   terms: boolean;
-  university: string;
+  universityId: string;
 }
 
 type SignupErrors = Partial<Record<keyof SignupForm, string>>;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const universityOptions = [
-  { label: "Select your university", value: "", disabled: true },
-  { label: "COMSATS", value: "COMSATS" },
-  { label: "FAST", value: "FAST" },
-  { label: "NUST", value: "NUST" },
-  { label: "UET", value: "UET" },
-  { label: "PU", value: "PU" },
-  { label: "LUMS", value: "LUMS" },
-];
-
-const departmentOptions = [
-  { label: "Select your department", value: "", disabled: true },
-  { label: "Computer Science", value: "Computer Science" },
-  { label: "Software Engineering", value: "Software Engineering" },
-  { label: "AI", value: "AI" },
-  { label: "Data Science", value: "Data Science" },
-];
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const semesterOptions = [
   { label: "Select semester", value: "", disabled: true },
@@ -81,19 +69,19 @@ const strengthColors = [
 ];
 
 export function SignupPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState<SignupForm>({
     confirmPassword: "",
-    department: "",
+    departmentId: "",
     email: "",
     fullName: "",
     password: "",
     semester: "",
     terms: false,
-    university: "",
+    universityId: "",
   });
   const [errors, setErrors] = useState<SignupErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { showToast } = useToast();
+  const { authError, clearAuthError, isLoading, register } = useAuth();
   const passwordStrength = useMemo(
     () => getPasswordStrength(form.password),
     [form.password],
@@ -102,17 +90,19 @@ export function SignupPage() {
   useDocumentTitle("Create your account · CampusOne");
 
   const updateInput =
-    (field: "fullName" | "email" | "password" | "confirmPassword") =>
+    (
+      field:
+        | "fullName"
+        | "email"
+        | "password"
+        | "confirmPassword"
+        | "universityId"
+        | "departmentId",
+    ) =>
     (event: ChangeEvent<HTMLInputElement>) => {
       setForm((current) => ({ ...current, [field]: event.target.value }));
       setErrors((current) => ({ ...current, [field]: undefined }));
-    };
-
-  const updateSelect =
-    (field: "university" | "department" | "semester") =>
-    (event: ChangeEvent<HTMLSelectElement>) => {
-      setForm((current) => ({ ...current, [field]: event.target.value }));
-      setErrors((current) => ({ ...current, [field]: undefined }));
+      clearAuthError();
     };
 
   const validate = () => {
@@ -120,6 +110,8 @@ export function SignupPage() {
 
     if (form.fullName.trim().length < 2) {
       nextErrors.fullName = "Enter your full name.";
+    } else if (form.fullName.trim().length > 80) {
+      nextErrors.fullName = "Full name cannot exceed 80 characters.";
     }
 
     if (!form.email.trim()) {
@@ -130,11 +122,15 @@ export function SignupPage() {
 
     if (!form.password) {
       nextErrors.password = "Create a password.";
-    } else if (form.password.length < 8) {
-      nextErrors.password = "Use at least 8 characters.";
-    } else if (passwordStrength < 3) {
+    } else if (form.password.length < 8 || form.password.length > 72) {
+      nextErrors.password = "Use between 8 and 72 characters.";
+    } else if (
+      !/[a-z]/.test(form.password) ||
+      !/[A-Z]/.test(form.password) ||
+      !/\d/.test(form.password)
+    ) {
       nextErrors.password =
-        "Add uppercase, lowercase, a number, or a symbol.";
+        "Include an uppercase letter, a lowercase letter, and a number.";
     }
 
     if (!form.confirmPassword) {
@@ -143,11 +139,11 @@ export function SignupPage() {
       nextErrors.confirmPassword = "Passwords do not match.";
     }
 
-    if (!form.university) {
-      nextErrors.university = "Select your university.";
+    if (!uuidPattern.test(form.universityId.trim())) {
+      nextErrors.universityId = "Enter a valid university UUID.";
     }
-    if (!form.department) {
-      nextErrors.department = "Select your department.";
+    if (!uuidPattern.test(form.departmentId.trim())) {
+      nextErrors.departmentId = "Enter a valid department UUID.";
     }
     if (!form.semester) {
       nextErrors.semester = "Select your semester.";
@@ -160,20 +156,29 @@ export function SignupPage() {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!validate()) return;
 
-    setIsSubmitting(true);
-    window.setTimeout(() => {
-      setIsSubmitting(false);
-      showToast({
-        title: "Account details accepted",
-        message:
-          "Your CampusOne profile is ready for backend account creation.",
-        variant: "success",
+    try {
+      await register({
+        departmentId: form.departmentId.trim(),
+        email: form.email.trim(),
+        fullName: form.fullName.trim(),
+        password: form.password,
+        semester: Number(form.semester),
+        universityId: form.universityId.trim(),
       });
-    }, 600);
+      navigate(paths.login, {
+        replace: true,
+        state: {
+          accountCreated: true,
+          email: form.email.trim(),
+        },
+      });
+    } catch {
+      // AuthContext exposes a safe, user-facing error message.
+    }
   };
 
   return (
@@ -186,12 +191,15 @@ export function SignupPage() {
       title="Create your student account"
     >
       <form className="grid gap-5" noValidate onSubmit={handleSubmit}>
+        {authError ? <ErrorMessage message={authError} /> : null}
+
         <div className="grid gap-5 sm:grid-cols-2">
           <FormField
             autoComplete="name"
             error={errors.fullName}
             icon={<UserRound className="size-4" />}
             label="Full name"
+            maxLength={80}
             name="fullName"
             onChange={updateInput("fullName")}
             placeholder="Ali Khan"
@@ -203,6 +211,7 @@ export function SignupPage() {
             error={errors.email}
             icon={<Mail className="size-4" />}
             label="Email address"
+            maxLength={254}
             name="email"
             onChange={updateInput("email")}
             placeholder="you@university.edu.pk"
@@ -219,6 +228,7 @@ export function SignupPage() {
               error={errors.password}
               icon={<LockKeyhole className="size-4" />}
               label="Password"
+              maxLength={72}
               name="password"
               onChange={updateInput("password")}
               placeholder="Create a strong password"
@@ -252,7 +262,9 @@ export function SignupPage() {
                 >
                   {strengthLabels[passwordStrength]}
                 </span>
-                <span className="text-slate-400">8+ characters</span>
+                <span className="text-slate-400">
+                  Uppercase, lowercase, number
+                </span>
               </div>
             </div>
           </div>
@@ -262,6 +274,7 @@ export function SignupPage() {
             error={errors.confirmPassword}
             icon={<LockKeyhole className="size-4" />}
             label="Confirm password"
+            maxLength={72}
             name="confirmPassword"
             onChange={updateInput("confirmPassword")}
             placeholder="Repeat your password"
@@ -271,23 +284,29 @@ export function SignupPage() {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <SelectField
-            error={errors.university}
-            label="University"
-            name="university"
-            onChange={updateSelect("university")}
-            options={universityOptions}
+          <FormField
+            autoComplete="off"
+            error={errors.universityId}
+            hint="Use the UUID from the backend academic directory."
+            icon={<School className="size-4" />}
+            label="University ID"
+            name="universityId"
+            onChange={updateInput("universityId")}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             required
-            value={form.university}
+            value={form.universityId}
           />
-          <SelectField
-            error={errors.department}
-            label="Department"
-            name="department"
-            onChange={updateSelect("department")}
-            options={departmentOptions}
+          <FormField
+            autoComplete="off"
+            error={errors.departmentId}
+            hint="The department must belong to the selected university."
+            icon={<GraduationCap className="size-4" />}
+            label="Department ID"
+            name="departmentId"
+            onChange={updateInput("departmentId")}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
             required
-            value={form.department}
+            value={form.departmentId}
           />
         </div>
 
@@ -295,7 +314,17 @@ export function SignupPage() {
           error={errors.semester}
           label="Semester"
           name="semester"
-          onChange={updateSelect("semester")}
+          onChange={(event) => {
+            setForm((current) => ({
+              ...current,
+              semester: event.target.value,
+            }));
+            setErrors((current) => ({
+              ...current,
+              semester: undefined,
+            }));
+            clearAuthError();
+          }}
           options={semesterOptions}
           required
           value={form.semester}
@@ -327,14 +356,14 @@ export function SignupPage() {
           }}
         />
 
-        <Button className="w-full" loading={isSubmitting} size="lg" type="submit">
-          {isSubmitting ? "Creating account" : "Create account"}
-          {!isSubmitting ? <ArrowRight className="size-4" /> : null}
+        <Button className="w-full" loading={isLoading} size="lg" type="submit">
+          {isLoading ? "Creating account" : "Create account"}
+          {!isLoading ? <ArrowRight className="size-4" /> : null}
         </Button>
 
         <p className="flex items-center justify-center gap-1.5 text-xs text-slate-400">
           <Check className="size-3.5 text-emerald-500" />
-          Your student profile remains private until you publish it.
+          Registration creates your account; you will log in on the next step.
         </p>
       </form>
     </AuthPageShell>

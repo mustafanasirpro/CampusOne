@@ -1,12 +1,10 @@
 import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 import { useState, type ChangeEvent, type FormEvent } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
-import { Button, useToast } from "@/components/common";
-import {
-  CheckboxField,
-  FormField,
-  PasswordField,
-} from "@/components/forms";
+import { useAuth } from "@/auth/useAuth";
+import { Button, ErrorMessage } from "@/components/common";
+import { FormField, PasswordField } from "@/components/forms";
 import { AuthPageShell } from "@/components/layout";
 import { paths } from "@/routes/paths";
 import { useDocumentTitle } from "@/utils/useDocumentTitle";
@@ -14,7 +12,12 @@ import { useDocumentTitle } from "@/utils/useDocumentTitle";
 interface LoginForm {
   email: string;
   password: string;
-  remember: boolean;
+}
+
+interface LoginLocationState {
+  accountCreated?: boolean;
+  email?: string;
+  from?: string;
 }
 
 type LoginErrors = Partial<Record<keyof LoginForm, string>>;
@@ -22,22 +25,24 @@ type LoginErrors = Partial<Record<keyof LoginForm, string>>;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function LoginPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const locationState = location.state as LoginLocationState | null;
   const [form, setForm] = useState<LoginForm>({
-    email: "",
+    email: locationState?.email ?? "",
     password: "",
-    remember: false,
   });
   const [errors, setErrors] = useState<LoginErrors>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { showToast } = useToast();
+  const { authError, clearAuthError, isLoading, login } = useAuth();
 
   useDocumentTitle("Log in · CampusOne");
 
   const updateField =
-    (field: "email" | "password") =>
+    (field: keyof LoginForm) =>
     (event: ChangeEvent<HTMLInputElement>) => {
       setForm((current) => ({ ...current, [field]: event.target.value }));
       setErrors((current) => ({ ...current, [field]: undefined }));
+      clearAuthError();
     };
 
   const validate = () => {
@@ -51,28 +56,29 @@ export function LoginPage() {
 
     if (!form.password) {
       nextErrors.password = "Enter your password.";
-    } else if (form.password.length < 6) {
-      nextErrors.password = "Password must contain at least 6 characters.";
     }
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!validate()) return;
 
-    setIsSubmitting(true);
-    window.setTimeout(() => {
-      setIsSubmitting(false);
-      showToast({
-        title: "Welcome back",
-        message:
-          "Your details look good. Real authentication will be connected later.",
-        variant: "success",
+    try {
+      await login({
+        email: form.email.trim(),
+        password: form.password,
       });
-    }, 500);
+      const destination =
+        locationState?.from?.startsWith("/") === true
+          ? locationState.from
+          : paths.dashboard;
+      navigate(destination, { replace: true });
+    } catch {
+      // AuthContext exposes a safe, user-facing error message.
+    }
   };
 
   return (
@@ -85,6 +91,17 @@ export function LoginPage() {
       title="Log in to CampusOne"
     >
       <form className="grid gap-5" noValidate onSubmit={handleSubmit}>
+        {locationState?.accountCreated ? (
+          <div
+            className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-700"
+            role="status"
+          >
+            Account created successfully. Log in to enter CampusOne.
+          </div>
+        ) : null}
+
+        {authError ? <ErrorMessage message={authError} /> : null}
+
         <FormField
           autoComplete="email"
           error={errors.email}
@@ -110,68 +127,16 @@ export function LoginPage() {
           value={form.password}
         />
 
-        <div className="flex items-start justify-between gap-4">
-          <CheckboxField
-            checked={form.remember}
-            label="Remember me"
-            name="remember"
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                remember: event.target.checked,
-              }))
-            }
-          />
-          <button
-            className="shrink-0 text-sm font-semibold text-brand-700 transition hover:text-brand-800 hover:underline"
-            onClick={() =>
-              showToast({
-                title: "Password reset",
-                message:
-                  "Password recovery is a demo action until authentication is connected.",
-              })
-            }
-            type="button"
-          >
-            Forgot password?
-          </button>
-        </div>
-
-        <Button className="w-full" loading={isSubmitting} size="lg" type="submit">
-          Log in
-          {!isSubmitting ? <ArrowRight className="size-4" /> : null}
+        <Button className="w-full" loading={isLoading} size="lg" type="submit">
+          {isLoading ? "Logging in" : "Log in"}
+          {!isLoading ? <ArrowRight className="size-4" /> : null}
         </Button>
 
-        <div className="flex items-center gap-3">
-          <span className="h-px flex-1 bg-slate-200" />
-          <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
-            or continue with
-          </span>
-          <span className="h-px flex-1 bg-slate-200" />
-        </div>
-
-        <Button
-          className="w-full"
-          onClick={() =>
-            showToast({
-              title: "Google sign-in",
-              message:
-                "Google authentication will be available when the backend is connected.",
-            })
-          }
-          size="lg"
-          variant="outline"
-        >
-          <span
-            aria-hidden="true"
-            className="grid size-5 place-items-center rounded-full bg-white text-sm font-bold text-brand-600"
-          >
-            G
-          </span>
-          Continue with Google
-        </Button>
+        <p className="text-center text-xs leading-5 text-slate-400">
+          CampusOne uses a short-lived access token and a secure refresh
+          session managed by the backend.
+        </p>
       </form>
     </AuthPageShell>
   );
 }
-
