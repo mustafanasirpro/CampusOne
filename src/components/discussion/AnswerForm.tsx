@@ -65,7 +65,7 @@ export function AnswerForm({
         </span>
       </label>
       <Button
-        className="justify-self-end"
+        className="w-full sm:w-auto sm:justify-self-end"
         disabled={disabled}
         loading={isSubmitting}
         type="submit"
@@ -76,4 +76,3 @@ export function AnswerForm({
     </form>
   );
 }
-
