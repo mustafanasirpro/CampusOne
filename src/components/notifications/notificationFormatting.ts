@@ -1,4 +1,5 @@
 import type { NotificationType } from "@/types/notifications";
+import { formatDateTime } from "@/utils/format";
 
 export const notificationTypeOptions: Array<{
   label: string;
@@ -21,9 +22,5 @@ export function notificationTypeLabel(type: NotificationType) {
 }
 
 export function formatNotificationDate(value: string) {
-  return new Intl.DateTimeFormat("en-PK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value);
 }
-
