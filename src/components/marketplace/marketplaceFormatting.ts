@@ -3,6 +3,10 @@ import type {
   MarketplaceItemCondition,
   MarketplaceListingStatus,
 } from "@/types/marketplace";
+import {
+  formatCurrency,
+  formatDate,
+} from "@/utils/format";
 
 export const marketplaceCategoryOptions: Array<{
   label: string;
@@ -48,21 +52,9 @@ export function statusLabel(status: MarketplaceListingStatus) {
 }
 
 export function formatMarketplaceDate(value: string) {
-  return new Intl.DateTimeFormat("en-PK", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
+  return formatDate(value);
 }
 
 export function formatMarketplacePrice(price: number, currency: string) {
-  try {
-    return new Intl.NumberFormat("en-PK", {
-      currency,
-      maximumFractionDigits: 2,
-      style: "currency",
-    }).format(price);
-  } catch {
-    return `${currency} ${price.toLocaleString("en-PK")}`;
-  }
+  return formatCurrency(price, currency);
 }
