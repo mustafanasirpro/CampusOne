@@ -2,6 +2,7 @@ import type {
   GamificationActionType,
   LeaderboardPeriod,
 } from "@/types/gamification";
+import { formatDateTime } from "@/utils/format";
 
 export function leaderboardPeriodLabel(period: LeaderboardPeriod) {
   return {
@@ -20,9 +21,5 @@ export function gamificationActionLabel(action: GamificationActionType) {
 }
 
 export function formatGamificationDate(value: string) {
-  return new Intl.DateTimeFormat("en-PK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value);
 }
-
