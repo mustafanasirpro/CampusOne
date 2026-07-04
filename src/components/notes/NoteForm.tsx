@@ -220,11 +220,13 @@ export function NoteForm(props: NoteFormProps) {
         nextErrors.checksumSha256 =
           "Checksum must contain exactly 64 hexadecimal characters.";
       }
-      if (
-        form.expiresAt &&
-        new Date(form.expiresAt).getTime() <= Date.now()
-      ) {
-        nextErrors.expiresAt = "Expiry must be in the future.";
+      if (form.expiresAt) {
+        const expiresAt = new Date(form.expiresAt);
+        if (Number.isNaN(expiresAt.getTime())) {
+          nextErrors.expiresAt = "Choose a valid expiry date.";
+        } else if (expiresAt.getTime() <= Date.now()) {
+          nextErrors.expiresAt = "Expiry must be in the future.";
+        }
       }
     }
 
@@ -520,7 +522,12 @@ export function NoteForm(props: NoteFormProps) {
       )}
 
       <div className="flex justify-end">
-        <Button loading={props.isSubmitting} size="lg" type="submit">
+        <Button
+          className="w-full sm:w-auto"
+          loading={props.isSubmitting}
+          size="lg"
+          type="submit"
+        >
           <Save className="size-4" />
           {props.isSubmitting ? "Saving note" : props.submitLabel}
         </Button>
