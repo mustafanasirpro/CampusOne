@@ -30,6 +30,7 @@ import {
   NotificationCard,
   NotificationFilterBar,
 } from "@/components/notifications";
+import { paths } from "@/routes/paths";
 import type {
   NotificationItem,
   NotificationPage,
@@ -158,12 +159,13 @@ export function NotificationsPage() {
     }
     if (/^https?:\/\//i.test(notification.actionUrl)) {
       window.open(notification.actionUrl, "_blank", "noopener,noreferrer");
+    } else if (
+      notification.actionUrl.startsWith("/") &&
+      !notification.actionUrl.startsWith("//")
+    ) {
+      navigate(notification.actionUrl);
     } else {
-      navigate(
-        notification.actionUrl.startsWith("/")
-          ? notification.actionUrl
-          : `/${notification.actionUrl}`,
-      );
+      navigate(paths.notifications);
     }
   };
 
@@ -173,6 +175,10 @@ export function NotificationsPage() {
     setActionError(null);
     try {
       await deleteNotification(notification.id);
+      if (result?.content.length === 1 && page > 0) {
+        setPage((value) => Math.max(0, value - 1));
+        setIsLoading(true);
+      }
       setResult((current) =>
         current
           ? {
