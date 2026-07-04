@@ -1,4 +1,5 @@
 export * from "./AiAssistantPage";
+export * from "./AdminPage";
 export * from "./DashboardPage";
 export * from "./DiscussionsPage";
 export * from "./EventsPage";
@@ -9,7 +10,8 @@ export * from "./LoginPage";
 export * from "./MarketplacePage";
 export * from "./NotFoundPage";
 export * from "./NotesPage";
+export * from "./NotificationsPage";
 export * from "./ProfilePage";
 export * from "./SettingsPage";
 export * from "./SignupPage";
-
+export * from "./SearchPage";
