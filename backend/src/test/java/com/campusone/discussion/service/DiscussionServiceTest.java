@@ -1,5 +1,6 @@
 package com.campusone.discussion.service;
 
+import com.campusone.common.service.CommunityIntegrationService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -75,6 +76,9 @@ class DiscussionServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private CommunityIntegrationService integrationService;
+
     private DiscussionService discussionService;
     private User owner;
     private User otherUser;
@@ -93,7 +97,8 @@ class DiscussionServiceTest {
                 questionVoteRepository,
                 answerVoteRepository,
                 userRepository,
-                new DiscussionMapper());
+                new DiscussionMapper(),
+                integrationService);
 
         lenient().when(answerRepository.findVisibleByQuestionId(
                         any(UUID.class),
