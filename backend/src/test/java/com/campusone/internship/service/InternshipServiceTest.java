@@ -1,5 +1,6 @@
 package com.campusone.internship.service;
 
+import com.campusone.common.service.CommunityIntegrationService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -64,6 +65,9 @@ class InternshipServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private CommunityIntegrationService integrationService;
+
     private InternshipService internshipService;
     private User poster;
     private User student;
@@ -79,6 +83,7 @@ class InternshipServiceTest {
                 savedRepository,
                 userRepository,
                 new InternshipMapper(),
+                integrationService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         lenient().when(savedRepository.findSavedInternshipIds(
                         any(UUID.class),

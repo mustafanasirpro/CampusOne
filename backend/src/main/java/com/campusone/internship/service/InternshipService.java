@@ -1,5 +1,6 @@
 package com.campusone.internship.service;
 
+import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.common.exception.ResourceNotFoundException;
 import com.campusone.internship.dto.request.CreateInternshipRequest;
 import com.campusone.internship.dto.request.InternshipSort;
@@ -40,6 +41,7 @@ public class InternshipService {
     private final SavedInternshipRepository savedRepository;
     private final UserRepository userRepository;
     private final InternshipMapper internshipMapper;
+    private final CommunityIntegrationService integrationService;
     private final Clock clock;
 
     public InternshipService(
@@ -47,11 +49,13 @@ public class InternshipService {
             SavedInternshipRepository savedRepository,
             UserRepository userRepository,
             InternshipMapper internshipMapper,
+            CommunityIntegrationService integrationService,
             Clock clock) {
         this.internshipRepository = internshipRepository;
         this.savedRepository = savedRepository;
         this.userRepository = userRepository;
         this.internshipMapper = internshipMapper;
+        this.integrationService = integrationService;
         this.clock = clock;
     }
 
@@ -74,6 +78,7 @@ public class InternshipService {
                 request.currency(),
                 request.applyUrl(),
                 request.deadline()));
+        integrationService.internshipCreated(userId, internship.getId());
         return internshipMapper.toDetail(internship, false, true);
     }
 
