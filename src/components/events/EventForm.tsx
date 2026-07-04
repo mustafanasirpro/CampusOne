@@ -82,12 +82,18 @@ export function EventForm(props: EventFormProps) {
     if (form.location.trim().length < 2) {
       next.location = "Use at least 2 characters.";
     }
-    if (!form.startTime) next.startTime = "Choose a start time.";
-    if (!form.endTime) next.endTime = "Choose an end time.";
+    const startTime = new Date(form.startTime);
+    const endTime = new Date(form.endTime);
+    if (!form.startTime || Number.isNaN(startTime.getTime())) {
+      next.startTime = "Choose a valid start time.";
+    }
+    if (!form.endTime || Number.isNaN(endTime.getTime())) {
+      next.endTime = "Choose a valid end time.";
+    }
     if (
-      form.startTime &&
-      form.endTime &&
-      new Date(form.endTime) <= new Date(form.startTime)
+      !Number.isNaN(startTime.getTime()) &&
+      !Number.isNaN(endTime.getTime()) &&
+      endTime <= startTime
     ) {
       next.endTime = "End time must be after the start time.";
     }
@@ -259,7 +265,12 @@ export function EventForm(props: EventFormProps) {
         </CardContent>
       </Card>
       <div className="flex justify-end">
-        <Button loading={props.isSubmitting} size="lg" type="submit">
+        <Button
+          className="w-full sm:w-auto"
+          loading={props.isSubmitting}
+          size="lg"
+          type="submit"
+        >
           <Save className="size-4" />
           {props.isSubmitting ? "Saving event" : props.submitLabel}
         </Button>
