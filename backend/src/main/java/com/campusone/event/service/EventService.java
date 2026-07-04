@@ -1,6 +1,7 @@
 package com.campusone.event.service;
 
 import com.campusone.common.exception.ResourceNotFoundException;
+import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.event.dto.request.CreateEventRequest;
 import com.campusone.event.dto.request.EventSort;
 import com.campusone.event.dto.request.UpdateEventRequest;
@@ -23,6 +24,7 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -38,16 +40,19 @@ public class EventService {
     private final EventParticipantRepository participantRepository;
     private final UserRepository userRepository;
     private final EventMapper eventMapper;
+    private final CommunityIntegrationService integrationService;
 
     public EventService(
             CampusEventRepository eventRepository,
             EventParticipantRepository participantRepository,
             UserRepository userRepository,
-            EventMapper eventMapper) {
+            EventMapper eventMapper,
+            CommunityIntegrationService integrationService) {
         this.eventRepository = eventRepository;
         this.participantRepository = participantRepository;
         this.userRepository = userRepository;
         this.eventMapper = eventMapper;
+        this.integrationService = integrationService;
     }
 
     @Transactional
@@ -64,6 +69,7 @@ public class EventService {
                 request.endTime(),
                 request.capacity(),
                 request.visibility()));
+        integrationService.eventCreated(userId, event.getId());
         return eventMapper.toDetail(event, false, true);
     }
 
@@ -124,6 +130,8 @@ public class EventService {
         CampusEvent event = requireEventForUpdate(eventId);
         requireOrganizer(event, userId);
         validateUpdate(event, request);
+        boolean changed = hasMeaningfulChanges(event, request);
+        EventStatus previousStatus = event.getStatus();
         event.update(
                 request.title(),
                 request.description(),
@@ -133,6 +141,13 @@ public class EventService {
                 request.capacity(),
                 request.visibility(),
                 request.status());
+        if (changed) {
+            integrationService.eventUpdated(
+                    participantRepository.findParticipantUserIds(eventId),
+                    eventId,
+                    previousStatus != EventStatus.CANCELLED
+                            && event.getStatus() == EventStatus.CANCELLED);
+        }
         return toDetail(event, userId);
     }
 
@@ -166,6 +181,10 @@ public class EventService {
         EventParticipant participant = participantRepository.save(
                 new EventParticipant(event, user));
         event.incrementParticipantCount();
+        integrationService.eventJoined(
+                userId,
+                event.getOrganizer().getId(),
+                eventId);
         return eventMapper.toParticipant(
                 participant,
                 event.getParticipantCount());
@@ -276,6 +295,23 @@ public class EventService {
                     "EVENT_CAPACITY_BELOW_PARTICIPANTS",
                     "Capacity cannot be lower than the current participant count.");
         }
+    }
+
+    private boolean hasMeaningfulChanges(
+            CampusEvent event,
+            UpdateEventRequest request) {
+        return differs(request.title(), event.getTitle())
+                || differs(request.description(), event.getDescription())
+                || differs(request.location(), event.getLocation())
+                || differs(request.startTime(), event.getStartTime())
+                || differs(request.endTime(), event.getEndTime())
+                || differs(request.capacity(), event.getCapacity())
+                || differs(request.visibility(), event.getVisibility())
+                || differs(request.status(), event.getStatus());
+    }
+
+    private boolean differs(Object requested, Object current) {
+        return requested != null && !Objects.equals(requested, current);
     }
 
     private void validateJoin(CampusEvent event, UUID userId) {

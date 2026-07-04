@@ -1,5 +1,6 @@
 package com.campusone.event.service;
 
+import com.campusone.common.service.CommunityIntegrationService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -62,6 +63,9 @@ class EventServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private CommunityIntegrationService integrationService;
+
     private EventService eventService;
     private User organizer;
     private User attendee;
@@ -76,7 +80,8 @@ class EventServiceTest {
                 eventRepository,
                 participantRepository,
                 userRepository,
-                new EventMapper());
+                new EventMapper(),
+                integrationService);
         lenient().when(participantRepository.findJoinedEventIds(
                         any(UUID.class),
                         any()))
