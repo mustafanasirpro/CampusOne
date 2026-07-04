@@ -1,4 +1,5 @@
 import type { EventStatus } from "@/types/events";
+import { formatDateTime } from "@/utils/format";
 
 export function eventStatusLabel(status: EventStatus) {
   return {
@@ -9,10 +10,7 @@ export function eventStatusLabel(status: EventStatus) {
 }
 
 export function formatEventDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-PK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 export function toDateTimeInput(value: string) {
@@ -22,4 +20,3 @@ export function toDateTimeInput(value: string) {
   );
   return localDate.toISOString().slice(0, 16);
 }
-
