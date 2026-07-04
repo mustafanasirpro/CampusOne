@@ -1,10 +1,12 @@
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { useAuth } from "@/auth/useAuth";
 import { paths } from "@/routes/paths";
 import { useDocumentTitle } from "@/utils/useDocumentTitle";
 
 export function NotFoundPage() {
+  const { isAuthenticated } = useAuth();
   useDocumentTitle("Page not found · CampusOne");
 
   return (
@@ -21,10 +23,10 @@ export function NotFoundPage() {
         </p>
         <Link
           className="mt-6 inline-flex h-10 items-center gap-2 rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white hover:bg-brand-700"
-          to={paths.landing}
+          to={isAuthenticated ? paths.dashboard : paths.landing}
         >
           <ArrowLeft className="size-4" />
-          Back to CampusOne
+          {isAuthenticated ? "Back to dashboard" : "Back to CampusOne"}
         </Link>
       </div>
     </main>
