@@ -39,7 +39,7 @@ export function SelectField({
           aria-describedby={error ? messageId : undefined}
           aria-invalid={Boolean(error)}
           className={cn(
-            "h-11 w-full appearance-none rounded-xl border bg-white py-2 pl-3.5 pr-10 text-sm text-slate-950 outline-none transition hover:border-slate-300 focus:ring-4",
+            "h-11 w-full appearance-none rounded-xl border bg-white py-2 pl-3.5 pr-10 text-sm text-slate-950 outline-none transition hover:border-slate-300 focus:ring-4 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400",
             error
               ? "border-red-300 focus:border-red-400 focus:ring-red-100"
               : "border-slate-200 focus:border-brand-400 focus:ring-brand-100",
@@ -69,4 +69,3 @@ export function SelectField({
     </div>
   );
 }
-
