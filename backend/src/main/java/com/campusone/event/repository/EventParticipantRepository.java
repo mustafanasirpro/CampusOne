@@ -20,4 +20,12 @@ public interface EventParticipantRepository
     List<UUID> findJoinedEventIds(
             @Param("userId") UUID userId,
             @Param("eventIds") List<UUID> eventIds);
+
+    @Query("""
+            select participant.id.userId
+            from EventParticipant participant
+            where participant.id.eventId = :eventId
+            """)
+    List<UUID> findParticipantUserIds(
+            @Param("eventId") UUID eventId);
 }
