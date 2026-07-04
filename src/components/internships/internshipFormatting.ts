@@ -3,6 +3,10 @@ import type {
   InternshipType,
   InternshipWorkMode,
 } from "@/types/internships";
+import {
+  formatCurrency,
+  formatDateTime,
+} from "@/utils/format";
 
 export const internshipTypeOptions: Array<{
   label: string;
@@ -37,10 +41,7 @@ export function internshipStatusLabel(value: InternshipStatus) {
 }
 
 export function formatInternshipDeadline(value: string) {
-  return new Intl.DateTimeFormat("en-PK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value);
 }
 
 export function formatInternshipPay(
@@ -50,14 +51,5 @@ export function formatInternshipPay(
 ) {
   if (!paid) return "Unpaid";
   if (stipendAmount === null || !currency) return "Paid";
-  try {
-    return new Intl.NumberFormat("en-PK", {
-      currency,
-      maximumFractionDigits: 2,
-      style: "currency",
-    }).format(stipendAmount);
-  } catch {
-    return `${currency} ${stipendAmount.toLocaleString("en-PK")}`;
-  }
+  return formatCurrency(stipendAmount, currency);
 }
-
