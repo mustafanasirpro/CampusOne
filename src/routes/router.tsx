@@ -25,6 +25,21 @@ const NotesPage = lazy(async () => {
   return { default: module.NotesPage };
 });
 
+const NoteDetailPage = lazy(async () => {
+  const module = await import("@/pages/NoteDetailPage");
+  return { default: module.NoteDetailPage };
+});
+
+const CreateNotePage = lazy(async () => {
+  const module = await import("@/pages/CreateNotePage");
+  return { default: module.CreateNotePage };
+});
+
+const EditNotePage = lazy(async () => {
+  const module = await import("@/pages/EditNotePage");
+  return { default: module.EditNotePage };
+});
+
 const DiscussionsPage = lazy(async () => {
   const module = await import("@/pages/DiscussionsPage");
   return { default: module.DiscussionsPage };
@@ -118,6 +133,18 @@ export const router = createBrowserRouter([
           {
             path: paths.notes,
             element: lazyRoute(<NotesPage />, paths.notes),
+          },
+          {
+            path: paths.noteNew,
+            element: lazyRoute(<CreateNotePage />, paths.noteNew),
+          },
+          {
+            path: "/notes/:noteId/edit",
+            element: lazyRoute(<EditNotePage />, paths.notes),
+          },
+          {
+            path: "/notes/:noteId",
+            element: lazyRoute(<NoteDetailPage />, paths.notes),
           },
           {
             path: paths.discussions,
