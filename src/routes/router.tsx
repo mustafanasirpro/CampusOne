@@ -85,9 +85,39 @@ const InternshipsPage = lazy(async () => {
   return { default: module.InternshipsPage };
 });
 
+const InternshipDetailPage = lazy(async () => {
+  const module = await import("@/pages/InternshipDetailPage");
+  return { default: module.InternshipDetailPage };
+});
+
+const CreateInternshipPage = lazy(async () => {
+  const module = await import("@/pages/CreateInternshipPage");
+  return { default: module.CreateInternshipPage };
+});
+
+const EditInternshipPage = lazy(async () => {
+  const module = await import("@/pages/EditInternshipPage");
+  return { default: module.EditInternshipPage };
+});
+
 const EventsPage = lazy(async () => {
   const module = await import("@/pages/EventsPage");
   return { default: module.EventsPage };
+});
+
+const EventDetailPage = lazy(async () => {
+  const module = await import("@/pages/EventDetailPage");
+  return { default: module.EventDetailPage };
+});
+
+const CreateEventPage = lazy(async () => {
+  const module = await import("@/pages/CreateEventPage");
+  return { default: module.CreateEventPage };
+});
+
+const EditEventPage = lazy(async () => {
+  const module = await import("@/pages/EditEventPage");
+  return { default: module.EditEventPage };
 });
 
 const LeaderboardPage = lazy(async () => {
@@ -231,8 +261,41 @@ export const router = createBrowserRouter([
             element: lazyRoute(<InternshipsPage />, paths.internships),
           },
           {
+            path: paths.internshipNew,
+            element: lazyRoute(
+              <CreateInternshipPage />,
+              paths.internshipNew,
+            ),
+          },
+          {
+            path: "/internships/:internshipId/edit",
+            element: lazyRoute(
+              <EditInternshipPage />,
+              paths.internships,
+            ),
+          },
+          {
+            path: "/internships/:internshipId",
+            element: lazyRoute(
+              <InternshipDetailPage />,
+              paths.internships,
+            ),
+          },
+          {
             path: paths.events,
             element: lazyRoute(<EventsPage />, paths.events),
+          },
+          {
+            path: paths.eventNew,
+            element: lazyRoute(<CreateEventPage />, paths.eventNew),
+          },
+          {
+            path: "/events/:eventId/edit",
+            element: lazyRoute(<EditEventPage />, paths.events),
+          },
+          {
+            path: "/events/:eventId",
+            element: lazyRoute(<EventDetailPage />, paths.events),
           },
           {
             path: paths.notifications,
