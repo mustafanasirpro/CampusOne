@@ -1,5 +1,6 @@
 package com.campusone.moderation.service;
 
+import com.campusone.common.service.CommunityIntegrationService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -68,6 +69,9 @@ class ModerationAdminServiceTest {
     @Mock
     private ModeratorAuthorizationService authorizationService;
 
+    @Mock
+    private CommunityIntegrationService integrationService;
+
     private ModerationAdminService service;
     private User moderatorUser;
     private Moderator moderator;
@@ -95,6 +99,7 @@ class ModerationAdminServiceTest {
                 authorizationService,
                 new ModerationMapper(),
                 new ObjectMapper(),
+                integrationService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 

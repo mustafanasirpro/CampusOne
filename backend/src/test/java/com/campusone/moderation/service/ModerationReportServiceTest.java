@@ -1,5 +1,6 @@
 package com.campusone.moderation.service;
 
+import com.campusone.common.service.CommunityIntegrationService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -17,6 +18,7 @@ import com.campusone.moderation.entity.ReportStatus;
 import com.campusone.moderation.exception.DuplicateActiveReportException;
 import com.campusone.moderation.mapper.ModerationMapper;
 import com.campusone.moderation.repository.ContentReportRepository;
+import com.campusone.moderation.repository.ModeratorRepository;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.time.Instant;
@@ -53,6 +55,12 @@ class ModerationReportServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ModeratorRepository moderatorRepository;
+
+    @Mock
+    private CommunityIntegrationService integrationService;
+
     private ModerationReportService service;
     private User reporter;
     private ContentReport report;
@@ -64,7 +72,9 @@ class ModerationReportServiceTest {
         service = new ModerationReportService(
                 reportRepository,
                 userRepository,
-                new ModerationMapper());
+                moderatorRepository,
+                new ModerationMapper(),
+                integrationService);
     }
 
     @Test
