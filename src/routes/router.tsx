@@ -45,6 +45,21 @@ const DiscussionsPage = lazy(async () => {
   return { default: module.DiscussionsPage };
 });
 
+const DiscussionQuestionDetailPage = lazy(async () => {
+  const module = await import("@/pages/DiscussionQuestionDetailPage");
+  return { default: module.DiscussionQuestionDetailPage };
+});
+
+const CreateDiscussionQuestionPage = lazy(async () => {
+  const module = await import("@/pages/CreateDiscussionQuestionPage");
+  return { default: module.CreateDiscussionQuestionPage };
+});
+
+const EditDiscussionQuestionPage = lazy(async () => {
+  const module = await import("@/pages/EditDiscussionQuestionPage");
+  return { default: module.EditDiscussionQuestionPage };
+});
+
 const MarketplacePage = lazy(async () => {
   const module = await import("@/pages/MarketplacePage");
   return { default: module.MarketplacePage };
@@ -164,6 +179,27 @@ export const router = createBrowserRouter([
           {
             path: paths.discussions,
             element: lazyRoute(<DiscussionsPage />, paths.discussions),
+          },
+          {
+            path: paths.discussionQuestionNew,
+            element: lazyRoute(
+              <CreateDiscussionQuestionPage />,
+              paths.discussionQuestionNew,
+            ),
+          },
+          {
+            path: "/discussions/questions/:questionId/edit",
+            element: lazyRoute(
+              <EditDiscussionQuestionPage />,
+              paths.discussions,
+            ),
+          },
+          {
+            path: "/discussions/questions/:questionId",
+            element: lazyRoute(
+              <DiscussionQuestionDetailPage />,
+              paths.discussions,
+            ),
           },
           {
             path: paths.marketplace,
