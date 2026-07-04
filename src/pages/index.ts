@@ -1,6 +1,7 @@
 export * from "./AiAssistantPage";
 export * from "./AdminPage";
 export * from "./DashboardPage";
+export * from "./CreateNotePage";
 export * from "./DiscussionsPage";
 export * from "./EventsPage";
 export * from "./InternshipsPage";
@@ -10,6 +11,8 @@ export * from "./LoginPage";
 export * from "./MarketplacePage";
 export * from "./NotFoundPage";
 export * from "./NotesPage";
+export * from "./NoteDetailPage";
+export * from "./EditNotePage";
 export * from "./NotificationsPage";
 export * from "./ProfilePage";
 export * from "./SettingsPage";
