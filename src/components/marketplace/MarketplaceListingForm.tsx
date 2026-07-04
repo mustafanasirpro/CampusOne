@@ -453,7 +453,12 @@ export function MarketplaceListingForm(
       </Card>
 
       <div className="flex justify-end">
-        <Button loading={props.isSubmitting} size="lg" type="submit">
+        <Button
+          className="w-full sm:w-auto"
+          loading={props.isSubmitting}
+          size="lg"
+          type="submit"
+        >
           <Save className="size-4" />
           {props.isSubmitting ? "Saving listing" : props.submitLabel}
         </Button>
