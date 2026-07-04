@@ -1,11 +1,14 @@
 import {
   Bot,
+  Bell,
   BriefcaseBusiness,
   CalendarDays,
   FileText,
   Home,
   MessageSquareText,
+  Search,
   Settings,
+  ShieldCheck,
   ShoppingBag,
   Trophy,
   UserRound,
@@ -30,11 +33,13 @@ export const primaryNavigation: NavigationItem[] = [
     icon: BriefcaseBusiness,
   },
   { label: "Events", path: paths.events, icon: CalendarDays },
+  { label: "Notifications", path: paths.notifications, icon: Bell },
+  { label: "Search", path: paths.search, icon: Search },
   { label: "Leaderboard", path: paths.leaderboard, icon: Trophy },
   { label: "AI Assistant", path: paths.assistant, icon: Bot },
 ];
 
 export const secondaryNavigation: NavigationItem[] = [
+  { label: "Admin", path: paths.admin, icon: ShieldCheck },
   { label: "Settings", path: paths.settings, icon: Settings },
 ];
-
