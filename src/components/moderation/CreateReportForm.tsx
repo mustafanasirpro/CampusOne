@@ -126,7 +126,11 @@ export function CreateReportForm({
             </span>
           </label>
           {error ? <ErrorMessage message={error} /> : null}
-          <Button className="w-fit" loading={isSubmitting} type="submit">
+          <Button
+            className="w-full sm:w-fit"
+            loading={isSubmitting}
+            type="submit"
+          >
             Submit report
           </Button>
         </form>
