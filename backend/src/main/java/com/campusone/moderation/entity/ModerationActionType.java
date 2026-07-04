@@ -1,0 +1,14 @@
+package com.campusone.moderation.entity;
+
+public enum ModerationActionType {
+    REPORT_REVIEWED,
+    REPORT_RESOLVED,
+    REPORT_DISMISSED,
+    CONTENT_WARNING,
+    CONTENT_HIDDEN,
+    CONTENT_RESTORED,
+    USER_WARNING,
+    USER_RESTRICTED,
+    USER_RESTORED,
+    SYSTEM_NOTE
+}
