@@ -12,7 +12,7 @@ export function ErrorMessage({
   return (
     <div
       className={cn(
-        "flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700",
+        "min-w-0 break-words flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-3 text-sm text-red-700",
         className,
       )}
       role="alert"
