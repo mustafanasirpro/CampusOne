@@ -49,7 +49,7 @@ export function FormField({
           aria-invalid={Boolean(error)}
           className={cn(
             "h-11 w-full rounded-xl border bg-white px-3.5 text-sm text-slate-950 outline-none transition",
-            "placeholder:text-slate-400 hover:border-slate-300 focus:ring-4",
+            "placeholder:text-slate-400 hover:border-slate-300 focus:ring-4 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400",
             Boolean(icon) && "pl-10",
             Boolean(trailing) && "pr-11",
             error
