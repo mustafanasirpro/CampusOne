@@ -10,6 +10,10 @@ export const paths = {
   noteEdit: (noteId: string) => `/notes/${noteId}/edit`,
   discussions: "/discussions",
   marketplace: "/marketplace",
+  marketplaceNew: "/marketplace/new",
+  marketplaceDetail: (listingId: string) => `/marketplace/${listingId}`,
+  marketplaceEdit: (listingId: string) =>
+    `/marketplace/${listingId}/edit`,
   internships: "/internships",
   events: "/events",
   notifications: "/notifications",
