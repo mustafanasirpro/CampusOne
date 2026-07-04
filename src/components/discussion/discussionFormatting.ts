@@ -2,6 +2,7 @@ import type {
   DiscussionCategory,
   DiscussionQuestionStatus,
 } from "@/types/discussion";
+import { formatDate } from "@/utils/format";
 
 export const discussionCategoryOptions: Array<{
   label: string;
@@ -33,10 +34,5 @@ export function discussionStatusLabel(status: DiscussionQuestionStatus) {
 }
 
 export function formatDiscussionDate(value: string) {
-  return new Intl.DateTimeFormat("en-PK", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
+  return formatDate(value);
 }
-
