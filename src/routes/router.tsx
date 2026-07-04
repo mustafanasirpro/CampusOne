@@ -50,6 +50,21 @@ const MarketplacePage = lazy(async () => {
   return { default: module.MarketplacePage };
 });
 
+const MarketplaceListingDetailPage = lazy(async () => {
+  const module = await import("@/pages/MarketplaceListingDetailPage");
+  return { default: module.MarketplaceListingDetailPage };
+});
+
+const CreateMarketplaceListingPage = lazy(async () => {
+  const module = await import("@/pages/CreateMarketplaceListingPage");
+  return { default: module.CreateMarketplaceListingPage };
+});
+
+const EditMarketplaceListingPage = lazy(async () => {
+  const module = await import("@/pages/EditMarketplaceListingPage");
+  return { default: module.EditMarketplaceListingPage };
+});
+
 const InternshipsPage = lazy(async () => {
   const module = await import("@/pages/InternshipsPage");
   return { default: module.InternshipsPage };
@@ -153,6 +168,27 @@ export const router = createBrowserRouter([
           {
             path: paths.marketplace,
             element: lazyRoute(<MarketplacePage />, paths.marketplace),
+          },
+          {
+            path: paths.marketplaceNew,
+            element: lazyRoute(
+              <CreateMarketplaceListingPage />,
+              paths.marketplaceNew,
+            ),
+          },
+          {
+            path: "/marketplace/:listingId/edit",
+            element: lazyRoute(
+              <EditMarketplaceListingPage />,
+              paths.marketplace,
+            ),
+          },
+          {
+            path: "/marketplace/:listingId",
+            element: lazyRoute(
+              <MarketplaceListingDetailPage />,
+              paths.marketplace,
+            ),
           },
           {
             path: paths.internships,
