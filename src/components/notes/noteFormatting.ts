@@ -2,13 +2,10 @@ import type {
   NoteModerationStatus,
   NoteVisibility,
 } from "@/types/notes";
+import { formatDate } from "@/utils/format";
 
 export function formatNoteDate(value: string) {
-  return new Intl.DateTimeFormat("en-PK", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
+  return formatDate(value);
 }
 
 export function formatFileSize(bytes: number) {
