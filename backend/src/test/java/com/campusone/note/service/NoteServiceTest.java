@@ -14,6 +14,7 @@ import com.campusone.academic.entity.Department;
 import com.campusone.academic.entity.University;
 import com.campusone.academic.mapper.CourseMapper;
 import com.campusone.academic.repository.CourseRepository;
+import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.common.exception.ResourceNotFoundException;
 import com.campusone.note.dto.request.CreateNoteRequest;
 import com.campusone.note.dto.request.FileMetadataRequest;
@@ -110,6 +111,9 @@ class NoteServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private CommunityIntegrationService integrationService;
+
     private NoteService noteService;
     private User owner;
     private User otherUser;
@@ -131,9 +135,10 @@ class NoteServiceTest {
                 courseRepository,
                 userRepository,
                 new NoteMapper(
-                        new CourseMapper(),
-                        new FileAssetMapper(),
-                        new TagMapper()),
+                         new CourseMapper(),
+                         new FileAssetMapper(),
+                         new TagMapper()),
+                integrationService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         University university = new University(

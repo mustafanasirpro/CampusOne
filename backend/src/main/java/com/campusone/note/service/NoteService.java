@@ -4,6 +4,7 @@ import com.campusone.academic.entity.Course;
 import com.campusone.academic.repository.CourseRepository;
 import com.campusone.common.exception.InvalidNoteStateException;
 import com.campusone.common.exception.ResourceNotFoundException;
+import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.note.dto.request.CreateNoteRequest;
 import com.campusone.note.dto.request.FileMetadataRequest;
 import com.campusone.note.dto.request.NoteSort;
@@ -72,6 +73,7 @@ public class NoteService {
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final NoteMapper noteMapper;
+    private final CommunityIntegrationService integrationService;
     private final Clock clock;
 
     public NoteService(
@@ -86,6 +88,7 @@ public class NoteService {
             CourseRepository courseRepository,
             UserRepository userRepository,
             NoteMapper noteMapper,
+            CommunityIntegrationService integrationService,
             Clock clock) {
         this.noteRepository = noteRepository;
         this.fileAssetRepository = fileAssetRepository;
@@ -98,6 +101,7 @@ public class NoteService {
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.noteMapper = noteMapper;
+        this.integrationService = integrationService;
         this.clock = clock;
     }
 
@@ -128,6 +132,7 @@ public class NoteService {
         noteVersionRepository.save(NoteVersion.initial(savedNote));
         noteModerationActionRepository.save(
                 NoteModerationAction.submitted(savedNote, null));
+        integrationService.noteCreated(userId, savedNote.getId());
         return noteMapper.toDetail(savedNote, false, null);
     }
 
@@ -258,6 +263,10 @@ public class NoteService {
             rating.updateRating(newRating);
         }
         note.applyRating(previousRating, newRating);
+        integrationService.noteRated(
+                note.getUploader().getId(),
+                userId,
+                noteId);
 
         return new RatingResponse(
                 noteId,
@@ -284,6 +293,10 @@ public class NoteService {
                         sha256(requestFingerprint),
                         sha256(userAgent)));
         note.recordDownload();
+        integrationService.noteDownloaded(
+                note.getUploader().getId(),
+                userId,
+                noteId);
         return new DownloadEventResponse(
                 event.getId(),
                 noteId,
