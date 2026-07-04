@@ -1,5 +1,6 @@
 package com.campusone.marketplace.service;
 
+import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.common.exception.ResourceNotFoundException;
 import com.campusone.marketplace.dto.request.CreateMarketplaceListingRequest;
 import com.campusone.marketplace.dto.request.MarketplaceImageRequest;
@@ -31,16 +32,19 @@ public class MarketplaceListingService {
     private final MarketplaceListingRepository listingRepository;
     private final UserRepository userRepository;
     private final MarketplaceListingMapper listingMapper;
+    private final CommunityIntegrationService integrationService;
     private final Clock clock;
 
     public MarketplaceListingService(
             MarketplaceListingRepository listingRepository,
             UserRepository userRepository,
             MarketplaceListingMapper listingMapper,
+            CommunityIntegrationService integrationService,
             Clock clock) {
         this.listingRepository = listingRepository;
         this.userRepository = userRepository;
         this.listingMapper = listingMapper;
+        this.integrationService = integrationService;
         this.clock = clock;
     }
 
@@ -58,7 +62,11 @@ public class MarketplaceListingService {
                 request.currency(),
                 request.condition());
         replaceImages(listing, request.images());
-        return listingMapper.toDetail(listingRepository.save(listing));
+        MarketplaceListing savedListing = listingRepository.save(listing);
+        integrationService.marketplaceListingCreated(
+                userId,
+                savedListing.getId());
+        return listingMapper.toDetail(savedListing);
     }
 
     @Transactional(readOnly = true)

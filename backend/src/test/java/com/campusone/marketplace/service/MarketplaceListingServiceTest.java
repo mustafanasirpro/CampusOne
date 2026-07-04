@@ -1,5 +1,6 @@
 package com.campusone.marketplace.service;
 
+import com.campusone.common.service.CommunityIntegrationService;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -54,6 +55,9 @@ class MarketplaceListingServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private CommunityIntegrationService integrationService;
+
     private MarketplaceListingService listingService;
     private User owner;
     private MarketplaceListing listing;
@@ -66,6 +70,7 @@ class MarketplaceListingServiceTest {
                 listingRepository,
                 userRepository,
                 new MarketplaceListingMapper(),
+                integrationService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
