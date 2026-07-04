@@ -18,7 +18,7 @@ export interface SidebarProps {
 
 export function Sidebar({ className, onNavigate }: SidebarProps) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { isLoading, logout } = useAuth();
   const { showToast } = useToast();
 
   const handleLogout = async () => {
@@ -127,11 +127,12 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
       <div className="border-t border-slate-100 p-4">
         <Button
           className="w-full justify-start"
+          loading={isLoading}
           onClick={() => void handleLogout()}
           variant="ghost"
         >
           <LogOut className="size-[19px]" />
-          Log out
+          {isLoading ? "Logging out" : "Log out"}
         </Button>
       </div>
     </aside>
