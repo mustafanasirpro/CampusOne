@@ -3,6 +3,7 @@ import type {
   AiSessionMode,
   AiUsageFeature,
 } from "@/types/ai";
+import { formatDateTime } from "@/utils/format";
 
 export const aiSessionModeOptions: Array<{
   label: string;
@@ -41,9 +42,5 @@ export function aiFeatureLabel(feature: AiUsageFeature) {
 }
 
 export function formatAiDate(value: string) {
-  return new Intl.DateTimeFormat("en-PK", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value);
 }
-
