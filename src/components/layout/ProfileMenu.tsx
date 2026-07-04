@@ -16,7 +16,7 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { currentUser, logout } = useAuth();
+  const { currentUser, isLoading, logout } = useAuth();
   const { showToast } = useToast();
   const displayName = currentUser?.fullName || "CampusOne student";
   const roleLabel = currentUser?.roles.includes("ADMIN")
@@ -128,13 +128,14 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
           </div>
           <div className="border-t border-slate-100 pt-1.5">
             <button
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
+              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-wait disabled:opacity-50"
+              disabled={isLoading}
               onClick={() => void handleLogout()}
               role="menuitem"
               type="button"
             >
               <LogOut className="size-4" />
-              Log out
+              {isLoading ? "Logging out" : "Log out"}
             </button>
           </div>
         </div>
