@@ -32,7 +32,7 @@ export const paths = {
   notifications: "/notifications",
   search: "/search",
   leaderboard: "/leaderboard",
-  assistant: "/ai-assistant",
+  assistant: "/ai",
   admin: "/admin",
   settings: "/settings",
 } as const;
