@@ -70,12 +70,17 @@ export function ExplainConceptPanel() {
               />
             </label>
             {error ? <ErrorMessage message={error} /> : null}
-            <div className="flex gap-2">
-              <Button loading={isLoading} type="submit">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                className="w-full sm:w-auto"
+                loading={isLoading}
+                type="submit"
+              >
                 <WandSparkles className="size-4" />
                 Explain concept
               </Button>
               <Button
+                className="w-full sm:w-auto"
                 onClick={() => {
                   setConcept("");
                   setContext("");
@@ -114,4 +119,3 @@ export function ExplainConceptPanel() {
     </div>
   );
 }
-
