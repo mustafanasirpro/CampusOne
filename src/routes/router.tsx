@@ -317,6 +317,10 @@ export const router = createBrowserRouter([
             element: lazyRoute(<AiAssistantPage />, paths.assistant),
           },
           {
+            path: "/ai-assistant",
+            element: <Navigate replace to={paths.assistant} />,
+          },
+          {
             path: paths.admin,
             element: lazyRoute(<AdminPage />, paths.admin),
           },
