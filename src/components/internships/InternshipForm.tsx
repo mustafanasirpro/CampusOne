@@ -105,14 +105,15 @@ export function InternshipForm(props: InternshipFormProps) {
     if (!/^https?:\/\/\S+$/i.test(form.applyUrl.trim())) {
       next.applyUrl = "Enter a complete HTTP or HTTPS application URL.";
     }
-    if (!form.deadline) {
-      next.deadline = "Choose an application deadline.";
+    const deadline = new Date(form.deadline);
+    if (!form.deadline || Number.isNaN(deadline.getTime())) {
+      next.deadline = "Choose a valid application deadline.";
     } else {
       const changedDeadline =
         props.mode === "create" ||
         new Date(form.deadline).getTime() !==
           new Date(props.initialInternship.deadline).getTime();
-      if (changedDeadline && new Date(form.deadline) <= new Date()) {
+      if (changedDeadline && deadline <= new Date()) {
         next.deadline = "The application deadline must be in the future.";
       }
     }
@@ -325,7 +326,12 @@ export function InternshipForm(props: InternshipFormProps) {
         </CardContent>
       </Card>
       <div className="flex justify-end">
-        <Button loading={props.isSubmitting} size="lg" type="submit">
+        <Button
+          className="w-full sm:w-auto"
+          loading={props.isSubmitting}
+          size="lg"
+          type="submit"
+        >
           <Save className="size-4" />
           {props.isSubmitting ? "Saving internship" : props.submitLabel}
         </Button>
