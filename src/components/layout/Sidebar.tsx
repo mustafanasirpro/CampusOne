@@ -1,6 +1,7 @@
 import { LogOut } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 
+import { useAuth } from "@/auth/useAuth";
 import { Button, useToast } from "@/components/common";
 import { CampusOneLogo } from "@/components/layout/CampusOneLogo";
 import {
@@ -16,14 +17,19 @@ export interface SidebarProps {
 }
 
 export function Sidebar({ className, onNavigate }: SidebarProps) {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const { showToast } = useToast();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     onNavigate?.();
+    await logout();
     showToast({
-      message: "Authentication will be connected in a later phase.",
-      title: "Demo session",
+      message: "Your CampusOne session has ended.",
+      title: "Logged out",
+      variant: "success",
     });
+    navigate(paths.login, { replace: true });
   };
 
   return (
@@ -121,7 +127,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
       <div className="border-t border-slate-100 p-4">
         <Button
           className="w-full justify-start"
-          onClick={handleLogout}
+          onClick={() => void handleLogout()}
           variant="ghost"
         >
           <LogOut className="size-[19px]" />

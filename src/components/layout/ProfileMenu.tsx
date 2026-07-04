@@ -5,8 +5,9 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
+import { useAuth } from "@/auth/useAuth";
 import { Avatar, useToast } from "@/components/common";
 import { paths } from "@/routes/paths";
 import { cn } from "@/utils/cn";
@@ -14,7 +15,15 @@ import { cn } from "@/utils/cn";
 export function ProfileMenu({ compact = false }: { compact?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
   const { showToast } = useToast();
+  const displayName = currentUser?.fullName || "CampusOne student";
+  const roleLabel = currentUser?.roles.includes("ADMIN")
+    ? "Administrator"
+    : currentUser?.roles.includes("MODERATOR")
+      ? "Moderator"
+      : "Student";
 
   useEffect(() => {
     if (!isOpen) return;
@@ -39,6 +48,17 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
     };
   }, [isOpen]);
 
+  const handleLogout = async () => {
+    setIsOpen(false);
+    await logout();
+    showToast({
+      title: "Logged out",
+      message: "Your CampusOne session has ended.",
+      variant: "success",
+    });
+    navigate(paths.login, { replace: true });
+  };
+
   return (
     <div className="relative" ref={containerRef}>
       <button
@@ -52,15 +72,15 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >
-        <Avatar name="Ali Khan" size={compact ? "sm" : "md"} />
+        <Avatar name={displayName} size={compact ? "sm" : "md"} />
         {!compact ? (
           <>
             <span className="hidden text-left xl:block">
               <span className="block text-xs font-semibold text-slate-800">
-                Ali Khan
+                {displayName}
               </span>
               <span className="block text-[10px] text-slate-400">
-                COMSATS Islamabad
+                {roleLabel}
               </span>
             </span>
             <ChevronDown
@@ -79,9 +99,11 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
           role="menu"
         >
           <div className="border-b border-slate-100 px-3 py-2.5">
-            <p className="text-sm font-semibold text-slate-950">Ali Khan</p>
+            <p className="text-sm font-semibold text-slate-950">
+              {displayName}
+            </p>
             <p className="mt-0.5 truncate text-xs text-slate-500">
-              ali.khan@student.comsats.edu.pk
+              {currentUser?.email}
             </p>
           </div>
           <div className="py-1.5">
@@ -107,13 +129,7 @@ export function ProfileMenu({ compact = false }: { compact?: boolean }) {
           <div className="border-t border-slate-100 pt-1.5">
             <button
               className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
-              onClick={() => {
-                setIsOpen(false);
-                showToast({
-                  title: "Demo session",
-                  message: "Logout will be connected with authentication.",
-                });
-              }}
+              onClick={() => void handleLogout()}
               role="menuitem"
               type="button"
             >

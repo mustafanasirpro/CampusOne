@@ -1,9 +1,12 @@
 import { Link, Outlet } from "react-router-dom";
 
+import { useAuth } from "@/auth/useAuth";
 import { CampusOneLogo } from "@/components/layout/CampusOneLogo";
 import { paths } from "@/routes/paths";
 
 export function PublicLayout() {
+  const { isAuthenticated } = useAuth();
+
   return (
     <div className="min-h-screen bg-slate-50">
       <a
@@ -47,18 +50,29 @@ export function PublicLayout() {
             aria-label="Public navigation"
             className="ml-auto flex items-center gap-2"
           >
-            <Link
-              className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
-              to={paths.login}
-            >
-              Log in
-            </Link>
-            <Link
-              className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
-              to={paths.signup}
-            >
-              Get started
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+                to={paths.dashboard}
+              >
+                Open CampusOne
+              </Link>
+            ) : (
+              <>
+                <Link
+                  className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
+                  to={paths.login}
+                >
+                  Log in
+                </Link>
+                <Link
+                  className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+                  to={paths.signup}
+                >
+                  Get started
+                </Link>
+              </>
+            )}
           </nav>
         </div>
       </header>
