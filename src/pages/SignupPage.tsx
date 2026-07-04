@@ -1,10 +1,8 @@
 import {
   ArrowRight,
   Check,
-  GraduationCap,
   LockKeyhole,
   Mail,
-  School,
   UserRound,
 } from "lucide-react";
 import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
@@ -19,6 +17,11 @@ import {
   SelectField,
 } from "@/components/forms";
 import { AuthPageShell } from "@/components/layout";
+import {
+  campusDepartments,
+  campusSemesterOptions,
+  campusUniversities,
+} from "@/config/campusDirectory";
 import { paths } from "@/routes/paths";
 import { cn } from "@/utils/cn";
 import { useDocumentTitle } from "@/utils/useDocumentTitle";
@@ -37,15 +40,9 @@ interface SignupForm {
 type SignupErrors = Partial<Record<keyof SignupForm, string>>;
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 const semesterOptions = [
   { label: "Select semester", value: "", disabled: true },
-  ...Array.from({ length: 8 }, (_, index) => ({
-    label: `Semester ${index + 1}`,
-    value: String(index + 1),
-  })),
+  ...campusSemesterOptions,
 ];
 
 function getPasswordStrength(password: string) {
@@ -86,6 +83,27 @@ export function SignupPage() {
     () => getPasswordStrength(form.password),
     [form.password],
   );
+  const departmentOptions = useMemo(
+    () => [
+      {
+        label: form.universityId
+          ? "Select department"
+          : "Select a university first",
+        value: "",
+        disabled: true,
+      },
+      ...campusDepartments
+        .filter(
+          (department) =>
+            department.universityId === form.universityId,
+        )
+        .map((department) => ({
+          label: department.name,
+          value: department.id,
+        })),
+    ],
+    [form.universityId],
+  );
 
   useDocumentTitle("Create your account · CampusOne");
 
@@ -95,9 +113,7 @@ export function SignupPage() {
         | "fullName"
         | "email"
         | "password"
-        | "confirmPassword"
-        | "universityId"
-        | "departmentId",
+        | "confirmPassword",
     ) =>
     (event: ChangeEvent<HTMLInputElement>) => {
       setForm((current) => ({ ...current, [field]: event.target.value }));
@@ -116,7 +132,7 @@ export function SignupPage() {
 
     if (!form.email.trim()) {
       nextErrors.email = "Enter your email address.";
-    } else if (!emailPattern.test(form.email)) {
+    } else if (!emailPattern.test(form.email.trim())) {
       nextErrors.email = "Enter a valid email address.";
     }
 
@@ -139,13 +155,27 @@ export function SignupPage() {
       nextErrors.confirmPassword = "Passwords do not match.";
     }
 
-    if (!uuidPattern.test(form.universityId.trim())) {
-      nextErrors.universityId = "Enter a valid university UUID.";
+    const universityExists = campusUniversities.some(
+      (university) => university.id === form.universityId,
+    );
+    if (!universityExists) {
+      nextErrors.universityId = "Select your university.";
     }
-    if (!uuidPattern.test(form.departmentId.trim())) {
-      nextErrors.departmentId = "Enter a valid department UUID.";
+    const departmentBelongsToUniversity = campusDepartments.some(
+      (department) =>
+        department.id === form.departmentId &&
+        department.universityId === form.universityId,
+    );
+    if (!departmentBelongsToUniversity) {
+      nextErrors.departmentId = "Select a department for your university.";
     }
-    if (!form.semester) {
+    const semester = Number(form.semester);
+    if (
+      !form.semester ||
+      !Number.isInteger(semester) ||
+      semester < 1 ||
+      semester > 8
+    ) {
       nextErrors.semester = "Select your semester.";
     }
     if (!form.terms) {
@@ -284,27 +314,55 @@ export function SignupPage() {
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <FormField
-            autoComplete="off"
+          <SelectField
             error={errors.universityId}
-            hint="Use the UUID from the backend academic directory."
-            icon={<School className="size-4" />}
-            label="University ID"
+            label="University"
             name="universityId"
-            onChange={updateInput("universityId")}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            onChange={(event) => {
+              const universityId = event.target.value;
+              setForm((current) => ({
+                ...current,
+                departmentId: "",
+                universityId,
+              }));
+              setErrors((current) => ({
+                ...current,
+                departmentId: undefined,
+                universityId: undefined,
+              }));
+              clearAuthError();
+            }}
+            options={[
+              {
+                label: "Select university",
+                value: "",
+                disabled: true,
+              },
+              ...campusUniversities.map((university) => ({
+                label: university.name,
+                value: university.id,
+              })),
+            ]}
             required
             value={form.universityId}
           />
-          <FormField
-            autoComplete="off"
+          <SelectField
+            disabled={!form.universityId}
             error={errors.departmentId}
-            hint="The department must belong to the selected university."
-            icon={<GraduationCap className="size-4" />}
-            label="Department ID"
+            label="Department"
             name="departmentId"
-            onChange={updateInput("departmentId")}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            onChange={(event) => {
+              setForm((current) => ({
+                ...current,
+                departmentId: event.target.value,
+              }));
+              setErrors((current) => ({
+                ...current,
+                departmentId: undefined,
+              }));
+              clearAuthError();
+            }}
+            options={departmentOptions}
             required
             value={form.departmentId}
           />
@@ -353,6 +411,7 @@ export function SignupPage() {
               terms: event.target.checked,
             }));
             setErrors((current) => ({ ...current, terms: undefined }));
+            clearAuthError();
           }}
         />
 
