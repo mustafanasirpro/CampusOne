@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ApiError } from "@/api/apiClient";
-import { deleteEvent, getEventById, getMyParticipantState, joinEvent, leaveEvent } from "@/api/eventsApi";
+import { deleteEvent, getEventById, joinEvent, leaveEvent } from "@/api/eventsApi";
 import { Avatar, Badge, Button, Card, CardContent, ErrorMessage, LoadingSpinner, useToast } from "@/components/common";
 import { EventCapacityMeter, eventStatusLabel, formatEventDateTime } from "@/components/events";
 import { paths } from "@/routes/paths";
@@ -25,12 +25,8 @@ export function EventDetailPage() {
     if (!eventId) return;
     const controller = new AbortController();
     let active = true;
-    void Promise.all([
-      getEventById(eventId, controller.signal),
-      getMyParticipantState(eventId, controller.signal).catch(() => null),
-    ]).then(([detail, state]) => {
-      if (!active) return;
-      setEvent(state ? { ...detail, joinedByCurrentUser: state.joined, participantCount: state.participantCount } : detail);
+    void getEventById(eventId, controller.signal).then((detail) => {
+      if (active) setEvent(detail);
     }).catch((requestError: unknown) => {
       if (active) setError(requestError instanceof ApiError ? requestError.message : "The event could not be loaded.");
     }).finally(() => { if (active) setIsLoading(false); });
