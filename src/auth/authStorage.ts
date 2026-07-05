@@ -52,6 +52,20 @@ export function storeAuthSession(session: AuthSession) {
   window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
 }
 
+export function updateStoredAuthUser(
+  update: Pick<AuthUser, "email" | "fullName">,
+) {
+  if (!storageAvailable()) return;
+
+  const current = getStoredAuthUser();
+  if (!current) return;
+  window.localStorage.setItem(
+    AUTH_USER_KEY,
+    JSON.stringify({ ...current, ...update }),
+  );
+  window.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
+}
+
 export function clearStoredAuthSession() {
   if (!storageAvailable()) return;
 
