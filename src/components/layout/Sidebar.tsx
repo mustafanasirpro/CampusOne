@@ -62,6 +62,7 @@ export function Sidebar({ className, onNavigate }: SidebarProps) {
                     : "text-slate-600 hover:translate-x-0.5 hover:bg-slate-50 hover:text-slate-950",
                 )
               }
+              end={item.path === paths.dashboard}
               key={item.path}
               onClick={onNavigate}
               to={item.path}
