@@ -148,7 +148,7 @@ export function EditNotePage() {
       </Link>
 
       <PageHeader
-        description="Update descriptive note fields. File metadata cannot be replaced through the current backend endpoint."
+        description="Update descriptive note fields while keeping the currently uploaded file."
         eyebrow="Your notes"
         title="Edit note"
       />
