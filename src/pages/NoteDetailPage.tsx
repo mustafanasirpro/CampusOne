@@ -163,11 +163,11 @@ export function NoteDetailPage() {
           : current,
       );
       showToast({
-        title: "Download recorded",
-        message:
-          "File metadata is available, but binary download is not enabled yet.",
+        title: "PDF ready",
+        message: "Opening the uploaded study resource.",
         variant: "success",
       });
+      window.location.assign(response.downloadUrl);
     } catch (requestError) {
       setActionError(actionErrorMessage(requestError));
     } finally {
@@ -351,16 +351,18 @@ export function NoteDetailPage() {
                 <Badge className="ml-auto">{note.file.status}</Badge>
               </div>
               <p className="text-sm leading-6 text-slate-500">
-                CampusOne currently stores file metadata only. The backend can
-                record download activity, but it does not return a binary URL.
+                {note.file.status === "READY"
+                  ? "This PDF is stored securely in CampusOne object storage."
+                  : "This legacy file record is not available for download."}
               </p>
               <Button
                 className="w-fit"
+                disabled={note.file.status !== "READY"}
                 loading={busyAction === "download"}
                 onClick={() => void recordDownload()}
               >
                 <ArrowDownToLine className="size-4" />
-                Record download
+                View or download PDF
               </Button>
             </CardContent>
           </Card>
