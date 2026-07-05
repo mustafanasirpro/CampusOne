@@ -32,7 +32,11 @@ export function globalSearch({
       sort,
       types: types?.join(","),
     })}`,
-    { signal },
+    {
+      attachAccessToken: false,
+      retryOnUnauthorized: false,
+      signal,
+    },
   );
 }
 
@@ -43,13 +47,18 @@ export function getSearchSuggestions(
 ) {
   return apiRequest<SearchSuggestionResponse>(
     `${searchPath}/suggestions${queryString({ limit, q })}`,
-    { signal },
+    {
+      attachAccessToken: false,
+      retryOnUnauthorized: false,
+      signal,
+    },
   );
 }
 
 export function getSearchTypes(signal?: AbortSignal) {
   return apiRequest<SearchTypeMetadata[]>(`${searchPath}/types`, {
+    attachAccessToken: false,
+    retryOnUnauthorized: false,
     signal,
   });
 }
-
