@@ -17,6 +17,7 @@ import com.campusone.academic.repository.CourseRepository;
 import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.common.exception.ResourceNotFoundException;
 import com.campusone.note.dto.request.CreateNoteRequest;
+import com.campusone.note.dto.request.CreateUploadedNoteRequest;
 import com.campusone.note.dto.request.FileMetadataRequest;
 import com.campusone.note.dto.request.NoteSort;
 import com.campusone.note.dto.request.UpdateNoteRequest;
@@ -26,6 +27,7 @@ import com.campusone.note.dto.response.NoteDetailResponse;
 import com.campusone.note.dto.response.NotePageResponse;
 import com.campusone.note.dto.response.RatingResponse;
 import com.campusone.note.entity.FileAsset;
+import com.campusone.note.entity.FileAssetStatus;
 import com.campusone.note.entity.Note;
 import com.campusone.note.entity.NoteBookmark;
 import com.campusone.note.entity.NoteDownloadEvent;
@@ -46,6 +48,8 @@ import com.campusone.note.repository.NoteRatingRepository;
 import com.campusone.note.repository.NoteRepository;
 import com.campusone.note.repository.NoteVersionRepository;
 import com.campusone.note.repository.TagRepository;
+import com.campusone.note.storage.StorageService;
+import com.campusone.note.storage.StoredObject;
 import com.campusone.user.entity.StudentProfile;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
@@ -60,6 +64,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -114,6 +119,9 @@ class NoteServiceTest {
     @Mock
     private CommunityIntegrationService integrationService;
 
+    @Mock
+    private StorageService storageService;
+
     private NoteService noteService;
     private User owner;
     private User otherUser;
@@ -139,6 +147,7 @@ class NoteServiceTest {
                          new FileAssetMapper(),
                          new TagMapper()),
                 integrationService,
+                storageService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         University university = new University(
@@ -227,6 +236,64 @@ class NoteServiceTest {
                 noteService.createNote(OWNER_ID, createRequest()))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Course was not found.");
+    }
+
+    @Test
+    void createUploadedNote_storesReadyR2Metadata() {
+        when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+        when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.of(course));
+        when(fileAssetRepository.save(any(FileAsset.class)))
+                .thenAnswer(invocation -> {
+                    FileAsset saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", FILE_ID);
+                    ReflectionTestUtils.setField(saved, "createdAt", NOW);
+                    ReflectionTestUtils.setField(saved, "updatedAt", NOW);
+                    return saved;
+                });
+        when(tagRepository.findAllByNormalizedNameIn(anyCollection()))
+                .thenReturn(List.of());
+        when(tagRepository.saveAll(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(noteRepository.save(any(Note.class)))
+                .thenAnswer(invocation -> {
+                    Note saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", NOTE_ID);
+                    ReflectionTestUtils.setField(saved, "createdAt", NOW);
+                    ReflectionTestUtils.setField(saved, "updatedAt", NOW);
+                    return saved;
+                });
+        StoredObject storedObject = new StoredObject(
+                StorageProvider.S3_COMPATIBLE,
+                "campusone-notes",
+                "notes/" + OWNER_ID + "/2026/oop.pdf",
+                "oop-notes.pdf",
+                "application/pdf",
+                4096,
+                "a".repeat(64));
+        CreateUploadedNoteRequest request = new CreateUploadedNoteRequest(
+                COURSE_ID,
+                "Complete OOP Notes",
+                "Detailed object oriented programming lecture notes.",
+                "Dr. Ahmed Khan",
+                4,
+                NoteFileType.PDF,
+                NoteVisibility.PUBLIC,
+                List.of("OOP", "Java"));
+
+        NoteDetailResponse response = noteService.createUploadedNote(
+                OWNER_ID,
+                request,
+                storedObject);
+
+        ArgumentCaptor<FileAsset> assetCaptor =
+                ArgumentCaptor.forClass(FileAsset.class);
+        verify(fileAssetRepository).save(assetCaptor.capture());
+        assertThat(assetCaptor.getValue().getStatus())
+                .isEqualTo(FileAssetStatus.READY);
+        assertThat(assetCaptor.getValue().getStorageProvider())
+                .isEqualTo(StorageProvider.S3_COMPATIBLE);
+        assertThat(response.file().originalFilename())
+                .isEqualTo("oop-notes.pdf");
     }
 
     @Test
@@ -372,6 +439,8 @@ class NoteServiceTest {
         when(noteRepository.findActiveByIdForUpdate(NOTE_ID))
                 .thenReturn(Optional.of(note));
         when(userRepository.findById(OTHER_USER_ID)).thenReturn(Optional.of(otherUser));
+        when(storageService.createDownloadUrl(fileAsset))
+                .thenReturn("https://files.example.test/oop-notes.pdf");
         when(noteDownloadEventRepository.save(any(NoteDownloadEvent.class)))
                 .thenAnswer(invocation -> {
                     NoteDownloadEvent event = invocation.getArgument(0);
@@ -392,6 +461,8 @@ class NoteServiceTest {
 
         assertThat(response.downloadCount()).isEqualTo(1);
         assertThat(response.downloadedAt()).isEqualTo(NOW);
+        assertThat(response.downloadUrl())
+                .isEqualTo("https://files.example.test/oop-notes.pdf");
         verify(noteDownloadEventRepository)
                 .save(any(NoteDownloadEvent.class));
     }
