@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ApiError } from "@/api/apiClient";
-import { deleteInternship, getInternshipById, getSavedState, saveInternship, unsaveInternship } from "@/api/internshipsApi";
+import { deleteInternship, getInternshipById, saveInternship, unsaveInternship } from "@/api/internshipsApi";
 import { Avatar, Badge, Button, Card, CardContent, ErrorMessage, LoadingSpinner, useToast } from "@/components/common";
 import { formatInternshipDeadline, formatInternshipPay, internshipStatusLabel, internshipTypeLabel, internshipWorkModeLabel } from "@/components/internships";
 import { paths } from "@/routes/paths";
@@ -23,7 +23,7 @@ export function InternshipDetailPage() {
   useEffect(() => {
     if (!internshipId) return;
     const controller = new AbortController(); let active = true;
-    void Promise.all([getInternshipById(internshipId, controller.signal), getSavedState(internshipId, controller.signal).catch(() => null)]).then(([detail, state]) => { if (active) setInternship(state ? { ...detail, savedByCurrentUser: state.saved } : detail); }).catch((requestError: unknown) => { if (active) setError(requestError instanceof ApiError ? requestError.message : "The internship could not be loaded."); }).finally(() => { if (active) setIsLoading(false); });
+    void getInternshipById(internshipId, controller.signal).then((detail) => { if (active) setInternship(detail); }).catch((requestError: unknown) => { if (active) setError(requestError instanceof ApiError ? requestError.message : "The internship could not be loaded."); }).finally(() => { if (active) setIsLoading(false); });
     return () => { active = false; controller.abort(); };
   }, [internshipId]);
   const toggleSave = async () => {
@@ -57,4 +57,3 @@ export function InternshipDetailPage() {
     </div>
   );
 }
-
