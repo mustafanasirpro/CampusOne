@@ -1,6 +1,7 @@
 package com.campusone.note.controller;
 
 import com.campusone.note.dto.request.CreateNoteRequest;
+import com.campusone.note.dto.request.CreateUploadedNoteRequest;
 import com.campusone.note.dto.request.NoteSort;
 import com.campusone.note.dto.request.RateNoteRequest;
 import com.campusone.note.dto.request.UpdateNoteRequest;
@@ -10,6 +11,7 @@ import com.campusone.note.dto.response.NoteDetailResponse;
 import com.campusone.note.dto.response.NotePageResponse;
 import com.campusone.note.dto.response.RatingResponse;
 import com.campusone.note.service.NoteService;
+import com.campusone.note.service.NoteUploadService;
 import com.campusone.security.CampusOneUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -21,6 +23,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.util.UUID;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -33,7 +36,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/notes")
@@ -42,19 +47,49 @@ import org.springframework.web.bind.annotation.RestController;
 public class NoteController {
 
     private final NoteService noteService;
+    private final NoteUploadService noteUploadService;
 
-    public NoteController(NoteService noteService) {
+    public NoteController(
+            NoteService noteService,
+            NoteUploadService noteUploadService) {
         this.noteService = noteService;
+        this.noteUploadService = noteUploadService;
     }
 
     @PostMapping
-    @Operation(summary = "Create note metadata for moderation")
+    @Operation(
+            summary = "Create a note from existing file metadata",
+            description = "Deprecated compatibility endpoint. "
+                    + "Use /api/v1/notes/upload for real PDF uploads.",
+            deprecated = true)
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<NoteDetailResponse> createNote(
             @AuthenticationPrincipal CampusOneUserPrincipal principal,
             @Valid @RequestBody CreateNoteRequest request) {
         NoteDetailResponse response =
                 noteService.createNote(principal.getUserId(), request);
+        return ResponseEntity.created(
+                        URI.create("/api/v1/notes/" + response.id()))
+                .body(response);
+    }
+
+    @PostMapping(
+            path = "/upload",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Create a note and upload its PDF",
+            description = "Accepts a JSON `note` part and an application/pdf "
+                    + "`file` part. CampusOne validates and stores the PDF in "
+                    + "configured S3-compatible storage.")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<NoteDetailResponse> uploadNote(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @Valid @RequestPart("note") CreateUploadedNoteRequest request,
+            @RequestPart("file") MultipartFile file) {
+        NoteDetailResponse response = noteUploadService.uploadAndCreate(
+                principal.getUserId(),
+                request,
+                file);
         return ResponseEntity.created(
                         URI.create("/api/v1/notes/" + response.id()))
                 .body(response);
