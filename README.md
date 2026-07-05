@@ -256,7 +256,7 @@ configuration import. Operating-system environment variables take precedence.
 | `MAX_LOGIN_ATTEMPTS` | No | Defaults to `5` |
 | `ACCOUNT_LOCK_MINUTES` | No | Defaults to `15` |
 | `CORS_ALLOWED_ORIGINS` | No | Comma-separated exact frontend origins; defaults to local Vite origins and should be overridden in production |
-| `OPENAPI_ENABLED` | No | Disabled by default; enabled by the local profile |
+| `OPENAPI_ENABLED` | No | Enabled by default; set to `false` to disable API documentation |
 | `FLYWAY_URL` | No | Optional migration-role JDBC URL; falls back to `DB_URL` |
 | `FLYWAY_USERNAME` | No | Optional migration user; falls back to `DB_USERNAME` |
 | `FLYWAY_PASSWORD` | No | Optional migration password; falls back to `DB_PASSWORD` |

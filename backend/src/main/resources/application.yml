@@ -45,10 +45,10 @@ server:
 springdoc:
   api-docs:
     path: /api/v1/openapi
-    enabled: ${OPENAPI_ENABLED:false}
+    enabled: ${OPENAPI_ENABLED:true}
   swagger-ui:
     path: /api/v1/swagger-ui
-    enabled: ${OPENAPI_ENABLED:false}
+    enabled: ${OPENAPI_ENABLED:true}
     operations-sorter: method
     tags-sorter: alpha
 

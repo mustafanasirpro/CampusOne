@@ -88,7 +88,8 @@ JWT signing uses:
 - `CORS_ALLOWED_ORIGINS`: optional comma-separated exact frontend origins;
   defaults to `http://localhost:5173` and `http://127.0.0.1:5173`. Set it to
   the deployed frontend origin in production.
-- `OPENAPI_ENABLED`: defaults to `false`; enable only in trusted environments
+- `OPENAPI_ENABLED`: defaults to `true`; set to `false` to disable API
+  documentation
 
 Generate a different JWT secret for every environment. PowerShell:
 
@@ -186,8 +187,9 @@ SHA-256 hash. Set
 Unsafe browser requests are accepted only from exact configured origins (or
 the API's own origin). This origin check complements the refresh cookie's
 `SameSite=Strict` policy. Wildcard CORS origins are intentionally rejected.
-Swagger and OpenAPI are enabled by default only in the local profile. Production
-deployments should leave `OPENAPI_ENABLED=false`, avoid the `local` profile, and
+Swagger and OpenAPI are enabled by default and remain publicly reachable through
+the documented routes. Set `OPENAPI_ENABLED=false` only when API documentation
+should be disabled. Production deployments should avoid the `local` profile and
 set `CORS_ALLOWED_ORIGINS` to the exact deployed frontend origin.
 
 ## Verification
