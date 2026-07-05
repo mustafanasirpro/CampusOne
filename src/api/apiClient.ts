@@ -52,7 +52,10 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   if (response.status === 204) return undefined;
 
   const contentType = response.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) {
+  if (
+    contentType.includes("application/json") ||
+    contentType.includes("+json")
+  ) {
     return response.json();
   }
 
@@ -134,7 +137,10 @@ export async function apiRequest<T>(
       credentials: "include",
       headers,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
     throw new ApiError(
       "Unable to reach CampusOne. Check that the backend is running.",
       0,
