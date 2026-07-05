@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -15,6 +16,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.campusone.academic.dto.response.CourseResponse;
 import com.campusone.note.dto.request.CreateNoteRequest;
+import com.campusone.note.dto.request.CreateUploadedNoteRequest;
+import com.campusone.common.exception.StorageNotConfiguredException;
 import com.campusone.note.dto.response.FileMetadataResponse;
 import com.campusone.note.dto.response.NoteDetailResponse;
 import com.campusone.note.dto.response.NotePageResponse;
@@ -25,6 +28,7 @@ import com.campusone.note.entity.NoteModerationStatus;
 import com.campusone.note.entity.NoteVisibility;
 import com.campusone.note.entity.StorageProvider;
 import com.campusone.note.service.NoteService;
+import com.campusone.note.service.NoteUploadService;
 import com.campusone.security.CampusOneUserDetailsService;
 import com.campusone.security.CampusOneUserPrincipal;
 import com.campusone.security.JwtAuthenticationFilter;
@@ -49,6 +53,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
 @WebMvcTest(NoteController.class)
 @ActiveProfiles("test")
@@ -76,6 +81,9 @@ class NoteControllerTest {
 
     @MockitoBean
     private NoteService noteService;
+
+    @MockitoBean
+    private NoteUploadService noteUploadService;
 
     @MockitoBean
     private JwtService jwtService;
@@ -201,6 +209,60 @@ class NoteControllerTest {
     }
 
     @Test
+    void uploadNote_withoutAuthentication_isUnauthorized() throws Exception {
+        mockMvc.perform(multipart("/api/v1/notes/upload")
+                        .file(validUploadRequestPart())
+                        .file(validPdfPart()))
+                .andExpect(status().isUnauthorized());
+
+        verify(noteUploadService, never()).uploadAndCreate(
+                eq(USER_ID),
+                any(CreateUploadedNoteRequest.class),
+                any());
+    }
+
+    @Test
+    void uploadNote_authenticatedMultipartRequest_returnsCreated()
+            throws Exception {
+        when(noteUploadService.uploadAndCreate(
+                eq(USER_ID),
+                any(CreateUploadedNoteRequest.class),
+                any()))
+                .thenReturn(detailResponse);
+
+        mockMvc.perform(multipart("/api/v1/notes/upload")
+                        .file(validUploadRequestPart())
+                        .file(validPdfPart())
+                        .with(authentication(authentication)))
+                .andExpect(status().isCreated())
+                .andExpect(header().string(
+                        "Location",
+                        "/api/v1/notes/" + NOTE_ID))
+                .andExpect(jsonPath("$.file.originalFilename")
+                        .value("oop-notes.pdf"));
+    }
+
+    @Test
+    void uploadNote_storageNotConfigured_returnsCleanServiceUnavailable()
+            throws Exception {
+        when(noteUploadService.uploadAndCreate(
+                eq(USER_ID),
+                any(CreateUploadedNoteRequest.class),
+                any()))
+                .thenThrow(new StorageNotConfiguredException());
+
+        mockMvc.perform(multipart("/api/v1/notes/upload")
+                        .file(validUploadRequestPart())
+                        .file(validPdfPart())
+                        .with(authentication(authentication)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code")
+                        .value("STORAGE_NOT_CONFIGURED"))
+                .andExpect(jsonPath("$.message")
+                        .value("File upload is not configured yet."));
+    }
+
+    @Test
     void updateNote_withoutAuthentication_isUnauthorized() throws Exception {
         mockMvc.perform(patch("/api/v1/notes/{noteId}", NOTE_ID)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -230,6 +292,35 @@ class NoteControllerTest {
                   }
                 }
                 """.formatted(COURSE_ID, "a".repeat(64));
+    }
+
+    private MockMultipartFile validUploadRequestPart() {
+        String json = """
+                {
+                  "courseId": "%s",
+                  "title": "Complete OOP Notes",
+                  "description": "Detailed object oriented programming lecture notes.",
+                  "teacherName": "Dr. Ahmed Khan",
+                  "semester": 4,
+                  "fileType": "PDF",
+                  "visibility": "PUBLIC",
+                  "tags": ["OOP", "Java"]
+                }
+                """.formatted(COURSE_ID);
+        return new MockMultipartFile(
+                "note",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private MockMultipartFile validPdfPart() {
+        return new MockMultipartFile(
+                "file",
+                "oop-notes.pdf",
+                MediaType.APPLICATION_PDF_VALUE,
+                "%PDF-1.7\nCampusOne test PDF".getBytes(
+                        java.nio.charset.StandardCharsets.US_ASCII));
     }
 
     private NoteDetailResponse detailResponse() {
