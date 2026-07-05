@@ -121,7 +121,11 @@ export async function apiRequest<T>(
   const headers = new Headers(suppliedHeaders);
   headers.set("Accept", "application/json");
 
-  if (requestOptions.body && !headers.has("Content-Type")) {
+  if (
+    requestOptions.body &&
+    !(requestOptions.body instanceof FormData) &&
+    !headers.has("Content-Type")
+  ) {
     headers.set("Content-Type", "application/json");
   }
 
