@@ -90,34 +90,6 @@ export const campusOneBenefits: CampusOneBenefit[] = [
   },
 ];
 
-export const landingStats = [
-  { value: "12k+", label: "student resources" },
-  { value: "40+", label: "campus communities" },
-  { value: "3.8k", label: "questions answered" },
-  { value: "92%", label: "find help faster" },
-];
-
-export const testimonials = [
-  {
-    quote:
-      "CampusOne feels like the student groups I already use, except everything is organized and searchable.",
-    name: "Sara Ahmed",
-    role: "Computer Science · FAST Islamabad",
-  },
-  {
-    quote:
-      "I found past papers for my database course and an internship deadline I had completely missed—all in one place.",
-    name: "Ali Khan",
-    role: "Software Engineering · COMSATS",
-  },
-  {
-    quote:
-      "The AI study tools make revision much less overwhelming. I can turn a long topic into a plan in minutes.",
-    name: "Ayesha Malik",
-    role: "Data Science · NUST",
-  },
-];
-
 export const landingFaqs = [
   {
     question: "What is CampusOne?",
@@ -132,7 +104,7 @@ export const landingFaqs = [
   {
     question: "Which universities are supported?",
     answer:
-      "The initial community includes students from universities such as COMSATS, FAST, NUST, UET, Punjab University, and LUMS, with more campuses planned.",
+      "The current local seed supports COMSATS University Islamabad and its Computer Science department. The academic directory is designed to expand as more campuses are configured.",
   },
   {
     question: "Can I upload my own notes?",
@@ -142,7 +114,7 @@ export const landingFaqs = [
   {
     question: "Does the AI assistant use real course material?",
     answer:
-      "The planned assistant can work with the notes and topics you provide to create summaries, MCQs, viva questions, explanations, and study plans.",
+      "The assistant works with the text and topics you provide to create explanations, summaries, flashcards, quizzes, and study plans through CampusOne's deterministic local provider.",
   },
   {
     question: "Is the marketplace only for students?",
@@ -150,4 +122,3 @@ export const landingFaqs = [
       "It is designed around campus communities, making it easier to discover relevant listings and connect with nearby student sellers.",
   },
 ];
-
