@@ -19,6 +19,8 @@ import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -156,6 +158,78 @@ public class GlobalExceptionHandler {
         return response(
                 HttpStatus.CONFLICT,
                 "INVALID_NOTE_STATE",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(StorageNotConfiguredException.class)
+    ResponseEntity<ErrorResponse> handleStorageNotConfigured(
+            StorageNotConfiguredException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "STORAGE_NOT_CONFIGURED",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(InvalidFileUploadException.class)
+    ResponseEntity<ErrorResponse> handleInvalidFileUpload(
+            InvalidFileUploadException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.BAD_REQUEST,
+                "INVALID_FILE_UPLOAD",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(FileUploadTooLargeException.class)
+    ResponseEntity<ErrorResponse> handleFileUploadTooLarge(
+            FileUploadTooLargeException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "FILE_TOO_LARGE",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ErrorResponse> handleMultipartSizeLimit(
+            MaxUploadSizeExceededException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "FILE_TOO_LARGE",
+                "The uploaded PDF exceeds the configured size limit.",
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    ResponseEntity<ErrorResponse> handleMissingMultipartPart(
+            MissingServletRequestPartException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.BAD_REQUEST,
+                "MISSING_MULTIPART_PART",
+                "Both note details and a PDF file are required.",
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(StorageOperationException.class)
+    ResponseEntity<ErrorResponse> handleStorageOperation(
+            StorageOperationException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.BAD_GATEWAY,
+                "STORAGE_OPERATION_FAILED",
                 exception.getMessage(),
                 request,
                 Map.of());
