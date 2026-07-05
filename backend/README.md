@@ -4,9 +4,7 @@ Spring Boot foundation for the CampusOne university community platform.
 
 ## Current scope
 
-The backend currently contains the Phase 0 foundation, Phase 1 core domain
-model, Phase 2 authentication MVP, Phase 3 refresh-token authentication, and
-Phase 4 user profiles:
+The backend is a modular Spring Boot API for CampusOne:
 
 - Users, roles, universities, departments, courses, and student profiles
 - PostgreSQL schema managed by Flyway
@@ -20,20 +18,20 @@ Phase 4 user profiles:
 - Authenticated profile editing with validated academic selections
 - Normalized student skills and personal display preferences
 - Public and private student profile visibility
+- Notes with real R2-backed PDF upload and tracked downloads
+- Marketplace, discussions, events, internships, and notifications
+- Global search, gamification, AI study tools, and moderation workflows
 - Consistent validation, authentication, authorization, and API error responses
-
-Email verification, password recovery, and CampusOne business modules are
-intentionally not implemented yet.
 
 ## Development Status
 
 ### Completed
 
-- Backend Foundation (Phase 0)
-- Core Academic Domain (Phase 1)
-- Authentication & JWT (Phase 2)
-- Refresh Token Authentication (Phase 3)
-- User Profile Module (Phase 4)
+- Backend foundation and academic domain
+- Authentication, JWT, refresh sessions, and profiles
+- Notes, marketplace, discussions, events, and internships
+- Notifications, search, gamification, AI, and moderation
+- S3-compatible note PDF upload/download
 - Java 21 development environment
 - Maven build and test pipeline
 - JWT configuration validation
@@ -41,17 +39,9 @@ intentionally not implemented yet.
 
 ### Upcoming
 
-- Academic Directory Enhancements (Phase 5)
 - Multi-session management
 - Email Verification
 - Password Reset
-- Notes Module
-- Discussions Module
-- Marketplace Module
-- Events Module
-- Internship Module
-- Notifications
-- Leaderboard
 
 ## Requirements
 
@@ -66,6 +56,7 @@ The application reads its PostgreSQL connection from:
 - `DB_URL`
 - `DB_USERNAME`
 - `DB_PASSWORD`
+- `SERVER_PORT`: hosting-platform server port, supplied by Render
 
 Flyway defaults to the same values locally. Production can use a separate
 migration role by setting `FLYWAY_URL`, `FLYWAY_USERNAME`, and
@@ -88,8 +79,21 @@ JWT signing uses:
 - `CORS_ALLOWED_ORIGINS`: optional comma-separated exact frontend origins;
   defaults to `http://localhost:5173` and `http://127.0.0.1:5173`. Set it to
   the deployed frontend origin in production.
+- `APP_CORS_ALLOWED_ORIGINS`: Spring-style deployment alias for the same
+  exact-origin CORS property
 - `OPENAPI_ENABLED`: defaults to `true`; set to `false` to disable API
   documentation
+- `STORAGE_PROVIDER`: set to `r2` to enable real note PDF uploads; defaults to
+  disabled so missing storage credentials never prevent startup
+- `R2_ENDPOINT`: Cloudflare R2 S3 API endpoint
+- `R2_ACCESS_KEY_ID`: R2 API token access key
+- `R2_SECRET_ACCESS_KEY`: R2 API token secret key
+- `R2_BUCKET`: bucket used for note PDFs
+- `R2_REGION`: optional; defaults to `auto`
+- `R2_PUBLIC_BASE_URL`: optional public bucket/custom-domain URL; when omitted,
+  the backend creates short-lived private presigned GET URLs
+- `MAX_UPLOAD_SIZE_MB`: optional; defaults to `10`
+- `STORAGE_DOWNLOAD_URL_TTL`: optional presigned URL lifetime; defaults to `10m`
 
 Generate a different JWT secret for every environment. PowerShell:
 
@@ -144,6 +148,32 @@ The local profile provides development defaults for:
 The two exact loopback CORS origins are also safe startup defaults for packaged
 deployments. Production deployments should replace them through
 `CORS_ALLOWED_ORIGINS` so the deployed frontend can access the API.
+
+### Cloudflare R2 note storage
+
+The note upload endpoint accepts multipart form data at
+`POST /api/v1/notes/upload`, with a JSON `note` part and an
+`application/pdf` `file` part. The backend validates the PDF, generates an
+owner-scoped object key, uploads it to R2, and stores only its metadata in
+PostgreSQL.
+
+Configure these Render environment variables:
+
+```text
+STORAGE_PROVIDER=r2
+R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=<secret>
+R2_SECRET_ACCESS_KEY=<secret>
+R2_BUCKET=<bucket-name>
+R2_REGION=auto
+R2_PUBLIC_BASE_URL=
+MAX_UPLOAD_SIZE_MB=10
+```
+
+Use an R2 API token restricted to Object Read & Write for the selected bucket.
+Leave `R2_PUBLIC_BASE_URL` blank for private storage; CampusOne then returns
+short-lived presigned download URLs. No storage credentials are sent to the
+frontend or stored in PostgreSQL.
 
 For the default values in `.env.example`, PostgreSQL should have a database
 named `campusone` and a login named `campusone`. One possible setup from an
@@ -209,5 +239,6 @@ mvn clean verify
 - Update current profile: `PATCH http://localhost:8080/api/v1/users/me`
 - Replace current skills: `PUT http://localhost:8080/api/v1/users/me/skills`
 - Public profile: `GET http://localhost:8080/api/v1/profiles/{userId}`
+- Upload note PDF: `POST http://localhost:8080/api/v1/notes/upload`
 - OpenAPI JSON: `http://localhost:8080/api/v1/openapi`
 - Swagger UI: `http://localhost:8080/api/v1/swagger-ui`
