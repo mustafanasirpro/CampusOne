@@ -21,12 +21,12 @@ export function CreateNotePage() {
 
   useDocumentTitle("Create note · CampusOne");
 
-  const handleSubmit = async (request: CreateNoteRequest) => {
+  const handleSubmit = async (request: CreateNoteRequest, file: File) => {
     setIsSubmitting(true);
     setError(null);
     setFieldErrors({});
     try {
-      const note = await createNote(request);
+      const note = await createNote(request, file);
       showToast({
         title: "Note submitted",
         message: "Your note is pending moderation review.",
@@ -56,7 +56,7 @@ export function CreateNotePage() {
       </Link>
 
       <PageHeader
-        description="Submit note metadata and study-resource details for moderation."
+        description="Upload a PDF study resource and submit its academic details for moderation."
         eyebrow="Notes"
         title="Create a note"
       />
