@@ -6,6 +6,7 @@ import com.campusone.common.exception.InvalidNoteStateException;
 import com.campusone.common.exception.ResourceNotFoundException;
 import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.note.dto.request.CreateNoteRequest;
+import com.campusone.note.dto.request.CreateUploadedNoteRequest;
 import com.campusone.note.dto.request.FileMetadataRequest;
 import com.campusone.note.dto.request.NoteSort;
 import com.campusone.note.dto.request.UpdateNoteRequest;
@@ -20,6 +21,7 @@ import com.campusone.note.entity.Note;
 import com.campusone.note.entity.NoteBookmark;
 import com.campusone.note.entity.NoteBookmarkId;
 import com.campusone.note.entity.NoteDownloadEvent;
+import com.campusone.note.entity.NoteFileType;
 import com.campusone.note.entity.NoteModerationAction;
 import com.campusone.note.entity.NoteModerationStatus;
 import com.campusone.note.entity.NoteRating;
@@ -36,6 +38,8 @@ import com.campusone.note.repository.NoteRatingRepository;
 import com.campusone.note.repository.NoteRepository;
 import com.campusone.note.repository.NoteVersionRepository;
 import com.campusone.note.repository.TagRepository;
+import com.campusone.note.storage.StorageService;
+import com.campusone.note.storage.StoredObject;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.nio.charset.StandardCharsets;
@@ -74,6 +78,7 @@ public class NoteService {
     private final UserRepository userRepository;
     private final NoteMapper noteMapper;
     private final CommunityIntegrationService integrationService;
+    private final StorageService storageService;
     private final Clock clock;
 
     public NoteService(
@@ -89,6 +94,7 @@ public class NoteService {
             UserRepository userRepository,
             NoteMapper noteMapper,
             CommunityIntegrationService integrationService,
+            StorageService storageService,
             Clock clock) {
         this.noteRepository = noteRepository;
         this.fileAssetRepository = fileAssetRepository;
@@ -102,6 +108,7 @@ public class NoteService {
         this.userRepository = userRepository;
         this.noteMapper = noteMapper;
         this.integrationService = integrationService;
+        this.storageService = storageService;
         this.clock = clock;
     }
 
@@ -116,7 +123,8 @@ public class NoteService {
         FileAsset fileAsset = fileAssetRepository.save(toFileAsset(
                 uploader,
                 request.file()));
-        Note note = new Note(
+        return persistNewNote(
+                userId,
                 uploader,
                 course,
                 fileAsset,
@@ -125,8 +133,63 @@ public class NoteService {
                 request.teacherName(),
                 request.semester(),
                 request.fileType(),
-                request.visibility());
-        note.replaceTags(resolveTags(request.tags()));
+                request.visibility(),
+                request.tags());
+    }
+
+    @Transactional
+    public NoteDetailResponse createUploadedNote(
+            UUID userId,
+            CreateUploadedNoteRequest request,
+            StoredObject storedObject) {
+        User uploader = requireUser(userId);
+        Course course = requireActiveCourse(request.courseId());
+        FileAsset fileAsset = fileAssetRepository.save(FileAsset.uploaded(
+                uploader,
+                storedObject.storageProvider(),
+                storedObject.bucketName(),
+                storedObject.objectKey(),
+                storedObject.originalFilename(),
+                storedObject.mimeType(),
+                storedObject.sizeBytes(),
+                storedObject.checksumSha256()));
+        return persistNewNote(
+                userId,
+                uploader,
+                course,
+                fileAsset,
+                request.title(),
+                request.description(),
+                request.teacherName(),
+                request.semester(),
+                request.fileType(),
+                request.visibility(),
+                request.tags());
+    }
+
+    private NoteDetailResponse persistNewNote(
+            UUID userId,
+            User uploader,
+            Course course,
+            FileAsset fileAsset,
+            String title,
+            String description,
+            String teacherName,
+            int semester,
+            NoteFileType fileType,
+            NoteVisibility visibility,
+            List<String> tags) {
+        Note note = new Note(
+                uploader,
+                course,
+                fileAsset,
+                title,
+                description,
+                teacherName,
+                semester,
+                fileType,
+                visibility);
+        note.replaceTags(resolveTags(tags));
         Note savedNote = noteRepository.save(note);
 
         noteVersionRepository.save(NoteVersion.initial(savedNote));
@@ -285,6 +348,8 @@ public class NoteService {
                 .orElseThrow(() -> new ResourceNotFoundException("Note"));
         requireViewable(note, userId);
         User user = requireUser(userId);
+        String downloadUrl = storageService.createDownloadUrl(
+                note.getFileAsset());
 
         NoteDownloadEvent event = noteDownloadEventRepository.save(
                 new NoteDownloadEvent(
@@ -301,7 +366,8 @@ public class NoteService {
                 event.getId(),
                 noteId,
                 event.getDownloadedAt(),
-                note.getDownloadCount());
+                note.getDownloadCount(),
+                downloadUrl);
     }
 
     private NoteDetailResponse toDetail(Note note, UUID viewerUserId) {
