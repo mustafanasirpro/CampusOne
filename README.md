@@ -255,7 +255,7 @@ configuration import. Operating-system environment variables take precedence.
 | `REFRESH_TOKEN_CLEANUP_INTERVAL` | No | Defaults to `24h` |
 | `MAX_LOGIN_ATTEMPTS` | No | Defaults to `5` |
 | `ACCOUNT_LOCK_MINUTES` | No | Defaults to `15` |
-| `CORS_ALLOWED_ORIGINS` | Production | Explicit trusted origins; local default is `http://localhost:5173` |
+| `CORS_ALLOWED_ORIGINS` | Production | Explicit trusted origins; local defaults trust `http://localhost:5173` and `http://127.0.0.1:5173` |
 | `OPENAPI_ENABLED` | No | Disabled by default; enabled by the local profile |
 | `FLYWAY_URL` | No | Optional migration-role JDBC URL; falls back to `DB_URL` |
 | `FLYWAY_USERNAME` | No | Optional migration user; falls back to `DB_USERNAME` |
