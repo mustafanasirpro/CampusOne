@@ -17,11 +17,13 @@ class LocalCorsConfigurationTest {
                     .withUserConfiguration(CorsTestConfiguration.class);
 
     @Test
-    void localProfile_withoutEnvironmentOverride_usesTrustedLocalhostOrigin() {
+    void localProfile_withoutEnvironmentOverride_usesTrustedLoopbackOrigins() {
         contextRunner.run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context.getBean(CorsProperties.class).getAllowedOrigins())
-                    .containsExactly("http://localhost:5173");
+                    .containsExactly(
+                            "http://localhost:5173",
+                            "http://127.0.0.1:5173");
         });
     }
 
