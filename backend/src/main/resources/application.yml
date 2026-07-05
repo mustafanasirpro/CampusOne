@@ -69,3 +69,14 @@ app:
     account-lock-duration: ${ACCOUNT_LOCK_MINUTES:15}m
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  storage:
+    provider: ${STORAGE_PROVIDER:disabled}
+    max-upload-size-mb: ${MAX_UPLOAD_SIZE_MB:10}
+    download-url-ttl: ${STORAGE_DOWNLOAD_URL_TTL:10m}
+    r2:
+      endpoint: ${R2_ENDPOINT:}
+      access-key-id: ${R2_ACCESS_KEY_ID:}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+      bucket: ${R2_BUCKET:}
+      region: ${R2_REGION:auto}
+      public-base-url: ${R2_PUBLIC_BASE_URL:}
