@@ -28,16 +28,11 @@ study tools.
 
 The repository currently contains:
 
-- A responsive React frontend with complete product screens and local demo data.
+- A responsive React frontend connected to the CampusOne REST APIs.
 - A modular Spring Boot REST backend with PostgreSQL persistence.
 - Secure JWT authentication with rotating, hashed refresh-token sessions.
 - Versioned Flyway migrations covering the implemented backend modules.
 - Automated controller, service, validation, security, and persistence tests.
-
-> [!IMPORTANT]
-> The frontend experience is implemented, but most screens still use local
-> dummy data. Connecting those screens to the REST backend is the next major
-> integration milestone.
 
 ## ✨ Features
 
@@ -46,7 +41,7 @@ The repository currently contains:
 - Premium landing, login, and signup experiences
 - Responsive student dashboard and navigation
 - Student profiles, preferences, activity, skills, and achievements
-- Notes library with search, filters, bookmarks, previews, and upload flows
+- Notes library with real PDF uploads, search, filters, bookmarks, and downloads
 - Discussion and Q&A experiences with voting and replies
 - Student marketplace listings, wishlists, and seller previews
 - Internship discovery and saved opportunities
@@ -62,7 +57,7 @@ The repository currently contains:
 - Rotating opaque refresh tokens stored as SHA-256 hashes
 - Session logout, replay protection, account lockout, and strict CORS handling
 - Student profiles, skills, preferences, and visibility controls
-- Notes metadata, tags, ratings, bookmarks, downloads, and moderation states
+- R2-backed PDF note uploads, metadata, tags, ratings, downloads, and moderation
 - Marketplace listing CRUD, filters, images metadata, and soft deletion
 - Discussion questions, answers, votes, accepted answers, and pagination
 - Event creation, participation, ownership, capacity, and visibility rules
@@ -83,6 +78,7 @@ The repository currently contains:
 | Database | PostgreSQL, Hibernate, Flyway |
 | Authentication | JWT access tokens, opaque refresh tokens, BCrypt |
 | API documentation | Springdoc OpenAPI and Swagger UI |
+| File storage | Cloudflare R2 through the AWS SDK for Java v2 |
 | Build tools | Maven, npm |
 | Testing | JUnit 5, Mockito, MockMvc, Spring Security Test, Testcontainers |
 
@@ -126,7 +122,7 @@ the project runnable without an AI API key.
 | Authentication | Registration, login, JWT access tokens, refresh rotation, logout, lockout |
 | Academic core | Universities, departments, courses, and reference data |
 | User profiles | Profile editing, skills, preferences, visibility |
-| Notes | Metadata CRUD, tags, ratings, bookmarks, download events |
+| Notes | PDF upload/download, metadata CRUD, tags, ratings, bookmarks, download events |
 | Marketplace | Listing CRUD, filters, image metadata, ownership, soft deletion |
 | Discussions | Questions, answers, voting, accepted answers |
 | Events | Event CRUD, participation, capacity, visibility |
@@ -135,10 +131,7 @@ the project runnable without an AI API key.
 | Global search | Unified search across notes, listings, discussions, events, and internships |
 | Gamification | XP ledger, levels, badges, history, leaderboards |
 | AI Study Assistant | Sessions, messages, summaries, flashcards, quizzes, study plans, usage records |
-
-Admin and moderation management APIs are not implemented yet. Notification and
-XP infrastructure exists, but automatic triggers have not yet been connected
-to every content module.
+| Admin and moderation | User reports, moderator authorization, report workflows, action history |
 
 ## 📁 Project Structure
 
@@ -246,6 +239,7 @@ configuration import. Operating-system environment variables take precedence.
 | `DB_URL` | Yes | PostgreSQL JDBC URL |
 | `DB_USERNAME` | Yes | Runtime database user |
 | `DB_PASSWORD` | Yes | Runtime database password |
+| `SERVER_PORT` | Render | Port supplied by the hosting platform |
 | `JWT_SECRET` | Yes | Standard Base64 secret containing at least 256 bits |
 | `JWT_ISSUER` | No | Defaults to `campusone-backend` |
 | `JWT_AUDIENCE` | No | Defaults to `campusone-api` |
@@ -256,12 +250,30 @@ configuration import. Operating-system environment variables take precedence.
 | `MAX_LOGIN_ATTEMPTS` | No | Defaults to `5` |
 | `ACCOUNT_LOCK_MINUTES` | No | Defaults to `15` |
 | `CORS_ALLOWED_ORIGINS` | No | Comma-separated exact frontend origins; defaults to local Vite origins and should be overridden in production |
+| `APP_CORS_ALLOWED_ORIGINS` | No | Spring-style deployment alias for the same exact-origin CORS setting |
 | `OPENAPI_ENABLED` | No | Enabled by default; set to `false` to disable API documentation |
+| `STORAGE_PROVIDER` | Uploads | Set to `r2` to enable real note uploads; otherwise upload requests return a clean configuration error |
+| `R2_ENDPOINT` | R2 | Cloudflare account S3 API endpoint |
+| `R2_ACCESS_KEY_ID` | R2 | R2 API token access key |
+| `R2_SECRET_ACCESS_KEY` | R2 | R2 API token secret key |
+| `R2_BUCKET` | R2 | Bucket that stores note PDFs |
+| `R2_REGION` | No | Defaults to `auto`, as required by R2's S3-compatible API |
+| `R2_PUBLIC_BASE_URL` | No | Public bucket/custom-domain base URL; when omitted, private presigned download URLs are generated |
+| `MAX_UPLOAD_SIZE_MB` | No | Maximum PDF size; defaults to `10` |
+| `STORAGE_DOWNLOAD_URL_TTL` | No | Private presigned download lifetime; defaults to `10m` |
 | `FLYWAY_URL` | No | Optional migration-role JDBC URL; falls back to `DB_URL` |
 | `FLYWAY_USERNAME` | No | Optional migration user; falls back to `DB_USERNAME` |
 | `FLYWAY_PASSWORD` | No | Optional migration password; falls back to `DB_PASSWORD` |
 
 Secrets and local `.env` files must never be committed.
+
+Cloudflare R2 stores the PDF bytes; PostgreSQL stores only the generated object
+key and file metadata. On Render, set `STORAGE_PROVIDER=r2` and every required
+`R2_*` credential above. The Vercel frontend requires only:
+
+```text
+VITE_API_BASE_URL=https://campusone-backend-otc4.onrender.com/api/v1
+```
 
 ## 💻 Running Locally
 
@@ -316,8 +328,7 @@ With the backend running under the local profile:
 
 Use `POST /api/v1/auth/register` and `POST /api/v1/auth/login` to obtain an
 access token, then select **Authorize** in Swagger UI and enter the bearer
-token. OpenAPI is disabled by default outside local development and should
-remain disabled in untrusted production environments.
+token.
 
 ## 🗺️ Roadmap
 
@@ -326,7 +337,8 @@ remain disabled in untrusted production environments.
 - [x] JWT and refresh-token authentication
 - [x] Profiles, notes, marketplace, discussions, events, and internships
 - [x] Notifications, global search, gamification, and local AI study tools
-- [ ] Connect the React frontend to the REST APIs
+- [x] Connect the React frontend to the REST APIs
+- [x] Store uploaded note PDFs in S3-compatible object storage
 - [ ] Add email verification and password recovery
 - [ ] Add note and image uploads through private object storage
 - [ ] Implement administration and moderation workflows
