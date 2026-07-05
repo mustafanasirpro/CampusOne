@@ -343,7 +343,7 @@ export function NoteForm(props: NoteFormProps) {
               label="Teacher name"
               maxLength={120}
               onChange={(event) => update("teacherName", event.target.value)}
-              placeholder="Dr. Ayesha Malik"
+              placeholder="Instructor name"
               required
               value={form.teacherName}
             />
