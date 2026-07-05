@@ -1,7 +1,6 @@
 import {
   ArrowRight,
   Bell,
-  Bookmark,
   Bot,
   CalendarDays,
   Check,
@@ -12,7 +11,6 @@ import {
   MessageCircle,
   Search,
   Sparkles,
-  Star,
   TrendingUp,
   UsersRound,
 } from "lucide-react";
@@ -25,8 +23,6 @@ import {
   campusOneBenefits,
   landingFaqs,
   landingFeatures,
-  landingStats,
-  testimonials,
 } from "@/data/landing";
 import { paths } from "@/routes/paths";
 import { cn } from "@/utils/cn";
@@ -88,11 +84,14 @@ function DashboardMockup() {
               </div>
             </aside>
 
-            <div className="min-w-0 flex-1 p-3 sm:p-5">
+          <div className="min-w-0 flex-1 p-3 sm:p-5">
+              <p className="mb-3 text-[8px] font-semibold uppercase tracking-wider text-brand-600">
+                Interface preview · illustrative content
+              </p>
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-bold text-slate-950 sm:text-base">
-                    Good morning, Ali
+                    Welcome to your campus workspace
                   </p>
                   <p className="mt-1 text-[8px] text-slate-400 sm:text-[10px]">
                     Here is what is happening at your campus.
@@ -102,16 +101,16 @@ function DashboardMockup() {
                   <span className="grid size-7 place-items-center rounded-lg border border-slate-200 bg-white text-slate-400">
                     <Bell className="size-3" />
                   </span>
-                  <Avatar name="Ali Khan" size="sm" />
+                  <Avatar name="CampusOne student" size="sm" />
                 </div>
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
                 {[
-                  { value: "24", label: "New notes", icon: FileText },
-                  { value: "18", label: "Discussions", icon: MessageCircle },
-                  { value: "08", label: "Events", icon: CalendarDays },
-                  { value: "12", label: "Internships", icon: TrendingUp },
+                  { value: "Browse", label: "Notes", icon: FileText },
+                  { value: "Ask", label: "Discussions", icon: MessageCircle },
+                  { value: "Join", label: "Events", icon: CalendarDays },
+                  { value: "Apply", label: "Internships", icon: TrendingUp },
                 ].map((stat) => (
                   <div
                     className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-sm sm:p-3"
@@ -157,9 +156,8 @@ function DashboardMockup() {
                           <p className="truncate text-[9px] font-semibold text-slate-700">
                             {title}
                           </p>
-                          <p className="mt-1 flex items-center gap-2 text-[7px] text-slate-400">
-                            <span>{24 + index * 9} upvotes</span>
-                            <span>{8 + index * 3} replies</span>
+                          <p className="mt-1 text-[7px] text-slate-400">
+                            Example discussion preview {index + 1}
                           </p>
                         </div>
                       </div>
@@ -212,18 +210,18 @@ function DashboardMockup() {
           <Download className="size-4" />
         </span>
         <div>
-          <p className="text-xs font-bold text-slate-900">Notes downloaded</p>
-          <p className="text-[10px] text-slate-400">Database Systems · 2m ago</p>
+          <p className="text-xs font-bold text-slate-900">Study resources</p>
+          <p className="text-[10px] text-slate-400">Browse the notes library</p>
         </div>
       </div>
 
       <div className="animate-campus-float absolute -right-3 top-20 hidden items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl [animation-delay:1s] md:flex">
         <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-600">
-          <Star className="size-4 fill-amber-400" />
+          <Sparkles className="size-4" />
         </span>
         <div>
-          <p className="text-xs font-bold text-slate-900">+120 XP earned</p>
-          <p className="text-[10px] text-slate-400">Top contributor this week</p>
+          <p className="text-xs font-bold text-slate-900">Gamification</p>
+          <p className="text-[10px] text-slate-400">Earn XP by contributing</p>
         </div>
       </div>
     </div>
@@ -281,20 +279,8 @@ export function LandingPage() {
                 Explore campus
               </Link>
             </div>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 text-sm text-slate-500 sm:flex-row">
-              <div className="flex -space-x-2">
-                {["Ali Khan", "Sara Ahmed", "Hamza Raza", "Ayesha Malik"].map(
-                  (name) => (
-                    <Avatar key={name} name={name} size="sm" />
-                  ),
-                )}
-              </div>
-              <span>
-                Joining students from{" "}
-                <strong className="font-semibold text-slate-700">
-                  Pakistan’s leading universities
-                </strong>
-              </span>
+            <div className="mt-8 text-sm text-slate-500">
+              Built for focused university communities.
             </div>
           </Reveal>
 
@@ -355,43 +341,47 @@ export function LandingPage() {
               <div className="absolute -bottom-16 -right-16 size-56 rounded-full bg-campus-500/15 blur-3xl" />
               <div className="relative rounded-2xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
                 <div className="flex items-center gap-3">
-                  <Avatar name="Ayesha Malik" />
+                  <Avatar name="CampusOne student" />
                   <div>
                     <p className="text-sm font-semibold text-white">
-                      Ayesha Malik
+                      Your student profile
                     </p>
                     <p className="text-xs text-slate-400">
-                      Data Science · NUST
+                      Real account data from CampusOne
                     </p>
                   </div>
-                  <Badge className="ml-auto bg-amber-400/10 text-amber-300 ring-amber-300/20">
-                    2,480 XP
+                  <Badge className="ml-auto bg-brand-400/10 text-brand-200 ring-brand-300/20">
+                    Live profile
                   </Badge>
                 </div>
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   <div className="rounded-xl border border-white/10 bg-white/[0.05] p-4">
                     <FileText className="size-5 text-brand-300" />
-                    <p className="mt-3 text-xl font-bold text-white">38</p>
-                    <p className="text-xs text-slate-400">Notes shared</p>
+                    <p className="mt-3 text-sm font-bold text-white">
+                      Share resources
+                    </p>
+                    <p className="text-xs text-slate-400">Notes module</p>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-white/[0.05] p-4">
                     <UsersRound className="size-5 text-emerald-300" />
-                    <p className="mt-3 text-xl font-bold text-white">126</p>
-                    <p className="text-xs text-slate-400">Students helped</p>
+                    <p className="mt-3 text-sm font-bold text-white">
+                      Help students
+                    </p>
+                    <p className="text-xs text-slate-400">Discussion module</p>
                   </div>
                 </div>
                 <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.05] p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="grid size-8 place-items-center rounded-lg bg-brand-500/20 text-brand-200">
-                        <Bookmark className="size-4" />
+                        <Sparkles className="size-4" />
                       </span>
                       <div>
                         <p className="text-xs font-semibold text-white">
-                          Saved for later
+                          Connected workspace
                         </p>
                         <p className="text-[10px] text-slate-400">
-                          6 notes · 3 internships · 2 events
+                          Notes · internships · events
                         </p>
                       </div>
                     </div>
@@ -433,74 +423,6 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="bg-brand-700 px-4 py-14 sm:px-6 sm:py-16 lg:px-8">
-        <Reveal className="mx-auto grid max-w-7xl grid-cols-2 gap-y-10 text-center lg:grid-cols-4">
-          {landingStats.map((stat, index) => (
-            <div
-              className={cn(
-                "px-4",
-                index % 2 !== 0 && "border-l border-white/15",
-                index > 1 && "lg:border-l",
-                index === 2 && "border-l-0",
-              )}
-              key={stat.label}
-            >
-              <p className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                {stat.value}
-              </p>
-              <p className="mt-2 text-xs font-medium uppercase tracking-[0.12em] text-brand-200 sm:text-sm">
-                {stat.label}
-              </p>
-            </div>
-          ))}
-        </Reveal>
-      </section>
-
-      <section className="bg-white px-4 py-20 sm:px-6 sm:py-28 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <Reveal className="mx-auto max-w-2xl text-center">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600">
-              Student stories
-            </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-5xl">
-              Made for the way campus really works.
-            </h2>
-          </Reveal>
-          <div className="mt-12 grid gap-4 lg:grid-cols-3">
-            {testimonials.map((testimonial, index) => (
-              <Reveal delay={index * 80} key={testimonial.name}>
-                <Card className="h-full transition duration-300 hover:-translate-y-1 hover:shadow-xl">
-                  <CardContent className="flex h-full flex-col p-6 sm:p-7">
-                    <div className="flex gap-1 text-amber-400">
-                      {Array.from({ length: 5 }, (_, star) => (
-                        <Star
-                          className="size-4 fill-current"
-                          key={`${testimonial.name}-${star}`}
-                        />
-                      ))}
-                    </div>
-                    <blockquote className="mt-5 flex-1 text-base leading-7 text-slate-700">
-                      “{testimonial.quote}”
-                    </blockquote>
-                    <div className="mt-6 flex items-center gap-3 border-t border-slate-100 pt-5">
-                      <Avatar name={testimonial.name} />
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">
-                          {testimonial.name}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {testimonial.role}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section
         className="scroll-mt-24 border-y border-slate-200 bg-slate-50 px-4 py-20 sm:px-6 sm:py-28 lg:px-8"
         id="faq"
@@ -514,14 +436,8 @@ export function LandingPage() {
               Everything you might want to know.
             </h2>
             <p className="mt-4 text-sm leading-6 text-slate-600">
-              Still curious? Reach us at{" "}
-              <a
-                className="font-semibold text-brand-700 hover:underline"
-                href="mailto:hello@campusone.pk"
-              >
-                hello@campusone.pk
-              </a>
-              .
+              These answers describe the features available in the current
+              CampusOne codebase.
             </p>
           </Reveal>
 
@@ -634,13 +550,9 @@ export function LandingPage() {
                 <Link className="hover:text-brand-700" to={paths.signup}>
                   Join CampusOne
                 </Link>
-                <a
-                  className="hover:text-brand-700"
-                  href="mailto:hello@campusone.pk"
-                >
-                  Contact
-                </a>
-                <span>Student ambassadors</span>
+                <Link className="hover:text-brand-700" to={paths.signup}>
+                  Create an account
+                </Link>
               </div>
             </div>
             <div>
@@ -652,7 +564,9 @@ export function LandingPage() {
                 <Link className="hover:text-brand-700" to={paths.signup}>
                   Sign up
                 </Link>
-                <span>Privacy</span>
+                <Link className="hover:text-brand-700" to={paths.login}>
+                  Existing account
+                </Link>
               </div>
             </div>
           </div>
