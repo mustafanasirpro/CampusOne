@@ -14,6 +14,7 @@ import {
   getStoredAccessToken,
   getStoredAuthUser,
   storeAuthSession,
+  updateStoredAuthUser,
 } from "@/auth/authStorage";
 import {
   AuthContext,
@@ -99,6 +100,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearAuthError = useCallback(() => setAuthError(null), []);
+  const syncCurrentUser = useCallback(
+    (update: Pick<NonNullable<typeof currentUser>, "email" | "fullName">) => {
+      updateStoredAuthUser(update);
+      setCurrentUser((current) =>
+        current ? { ...current, ...update } : current,
+      );
+    },
+    [],
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -111,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       register,
+      syncCurrentUser,
     }),
     [
       accessToken,
@@ -121,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       register,
+      syncCurrentUser,
     ],
   );
 
