@@ -1,5 +1,17 @@
-import { FileArchive, Save } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import {
+  FileArchive,
+  FileText,
+  Save,
+  Trash2,
+  UploadCloud,
+} from "lucide-react";
+import {
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 
 import { Button, Card, CardContent } from "@/components/common";
 import { FormField, SelectField } from "@/components/forms";
@@ -8,26 +20,20 @@ import type {
   NoteDetail,
   NoteFileType,
   NoteVisibility,
-  StorageProvider,
   UpdateNoteRequest,
 } from "@/types/notes";
 import { cn } from "@/utils/cn";
+import { formatFileSize } from "./noteFormatting";
 
-type FormErrors = Partial<Record<keyof NoteFormState, string>>;
+type FormErrors = Partial<
+  Record<keyof NoteFormState | "file", string>
+>;
 
 interface NoteFormState {
-  bucketName: string;
-  checksumSha256: string;
   courseId: string;
   description: string;
-  expiresAt: string;
   fileType: NoteFileType;
-  mimeType: string;
-  objectKey: string;
-  originalFilename: string;
   semester: string;
-  sizeBytes: string;
-  storageProvider: StorageProvider;
   tags: string;
   teacherName: string;
   title: string;
@@ -43,7 +49,10 @@ interface CommonNoteFormProps {
 type NoteFormProps =
   | (CommonNoteFormProps & {
       mode: "create";
-      onSubmit: (request: CreateNoteRequest) => Promise<void>;
+      onSubmit: (
+        request: CreateNoteRequest,
+        file: File,
+      ) => Promise<void>;
     })
   | (CommonNoteFormProps & {
       initialNote: NoteDetail;
@@ -51,10 +60,9 @@ type NoteFormProps =
       onSubmit: (request: UpdateNoteRequest) => Promise<void>;
     });
 
+const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const checksumPattern = /^[0-9a-f]{64}$/i;
-const mimeTypePattern = /^[^/\s]+\/[^/\s]+$/;
 
 const fileTypeOptions = [
   "PDF",
@@ -72,13 +80,6 @@ const visibilityOptions = [
   { label: "Private", value: "PRIVATE" },
 ];
 
-const storageOptions = [
-  { label: "Local metadata", value: "LOCAL" },
-  { label: "MinIO", value: "MINIO" },
-  { label: "Amazon S3", value: "S3" },
-  { label: "S3 compatible", value: "S3_COMPATIBLE" },
-];
-
 const semesterOptions = Array.from({ length: 8 }, (_, index) => ({
   label: `Semester ${index + 1}`,
   value: String(index + 1),
@@ -86,18 +87,10 @@ const semesterOptions = Array.from({ length: 8 }, (_, index) => ({
 
 function initialState(initialNote?: NoteDetail): NoteFormState {
   return {
-    bucketName: "",
-    checksumSha256: "",
     courseId: initialNote?.course.id ?? "",
     description: initialNote?.description ?? "",
-    expiresAt: "",
     fileType: initialNote?.fileType ?? "PDF",
-    mimeType: "",
-    objectKey: "",
-    originalFilename: "",
     semester: String(initialNote?.semester ?? 1),
-    sizeBytes: "",
-    storageProvider: "LOCAL",
     tags: initialNote?.tags.map((tag) => tag.name).join(", ") ?? "",
     teacherName: initialNote?.teacherName ?? "",
     title: initialNote?.title ?? "",
@@ -152,11 +145,14 @@ function TextAreaField({
 }
 
 export function NoteForm(props: NoteFormProps) {
+  const fileInputId = useId();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const initialNote =
     props.mode === "edit" ? props.initialNote : undefined;
   const [form, setForm] = useState<NoteFormState>(() =>
     initialState(initialNote),
   );
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
 
   const update = <Key extends keyof NoteFormState>(
@@ -169,7 +165,46 @@ export function NoteForm(props: NoteFormProps) {
 
   const backendError = (key: string) =>
     props.backendFieldErrors?.[key]?.[0] ??
-    props.backendFieldErrors?.[`file.${key}`]?.[0];
+    props.backendFieldErrors?.[`note.${key}`]?.[0];
+
+  const selectFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setErrors((current) => ({ ...current, file: undefined }));
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
+    if (
+      file.type !== "application/pdf" ||
+      !file.name.toLowerCase().endsWith(".pdf")
+    ) {
+      setSelectedFile(null);
+      setErrors((current) => ({
+        ...current,
+        file: "Select a PDF file.",
+      }));
+      event.target.value = "";
+      return;
+    }
+    if (file.size > MAX_PDF_SIZE_BYTES) {
+      setSelectedFile(null);
+      setErrors((current) => ({
+        ...current,
+        file: "The PDF must not exceed 10 MB.",
+      }));
+      event.target.value = "";
+      return;
+    }
+    setSelectedFile(file);
+  };
+
+  const removeSelectedFile = () => {
+    setSelectedFile(null);
+    setErrors((current) => ({ ...current, file: undefined }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const validate = () => {
     const nextErrors: FormErrors = {};
@@ -194,40 +229,8 @@ export function NoteForm(props: NoteFormProps) {
     } else if (tags.some((tag) => tag.length < 2 || tag.length > 40)) {
       nextErrors.tags = "Each tag must contain 2 to 40 characters.";
     }
-
-    if (props.mode === "create") {
-      if (form.bucketName.trim().length < 3) {
-        nextErrors.bucketName =
-          "Bucket name must contain at least 3 characters.";
-      }
-      if (!form.objectKey.trim()) {
-        nextErrors.objectKey = "Enter the storage object key.";
-      }
-      if (!form.originalFilename.trim()) {
-        nextErrors.originalFilename = "Enter the original filename.";
-      }
-      if (!mimeTypePattern.test(form.mimeType.trim())) {
-        nextErrors.mimeType =
-          "Use a valid MIME type such as application/pdf.";
-      }
-      if (!Number.isFinite(Number(form.sizeBytes)) || Number(form.sizeBytes) <= 0) {
-        nextErrors.sizeBytes = "File size must be greater than zero.";
-      }
-      if (
-        form.checksumSha256.trim() &&
-        !checksumPattern.test(form.checksumSha256.trim())
-      ) {
-        nextErrors.checksumSha256 =
-          "Checksum must contain exactly 64 hexadecimal characters.";
-      }
-      if (form.expiresAt) {
-        const expiresAt = new Date(form.expiresAt);
-        if (Number.isNaN(expiresAt.getTime())) {
-          nextErrors.expiresAt = "Choose a valid expiry date.";
-        } else if (expiresAt.getTime() <= Date.now()) {
-          nextErrors.expiresAt = "Expiry must be in the future.";
-        }
-      }
+    if (props.mode === "create" && !selectedFile) {
+      nextErrors.file = "Select a PDF file to upload.";
     }
 
     setErrors(nextErrors);
@@ -241,7 +244,7 @@ export function NoteForm(props: NoteFormProps) {
     const commonRequest = {
       courseId: form.courseId.trim(),
       description: form.description.trim(),
-      fileType: form.fileType,
+      fileType: props.mode === "create" ? ("PDF" as const) : form.fileType,
       semester: Number(form.semester),
       tags: normalizedTags(form.tags),
       teacherName: form.teacherName.trim(),
@@ -250,51 +253,38 @@ export function NoteForm(props: NoteFormProps) {
     };
 
     if (props.mode === "create") {
-      await props.onSubmit({
-        ...commonRequest,
-        file: {
-          bucketName: form.bucketName.trim(),
-          checksumSha256:
-            form.checksumSha256.trim().toLowerCase() || null,
-          expiresAt: form.expiresAt
-            ? new Date(form.expiresAt).toISOString()
-            : null,
-          mimeType: form.mimeType.trim().toLowerCase(),
-          objectKey: form.objectKey.trim(),
-          originalFilename: form.originalFilename.trim(),
-          sizeBytes: Number(form.sizeBytes),
-          storageProvider: form.storageProvider,
-        },
-      });
-    } else {
-      const initialTags = props.initialNote.tags.map((tag) => tag.name);
-      const updateRequest: UpdateNoteRequest = {};
-      if (commonRequest.courseId !== props.initialNote.course.id) {
-        updateRequest.courseId = commonRequest.courseId;
-      }
-      if (commonRequest.title !== props.initialNote.title) {
-        updateRequest.title = commonRequest.title;
-      }
-      if (commonRequest.description !== props.initialNote.description) {
-        updateRequest.description = commonRequest.description;
-      }
-      if (commonRequest.teacherName !== props.initialNote.teacherName) {
-        updateRequest.teacherName = commonRequest.teacherName;
-      }
-      if (commonRequest.semester !== props.initialNote.semester) {
-        updateRequest.semester = commonRequest.semester;
-      }
-      if (commonRequest.fileType !== props.initialNote.fileType) {
-        updateRequest.fileType = commonRequest.fileType;
-      }
-      if (commonRequest.visibility !== props.initialNote.visibility) {
-        updateRequest.visibility = commonRequest.visibility;
-      }
-      if (!sameTags(commonRequest.tags, initialTags)) {
-        updateRequest.tags = commonRequest.tags;
-      }
-      await props.onSubmit(updateRequest);
+      if (!selectedFile) return;
+      await props.onSubmit(commonRequest, selectedFile);
+      return;
     }
+
+    const initialTags = props.initialNote.tags.map((tag) => tag.name);
+    const updateRequest: UpdateNoteRequest = {};
+    if (commonRequest.courseId !== props.initialNote.course.id) {
+      updateRequest.courseId = commonRequest.courseId;
+    }
+    if (commonRequest.title !== props.initialNote.title) {
+      updateRequest.title = commonRequest.title;
+    }
+    if (commonRequest.description !== props.initialNote.description) {
+      updateRequest.description = commonRequest.description;
+    }
+    if (commonRequest.teacherName !== props.initialNote.teacherName) {
+      updateRequest.teacherName = commonRequest.teacherName;
+    }
+    if (commonRequest.semester !== props.initialNote.semester) {
+      updateRequest.semester = commonRequest.semester;
+    }
+    if (commonRequest.fileType !== props.initialNote.fileType) {
+      updateRequest.fileType = commonRequest.fileType;
+    }
+    if (commonRequest.visibility !== props.initialNote.visibility) {
+      updateRequest.visibility = commonRequest.visibility;
+    }
+    if (!sameTags(commonRequest.tags, initialTags)) {
+      updateRequest.tags = commonRequest.tags;
+    }
+    await props.onSubmit(updateRequest);
   };
 
   return (
@@ -331,7 +321,7 @@ export function NoteForm(props: NoteFormProps) {
           <div className="grid gap-5 md:grid-cols-2">
             <FormField
               error={errors.courseId ?? backendError("courseId")}
-              hint="No public course-directory API is available yet."
+              hint="Use the course ID supplied by your CampusOne course directory."
               label="Course ID"
               onChange={(event) => update("courseId", event.target.value)}
               placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
@@ -349,7 +339,14 @@ export function NoteForm(props: NoteFormProps) {
             />
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-3">
+          <div
+            className={cn(
+              "grid gap-5",
+              props.mode === "create"
+                ? "sm:grid-cols-2"
+                : "sm:grid-cols-3",
+            )}
+          >
             <SelectField
               error={errors.semester ?? backendError("semester")}
               label="Semester"
@@ -358,16 +355,18 @@ export function NoteForm(props: NoteFormProps) {
               required
               value={form.semester}
             />
-            <SelectField
-              error={errors.fileType ?? backendError("fileType")}
-              label="File type"
-              onChange={(event) =>
-                update("fileType", event.target.value as NoteFileType)
-              }
-              options={fileTypeOptions}
-              required
-              value={form.fileType}
-            />
+            {props.mode === "edit" ? (
+              <SelectField
+                error={errors.fileType ?? backendError("fileType")}
+                label="File type"
+                onChange={(event) =>
+                  update("fileType", event.target.value as NoteFileType)
+                }
+                options={fileTypeOptions}
+                required
+                value={form.fileType}
+              />
+            ) : null}
             <SelectField
               error={errors.visibility ?? backendError("visibility")}
               label="Visibility"
@@ -400,123 +399,87 @@ export function NoteForm(props: NoteFormProps) {
               </span>
               <div>
                 <h2 className="text-lg font-semibold text-slate-950">
-                  File metadata
+                  PDF study resource
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Binary upload is not enabled yet. Enter metadata for an
-                  object that will later be managed by CampusOne storage.
+                  Upload one PDF up to 10 MB. CampusOne securely generates
+                  its storage key, MIME metadata, size, and checksum.
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              <SelectField
-                error={
-                  errors.storageProvider ??
-                  backendError("storageProvider")
-                }
-                label="Storage provider"
-                onChange={(event) =>
-                  update(
-                    "storageProvider",
-                    event.target.value as StorageProvider,
-                  )
-                }
-                options={storageOptions}
-                required
-                value={form.storageProvider}
+            <label
+              className={cn(
+                "grid cursor-pointer place-items-center gap-3 rounded-2xl border-2 border-dashed px-5 py-8 text-center transition",
+                errors.file || backendError("file")
+                  ? "border-red-300 bg-red-50 hover:border-red-400"
+                  : "border-slate-300 bg-slate-50 hover:border-brand-400 hover:bg-brand-50/40",
+              )}
+              htmlFor={fileInputId}
+            >
+              <UploadCloud className="size-8 text-brand-600" />
+              <span>
+                <span className="block text-sm font-semibold text-slate-800">
+                  Select a PDF
+                </span>
+                <span className="mt-1 block text-xs text-slate-500">
+                  PDF only · maximum 10 MB
+                </span>
+              </span>
+              <input
+                accept=".pdf,application/pdf"
+                className="sr-only"
+                disabled={props.isSubmitting}
+                id={fileInputId}
+                onChange={selectFile}
+                ref={fileInputRef}
+                type="file"
               />
-              <FormField
-                error={errors.bucketName ?? backendError("bucketName")}
-                label="Bucket name"
-                maxLength={100}
-                onChange={(event) =>
-                  update("bucketName", event.target.value)
-                }
-                placeholder="campusone-notes"
-                required
-                value={form.bucketName}
-              />
-            </div>
+            </label>
 
-            <FormField
-              error={errors.objectKey ?? backendError("objectKey")}
-              label="Object key"
-              maxLength={1024}
-              onChange={(event) => update("objectKey", event.target.value)}
-              placeholder="notes/2026/oop-final-revision.pdf"
-              required
-              value={form.objectKey}
-            />
+            {errors.file || backendError("file") ? (
+              <p className="text-sm font-medium text-red-600" role="alert">
+                {errors.file ?? backendError("file")}
+              </p>
+            ) : null}
 
-            <div className="grid gap-5 sm:grid-cols-2">
-              <FormField
-                error={
-                  errors.originalFilename ??
-                  backendError("originalFilename")
-                }
-                label="Original filename"
-                maxLength={255}
-                onChange={(event) =>
-                  update("originalFilename", event.target.value)
-                }
-                placeholder="oop-final-revision.pdf"
-                required
-                value={form.originalFilename}
-              />
-              <FormField
-                error={errors.mimeType ?? backendError("mimeType")}
-                label="MIME type"
-                maxLength={127}
-                onChange={(event) => update("mimeType", event.target.value)}
-                placeholder="application/pdf"
-                required
-                value={form.mimeType}
-              />
-            </div>
-
-            <div className="grid gap-5 sm:grid-cols-2">
-              <FormField
-                error={errors.sizeBytes ?? backendError("sizeBytes")}
-                label="File size in bytes"
-                min={1}
-                onChange={(event) => update("sizeBytes", event.target.value)}
-                placeholder="1048576"
-                required
-                type="number"
-                value={form.sizeBytes}
-              />
-              <FormField
-                error={errors.expiresAt ?? backendError("expiresAt")}
-                hint="Optional; must be in the future."
-                label="Metadata expiry"
-                onChange={(event) => update("expiresAt", event.target.value)}
-                type="datetime-local"
-                value={form.expiresAt}
-              />
-            </div>
-
-            <FormField
-              error={
-                errors.checksumSha256 ??
-                backendError("checksumSha256")
-              }
-              hint="Optional 64-character SHA-256 checksum."
-              label="SHA-256 checksum"
-              maxLength={64}
-              onChange={(event) =>
-                update("checksumSha256", event.target.value)
-              }
-              placeholder="64 hexadecimal characters"
-              value={form.checksumSha256}
-            />
+            {selectedFile ? (
+              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-emerald-700 shadow-sm">
+                  <FileText className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-slate-900">
+                    {selectedFile.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {formatFileSize(selectedFile.size)} · PDF
+                  </p>
+                </div>
+                <Button
+                  aria-label={`Remove ${selectedFile.name}`}
+                  disabled={props.isSubmitting}
+                  onClick={removeSelectedFile}
+                  size="sm"
+                  variant="outline"
+                >
+                  <Trash2 className="size-4" />
+                  Remove
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : (
         <Card className="border-brand-100 bg-brand-50/40">
-          <CardContent className="p-5 text-sm leading-6 text-brand-800">
-            The backend does not allow replacing file metadata through the
-            note update endpoint. This edit updates descriptive fields only.
+          <CardContent className="flex items-start gap-3 p-5 text-sm leading-6 text-brand-800">
+            <FileText className="mt-0.5 size-5 shrink-0" />
+            <span>
+              This edit keeps the existing file{" "}
+              <strong>{props.initialNote.file.originalFilename}</strong>.
+              File replacement is not available on the metadata update
+              endpoint.
+            </span>
           </CardContent>
         </Card>
       )}
