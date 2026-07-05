@@ -16,7 +16,7 @@ app:
   cors:
     # This fallback exists only in the local profile. All other profiles must
     # provide an explicit trusted-origin list.
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
 
 logging:
   level:
