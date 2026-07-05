@@ -49,12 +49,28 @@ export function NotificationMenu() {
 
   useEffect(() => {
     const controller = new AbortController();
+    let active = true;
     void getUnreadCount(controller.signal)
-      .then((response) => setUnreadCount(response.unreadCount))
-      .catch(() => {
-        // The full inbox still reports errors when the user opens it.
+      .then((response) => {
+        if (active) setUnreadCount(response.unreadCount);
+      })
+      .catch((requestError: unknown) => {
+        if (
+          active &&
+          !(requestError instanceof DOMException &&
+            requestError.name === "AbortError")
+        ) {
+          setError(
+            requestError instanceof ApiError
+              ? requestError.message
+              : "The unread notification count could not be loaded.",
+          );
+        }
       });
-    return () => controller.abort();
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {
