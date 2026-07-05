@@ -2,7 +2,7 @@ import { BookOpenCheck, ShieldCheck, Sparkles, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { Avatar, Badge } from "@/components/common";
+import { Badge } from "@/components/common";
 
 export interface AuthPageShellProps {
   alternateAction: string;
@@ -63,17 +63,13 @@ export function AuthPageShell({
         </div>
 
         <div className="relative mt-auto rounded-2xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur">
-          <p className="text-sm leading-6 text-slate-200">
-            “One place for the things students usually spend hours finding
-            across groups, drives, and scattered links.”
+          <p className="text-sm font-semibold text-white">
+            One connected student workspace
           </p>
-          <div className="mt-4 flex items-center gap-3">
-            <Avatar name="Sara Ahmed" size="sm" />
-            <div>
-              <p className="text-sm font-semibold">Sara Ahmed</p>
-              <p className="text-xs text-slate-400">FAST Islamabad</p>
-            </div>
-          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            Find resources, ask questions, discover opportunities, and use
+            study tools without relying on scattered groups and links.
+          </p>
         </div>
       </aside>
 
@@ -105,4 +101,3 @@ export function AuthPageShell({
     </div>
   );
 }
-
