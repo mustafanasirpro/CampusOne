@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, Search, SearchX } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { ApiError } from "@/api/apiClient";
 import {
@@ -29,34 +30,81 @@ import { useDocumentTitle } from "@/utils/useDocumentTitle";
 
 const pageSize = 10;
 
+function normalizedSearchQuery(value: string | null) {
+  const normalized = value?.trim() ?? "";
+  return normalized.length >= 2 && normalized.length <= 100
+    ? normalized
+    : "";
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 export function SearchPage() {
-  const [draft, setDraft] = useState("");
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = normalizedSearchQuery(searchParams.get("q"));
+  const [draftState, setDraftState] = useState({
+    sourceQuery: query,
+    value: query,
+  });
+  const draft =
+    draftState.sourceQuery === query ? draftState.value : query;
+  const [pageState, setPageState] = useState({
+    page: 0,
+    query,
+  });
+  const page = pageState.query === query ? pageState.page : 0;
   const [sort, setSort] = useState<GlobalSearchSort>("RELEVANCE");
   const [selectedTypes, setSelectedTypes] = useState<GlobalSearchType[]>([]);
   const [availableTypes, setAvailableTypes] = useState<SearchTypeMetadata[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [result, setResult] = useState<GlobalSearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filterError, setFilterError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(Boolean(query));
   const [searchKey, setSearchKey] = useState(0);
+  const searchPending =
+    isLoading ||
+    (Boolean(query) && !error && result?.query !== query);
 
   useDocumentTitle("Global Search · CampusOne");
 
+  const setPage = (nextPage: number | ((current: number) => number)) => {
+    setPageState((current) => {
+      const currentPage = current.query === query ? current.page : 0;
+      return {
+        page:
+          typeof nextPage === "function"
+            ? nextPage(currentPage)
+            : nextPage,
+        query,
+      };
+    });
+  };
+
   useEffect(() => {
     const controller = new AbortController();
+    let active = true;
     void getSearchTypes(controller.signal)
-      .then(setAvailableTypes)
-      .catch((requestError: unknown) =>
-        setError(
+      .then((response) => {
+        if (!active) return;
+        setAvailableTypes(response);
+        setFilterError(null);
+      })
+      .catch((requestError: unknown) => {
+        if (!active || isAbortError(requestError)) return;
+        setFilterError(
           requestError instanceof ApiError
             ? requestError.message
             : "Search filters could not be loaded.",
-        ),
-      );
-    return () => controller.abort();
+        );
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, []);
 
   useEffect(() => {
@@ -65,7 +113,9 @@ export function SearchPage() {
     const timeout = window.setTimeout(() => {
       void getSearchSuggestions(draft.trim(), 5, controller.signal)
         .then((response) => setSuggestions(response.suggestions))
-        .catch(() => setSuggestions([]));
+        .catch((requestError: unknown) => {
+          if (!isAbortError(requestError)) setSuggestions([]);
+        });
     }, 250);
     return () => {
       window.clearTimeout(timeout);
@@ -118,14 +168,14 @@ export function SearchPage() {
       setValidationError("Search queries cannot exceed 100 characters.");
       return;
     }
-    setDraft(normalized);
-    setQuery(normalized);
+    setDraftState({ sourceQuery: normalized, value: normalized });
     setPage(0);
     setSuggestions([]);
     setValidationError(null);
     setError(null);
     setIsLoading(true);
     setSearchKey((value) => value + 1);
+    setSearchParams({ q: normalized });
   };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -165,7 +215,10 @@ export function SearchPage() {
             id="global-search-query"
             maxLength={100}
             onChange={(event) => {
-              setDraft(event.target.value);
+              setDraftState({
+                sourceQuery: query,
+                value: event.target.value,
+              });
               setValidationError(null);
               if (event.target.value.trim().length < 2) setSuggestions([]);
             }}
@@ -179,6 +232,7 @@ export function SearchPage() {
         </Button>
       </form>
       {validationError ? <ErrorMessage message={validationError} /> : null}
+      {filterError ? <ErrorMessage message={filterError} /> : null}
       <SearchSuggestions
         onSelect={(suggestion) => runSearch(suggestion)}
         suggestions={suggestions}
@@ -195,19 +249,19 @@ export function SearchPage() {
         sort={sort}
       />
       {error ? <ErrorMessage message={error} /> : null}
-      {isLoading ? (
+      {searchPending ? (
         <div className="grid min-h-72 place-items-center rounded-2xl border border-slate-200 bg-white">
           <LoadingSpinner label="Searching CampusOne" />
         </div>
       ) : null}
-      {!query && !isLoading ? (
+      {!query && !searchPending ? (
         <EmptyState
           description="Enter a topic, course, company, event, or item to begin."
           icon={<Search className="size-6" />}
           title="What are you looking for?"
         />
       ) : null}
-      {query && !isLoading && !error && result?.results.length === 0 ? (
+      {query && !searchPending && !error && result?.results.length === 0 ? (
         <EmptyState
           action={
             selectedTypes.length > 0 ? (
@@ -228,7 +282,7 @@ export function SearchPage() {
           title="No results found"
         />
       ) : null}
-      {!isLoading && !error && result && result.results.length > 0 ? (
+      {!searchPending && !error && result && result.results.length > 0 ? (
         <>
           <p className="text-sm text-slate-500">
             {result.totalElements.toLocaleString()} results for “{result.query}”
