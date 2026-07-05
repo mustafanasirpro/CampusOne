@@ -115,6 +115,29 @@ public class FileAsset {
         this.expiresAt = expiresAt;
     }
 
+    public static FileAsset uploaded(
+            User owner,
+            StorageProvider storageProvider,
+            String bucketName,
+            String objectKey,
+            String originalFilename,
+            String mimeType,
+            long sizeBytes,
+            String checksumSha256) {
+        FileAsset fileAsset = new FileAsset(
+                owner,
+                storageProvider,
+                bucketName,
+                objectKey,
+                originalFilename,
+                mimeType,
+                sizeBytes,
+                checksumSha256,
+                null);
+        fileAsset.status = FileAssetStatus.READY;
+        return fileAsset;
+    }
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
