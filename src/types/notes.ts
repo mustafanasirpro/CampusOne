@@ -91,21 +91,9 @@ export interface NotePage {
   totalPages: number;
 }
 
-export interface FileMetadataRequest {
-  bucketName: string;
-  checksumSha256?: string | null;
-  expiresAt?: string | null;
-  mimeType: string;
-  objectKey: string;
-  originalFilename: string;
-  sizeBytes: number;
-  storageProvider: StorageProvider;
-}
-
 export interface CreateNoteRequest {
   courseId: string;
   description: string;
-  file: FileMetadataRequest;
   fileType: NoteFileType;
   semester: number;
   tags: string[];
@@ -149,6 +137,7 @@ export interface RatingResult {
 export interface DownloadEventResult {
   downloadedAt: string;
   downloadCount: number;
+  downloadUrl: string;
   eventId: string;
   noteId: string;
 }
