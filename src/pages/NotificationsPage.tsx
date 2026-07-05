@@ -151,8 +151,15 @@ export function NotificationsPage() {
         const updated = await markNotificationRead(notification.id);
         updateNotification(updated);
         setUnreadCount((value) => Math.max(0, value - 1));
-      } catch {
-        // Opening the destination remains useful if marking read fails.
+      } catch (requestError) {
+        showToast({
+          title: "Could not mark notification as read",
+          message:
+            requestError instanceof ApiError
+              ? requestError.message
+              : "The destination will still open.",
+          variant: "error",
+        });
       } finally {
         setBusyAction(null);
       }
