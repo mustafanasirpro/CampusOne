@@ -52,9 +52,16 @@ export function getNoteById(noteId: string, signal?: AbortSignal) {
   return apiRequest<NoteDetail>(`/notes/${noteId}`, { signal });
 }
 
-export function createNote(request: CreateNoteRequest) {
-  return apiRequest<NoteDetail>("/notes", {
-    body: JSON.stringify(request),
+export function createNote(request: CreateNoteRequest, file: File) {
+  const formData = new FormData();
+  formData.append(
+    "note",
+    new Blob([JSON.stringify(request)], { type: "application/json" }),
+  );
+  formData.append("file", file);
+
+  return apiRequest<NoteDetail>("/notes/upload", {
+    body: formData,
     method: "POST",
   });
 }
