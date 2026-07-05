@@ -232,7 +232,7 @@ export function SignupPage() {
             maxLength={80}
             name="fullName"
             onChange={updateInput("fullName")}
-            placeholder="Ali Khan"
+            placeholder="Your full name"
             required
             value={form.fullName}
           />
