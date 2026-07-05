@@ -1,705 +1,618 @@
 import {
-  Bell,
-  Check,
-  Eye,
-  Laptop,
+  GraduationCap,
   LockKeyhole,
   LogOut,
-  Monitor,
-  Moon,
   Palette,
   Save,
-  ShieldCheck,
-  SlidersHorizontal,
-  Smartphone,
-  Sun,
   UserRound,
 } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 
+import { ApiError } from "@/api/apiClient";
+import {
+  getCurrentUserProfile,
+  replaceCurrentUserSkills,
+  updateCurrentUser,
+  type CurrentUserIdentity,
+  type ProfileVisibility,
+  type ThemePreference,
+} from "@/api/userApi";
+import { useAuth } from "@/auth/useAuth";
 import {
   Avatar,
-  Badge,
   Button,
   Card,
   CardContent,
-  Modal,
+  ErrorMessage,
+  LoadingSpinner,
   PageHeader,
   Switch,
   useToast,
 } from "@/components/common";
-import { FormField, PasswordField, SelectField } from "@/components/forms";
+import { FormField, SelectField } from "@/components/forms";
 import {
-  activeSessions as initialActiveSessions,
-  departmentOptions,
-  initialAccount,
-  initialNotificationPreferences,
-  initialPrivacyPreferences,
-  initialProfilePreferences,
-  languageOptions,
-  notificationPreferences,
-  privacyPreferences,
-  profileVisibilityOptions,
-  semesterOptions,
-  themeOptions,
-  universityOptions,
-  type ThemePreference,
-} from "@/data/settings";
+  campusDepartments,
+  campusUniversities,
+} from "@/config/campusDirectory";
+import { paths } from "@/routes/paths";
 import { cn } from "@/utils/cn";
 import { useDocumentTitle } from "@/utils/useDocumentTitle";
 
-const settingsNavigation = [
-  { id: "account", label: "Account", icon: UserRound },
-  { id: "profile", label: "Preferences", icon: SlidersHorizontal },
-  { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "privacy", label: "Privacy", icon: Eye },
-  { id: "appearance", label: "Theme", icon: Palette },
-  { id: "security", label: "Security", icon: LockKeyhole },
+interface SettingsDraft {
+  bio: string;
+  compactMode: boolean;
+  departmentId: string;
+  fullName: string;
+  language: string;
+  location: string;
+  semester: string;
+  skills: string;
+  theme: ThemePreference;
+  universityId: string;
+  visibility: ProfileVisibility;
+}
+
+type SettingsErrors = Partial<
+  Record<
+    | "bio"
+    | "departmentId"
+    | "fullName"
+    | "language"
+    | "location"
+    | "semester"
+    | "skills"
+    | "universityId",
+    string
+  >
+>;
+
+function createDraft(profile: CurrentUserIdentity): SettingsDraft {
+  return {
+    bio: profile.bio ?? "",
+    compactMode: profile.preferences.compactMode,
+    departmentId: profile.department.id,
+    fullName: profile.fullName,
+    language: profile.preferences.language,
+    location: profile.location ?? "",
+    semester: String(profile.semester),
+    skills: profile.skills.join(", "),
+    theme: profile.preferences.theme,
+    universityId: profile.university.id,
+    visibility: profile.visibility,
+  };
+}
+
+function requestError(error: unknown) {
+  return error instanceof ApiError
+    ? error.message
+    : "Your settings could not be loaded. Please try again.";
+}
+
+const semesterOptions = [
+  { disabled: true, label: "Select semester", value: "" },
+  ...Array.from({ length: 8 }, (_, index) => ({
+    label: `Semester ${index + 1}`,
+    value: String(index + 1),
+  })),
 ];
 
-interface SettingsSectionProps {
-  children: ReactNode;
-  description: string;
-  icon: typeof UserRound;
-  id: string;
-  title: string;
-}
+const visibilityOptions = [
+  { label: "Public profile", value: "PUBLIC" },
+  { label: "Private profile", value: "PRIVATE" },
+];
 
-function SettingsSection({
-  children,
-  description,
-  icon: Icon,
-  id,
-  title,
-}: SettingsSectionProps) {
-  return (
-    <Card className="scroll-mt-28 overflow-hidden" id={id}>
-      <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-5 sm:px-6">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">
-          <Icon className="size-4.5" />
-        </span>
-        <div>
-          <h2 className="font-semibold text-slate-950">{title}</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-500">
-            {description}
-          </p>
-        </div>
-      </div>
-      <CardContent className="p-5 sm:p-6">{children}</CardContent>
-    </Card>
-  );
-}
+const themeOptions: Array<{
+  description: string;
+  label: string;
+  value: ThemePreference;
+}> = [
+  {
+    description: "Use your device preference",
+    label: "System",
+    value: "SYSTEM",
+  },
+  {
+    description: "Use the light interface",
+    label: "Light",
+    value: "LIGHT",
+  },
+  {
+    description: "Save dark mode as your preference",
+    label: "Dark",
+    value: "DARK",
+  },
+];
+
+const languageOptions = [
+  { label: "English", value: "en" },
+  { label: "Urdu", value: "ur" },
+];
 
 export function SettingsPage() {
-  const [account, setAccount] = useState(initialAccount);
-  const [profilePreferences, setProfilePreferences] = useState(
-    initialProfilePreferences,
-  );
-  const [notificationSettings, setNotificationSettings] = useState(
-    initialNotificationPreferences,
-  );
-  const [privacySettings, setPrivacySettings] = useState(
-    initialPrivacyPreferences,
-  );
-  const [profileVisibility, setProfileVisibility] = useState("community");
-  const [theme, setTheme] = useState<ThemePreference>("light");
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [sessions, setSessions] = useState(initialActiveSessions);
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [profile, setProfile] = useState<CurrentUserIdentity | null>(null);
+  const [draft, setDraft] = useState<SettingsDraft | null>(null);
+  const [errors, setErrors] = useState<SettingsErrors>({});
+  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLogoutOpen, setIsLogoutOpen] = useState(false);
+  const { isLoading: isAuthLoading, logout, syncCurrentUser } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
   useDocumentTitle("Settings · CampusOne");
 
-  const saveSettings = (section: string) => {
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    void getCurrentUserProfile(controller.signal)
+      .then((response) => {
+        if (!active) return;
+        setProfile(response);
+        setDraft(createDraft(response));
+        setError(null);
+      })
+      .catch((loadError: unknown) => {
+        if (active) setError(requestError(loadError));
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
+  const universityOptions = useMemo(() => {
+    const options = campusUniversities.map((university) => ({
+      label: university.name,
+      value: university.id,
+    }));
+    if (
+      profile &&
+      !options.some((option) => option.value === profile.university.id)
+    ) {
+      options.push({
+        label: profile.university.name,
+        value: profile.university.id,
+      });
+    }
+    return options;
+  }, [profile]);
+
+  const departmentOptions = useMemo(() => {
+    if (!draft) return [];
+    const options = campusDepartments
+      .filter(
+        (department) => department.universityId === draft.universityId,
+      )
+      .map((department) => ({
+        label: department.name,
+        value: department.id,
+      }));
+    if (
+      profile &&
+      profile.department.universityId === draft.universityId &&
+      !options.some((option) => option.value === profile.department.id)
+    ) {
+      options.push({
+        label: profile.department.name,
+        value: profile.department.id,
+      });
+    }
+    return options;
+  }, [draft, profile]);
+
+  const updateDraft = <Key extends keyof SettingsDraft>(
+    key: Key,
+    value: SettingsDraft[Key],
+  ) => {
+    setDraft((current) => (current ? { ...current, [key]: value } : current));
+    setErrors((current) => ({ ...current, [key]: undefined }));
+    setSaveError(null);
+  };
+
+  const save = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!draft) return;
+
+    const nextErrors: SettingsErrors = {};
+    const semester = Number(draft.semester);
+    const skills = draft.skills
+      .split(",")
+      .map((skill) => skill.trim())
+      .filter(Boolean);
+
+    if (
+      draft.fullName.trim().length < 2 ||
+      draft.fullName.trim().length > 80
+    ) {
+      nextErrors.fullName = "Use between 2 and 80 characters.";
+    }
+    if (draft.bio.trim().length > 500) {
+      nextErrors.bio = "Bio cannot exceed 500 characters.";
+    }
+    if (draft.location.trim().length > 100) {
+      nextErrors.location = "Location cannot exceed 100 characters.";
+    }
+    if (!universityOptions.some(({ value }) => value === draft.universityId)) {
+      nextErrors.universityId = "Select your university.";
+    }
+    if (!departmentOptions.some(({ value }) => value === draft.departmentId)) {
+      nextErrors.departmentId =
+        "Select a department from your university.";
+    }
+    if (!Number.isInteger(semester) || semester < 1 || semester > 8) {
+      nextErrors.semester = "Select a semester.";
+    }
+    if (!/^[A-Za-z]{2,3}(-[A-Za-z]{2})?$/.test(draft.language)) {
+      nextErrors.language = "Select a supported language.";
+    }
+    if (
+      skills.length > 20 ||
+      skills.some((skill) => skill.length < 2 || skill.length > 40)
+    ) {
+      nextErrors.skills =
+        "Use up to 20 comma-separated skills, each 2 to 40 characters.";
+    }
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
     setIsSaving(true);
-    window.setTimeout(() => {
-      setIsSaving(false);
+    setSaveError(null);
+    try {
+      await updateCurrentUser({
+        bio: draft.bio.trim(),
+        departmentId: draft.departmentId,
+        fullName: draft.fullName.trim(),
+        location: draft.location.trim(),
+        preferences: {
+          compactMode: draft.compactMode,
+          language: draft.language,
+          theme: draft.theme,
+        },
+        semester,
+        universityId: draft.universityId,
+        visibility: draft.visibility,
+      });
+      const updated = await replaceCurrentUserSkills(skills);
+      setProfile(updated);
+      setDraft(createDraft(updated));
+      syncCurrentUser({
+        email: updated.email,
+        fullName: updated.fullName,
+      });
       showToast({
-        title: `${section} saved`,
-        message: "Your frontend preferences have been updated.",
+        title: "Settings saved",
+        message: "Your account preferences have been updated.",
         variant: "success",
       });
-    }, 450);
-  };
-
-  const handleAccountSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    saveSettings("Account settings");
-  };
-
-  const handlePasswordSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (newPassword.length < 8) {
-      showToast({
-        title: "Use a stronger password",
-        message: "Your new password must contain at least 8 characters.",
-        variant: "error",
-      });
-      return;
+    } catch (saveRequestError) {
+      setSaveError(
+        saveRequestError instanceof ApiError
+          ? saveRequestError.message
+          : "Your settings could not be saved. Please try again.",
+      );
+    } finally {
+      setIsSaving(false);
     }
-    if (newPassword !== confirmPassword) {
-      showToast({
-        title: "Passwords do not match",
-        message: "Check the confirmation field and try again.",
-        variant: "error",
-      });
-      return;
-    }
-
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    showToast({
-      title: "Password updated",
-      message: "This is a secure frontend-only confirmation.",
-      variant: "success",
-    });
   };
 
-  const removeSession = (sessionId: string) => {
-    const session = sessions.find((item) => item.id === sessionId);
-    setSessions((current) =>
-      current.filter((item) => item.id !== sessionId),
+  const handleLogout = async () => {
+    await logout();
+    navigate(paths.login, { replace: true });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="grid min-h-[60vh] place-items-center">
+        <LoadingSpinner label="Loading your settings" />
+      </div>
     );
-    showToast({
-      title: "Session signed out",
-      message: session?.device ?? "The selected session was removed.",
-      variant: "success",
-    });
-  };
+  }
+
+  if (error || !profile || !draft) {
+    return (
+      <ErrorMessage
+        message={error ?? "Your settings could not be loaded."}
+      />
+    );
+  }
 
   return (
     <div className="grid gap-8 pb-8">
       <PageHeader
-        actions={
-          <Button
-            loading={isSaving}
-            onClick={() => saveSettings("All settings")}
-          >
-            <Save className="size-4" />
-            Save all changes
-          </Button>
-        }
-        description="Manage your CampusOne account, experience, privacy, and security preferences."
+        description="Manage the profile and preferences supported by your CampusOne account."
         eyebrow="Personal workspace"
         title="Settings"
       />
 
-      <div className="grid items-start gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="xl:sticky xl:top-28">
-          <Card className="overflow-hidden">
-            <CardContent className="p-3">
-              <div className="flex items-center gap-3 border-b border-slate-100 p-3">
-                <Avatar name={account.fullName} size="lg" />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-950">
-                    {account.fullName}
-                  </p>
-                  <p className="truncate text-xs text-slate-500">
-                    {account.studentId}
-                  </p>
-                </div>
-              </div>
-              <nav
-                aria-label="Settings sections"
-                className="mt-2 flex gap-1 overflow-x-auto xl:grid"
+      <Card>
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:p-6">
+          <Avatar
+            name={profile.fullName}
+            size="lg"
+            src={profile.avatarUrl ?? undefined}
+          />
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-slate-950">
+              {profile.fullName}
+            </p>
+            <p className="truncate text-sm text-slate-500">
+              {profile.email}
+            </p>
+          </div>
+          <div className="sm:ml-auto">
+            <p className="text-sm font-medium text-slate-700">
+              {profile.university.name}
+            </p>
+            <p className="text-xs text-slate-500">
+              {profile.department.name} · Semester {profile.semester}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <form className="grid gap-6" noValidate onSubmit={(event) => void save(event)}>
+        {saveError ? <ErrorMessage message={saveError} /> : null}
+
+        <Card>
+          <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-5 sm:px-6">
+            <span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
+              <UserRound className="size-4.5" />
+            </span>
+            <div>
+              <h2 className="font-semibold text-slate-950">
+                Profile information
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                These details appear on your CampusOne profile.
+              </p>
+            </div>
+          </div>
+          <CardContent className="grid gap-5 p-5 sm:p-6">
+            <div className="grid gap-5 md:grid-cols-2">
+              <FormField
+                error={errors.fullName}
+                label="Full name"
+                maxLength={80}
+                onChange={(event) =>
+                  updateDraft("fullName", event.target.value)
+                }
+                required
+                value={draft.fullName}
+              />
+              <FormField
+                disabled
+                hint="Email changes are not supported by the current backend."
+                label="Email"
+                value={profile.email}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <label
+                className="text-sm font-semibold text-slate-700"
+                htmlFor="settings-bio"
               >
-                {settingsNavigation.map((item) => (
-                  <a
-                    className="flex h-10 shrink-0 items-center gap-2.5 rounded-xl px-3 text-sm font-medium text-slate-600 transition hover:bg-brand-50 hover:text-brand-700"
-                    href={`#${item.id}`}
-                    key={item.id}
-                  >
-                    <item.icon className="size-4 text-slate-400" />
-                    {item.label}
-                  </a>
-                ))}
-              </nav>
-            </CardContent>
-          </Card>
-        </aside>
-
-        <div className="grid min-w-0 gap-6">
-          <SettingsSection
-            description="Keep your contact and university account details current."
-            icon={UserRound}
-            id="account"
-            title="Account settings"
-          >
-            <form className="grid gap-5" onSubmit={handleAccountSubmit}>
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField
-                  autoComplete="name"
-                  label="Full name"
-                  onChange={(event) =>
-                    setAccount((current) => ({
-                      ...current,
-                      fullName: event.target.value,
-                    }))
-                  }
-                  required
-                  value={account.fullName}
-                />
-                <FormField
-                  autoComplete="email"
-                  label="University email"
-                  onChange={(event) =>
-                    setAccount((current) => ({
-                      ...current,
-                      email: event.target.value,
-                    }))
-                  }
-                  required
-                  type="email"
-                  value={account.email}
-                />
-                <FormField
-                  autoComplete="tel"
-                  label="Phone number"
-                  onChange={(event) =>
-                    setAccount((current) => ({
-                      ...current,
-                      phone: event.target.value,
-                    }))
-                  }
-                  type="tel"
-                  value={account.phone}
-                />
-                <FormField
-                  disabled
-                  hint="Contact campus support to update your student ID."
-                  label="Student ID"
-                  value={account.studentId}
-                />
-              </div>
-              <div>
-                <Button loading={isSaving} type="submit">
-                  Save account details
-                </Button>
-              </div>
-            </form>
-          </SettingsSection>
-
-          <SettingsSection
-            description="Tune CampusOne around your degree and study habits."
-            icon={SlidersHorizontal}
-            id="profile"
-            title="Profile preferences"
-          >
-            <div className="grid gap-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <SelectField
-                  label="University"
-                  onChange={(event) =>
-                    setProfilePreferences((current) => ({
-                      ...current,
-                      university: event.target.value,
-                    }))
-                  }
-                  options={universityOptions}
-                  value={profilePreferences.university}
-                />
-                <SelectField
-                  label="Department"
-                  onChange={(event) =>
-                    setProfilePreferences((current) => ({
-                      ...current,
-                      department: event.target.value,
-                    }))
-                  }
-                  options={departmentOptions}
-                  value={profilePreferences.department}
-                />
-                <SelectField
-                  label="Semester"
-                  onChange={(event) =>
-                    setProfilePreferences((current) => ({
-                      ...current,
-                      semester: event.target.value,
-                    }))
-                  }
-                  options={semesterOptions}
-                  value={profilePreferences.semester}
-                />
-                <SelectField
-                  label="Preferred content language"
-                  onChange={(event) =>
-                    setProfilePreferences((current) => ({
-                      ...current,
-                      language: event.target.value,
-                    }))
-                  }
-                  options={languageOptions}
-                  value={profilePreferences.language}
-                />
-              </div>
-              <div className="border-t border-slate-100 pt-3">
-                <Switch
-                  checked={profilePreferences.compactDashboard}
-                  description="Show denser dashboard cards and activity lists."
-                  label="Compact dashboard"
-                  onCheckedChange={(checked) =>
-                    setProfilePreferences((current) => ({
-                      ...current,
-                      compactDashboard: checked,
-                    }))
-                  }
-                />
-              </div>
-              <div>
-                <Button onClick={() => saveSettings("Profile preferences")}>
-                  Save preferences
-                </Button>
-              </div>
+                Bio
+              </label>
+              <textarea
+                aria-describedby={
+                  errors.bio ? "settings-bio-error" : undefined
+                }
+                aria-invalid={Boolean(errors.bio)}
+                className={cn(
+                  "min-h-28 w-full resize-y rounded-xl border bg-white px-3.5 py-3 text-sm leading-6 text-slate-950 outline-none transition focus:ring-4",
+                  errors.bio
+                    ? "border-red-300 focus:border-red-400 focus:ring-red-100"
+                    : "border-slate-200 focus:border-brand-400 focus:ring-brand-100",
+                )}
+                id="settings-bio"
+                maxLength={500}
+                onChange={(event) => updateDraft("bio", event.target.value)}
+                value={draft.bio}
+              />
+              {errors.bio ? (
+                <p
+                  className="text-xs font-medium text-red-600"
+                  id="settings-bio-error"
+                >
+                  {errors.bio}
+                </p>
+              ) : null}
             </div>
-          </SettingsSection>
-
-          <SettingsSection
-            description="Choose which campus updates deserve your attention."
-            icon={Bell}
-            id="notifications"
-            title="Notification preferences"
-          >
-            <div className="divide-y divide-slate-100">
-              {notificationPreferences.map((preference) => (
-                <Switch
-                  checked={notificationSettings[preference.key]}
-                  className="py-4 first:pt-0 last:pb-0"
-                  description={preference.description}
-                  key={preference.key}
-                  label={preference.label}
-                  onCheckedChange={(checked) =>
-                    setNotificationSettings((current) => ({
-                      ...current,
-                      [preference.key]: checked,
-                    }))
-                  }
-                />
-              ))}
-            </div>
-            <Button
-              className="mt-5"
-              onClick={() => saveSettings("Notification preferences")}
-            >
-              Save notification settings
-            </Button>
-          </SettingsSection>
-
-          <SettingsSection
-            description="Control who can discover your profile and activity."
-            icon={Eye}
-            id="privacy"
-            title="Privacy settings"
-          >
-            <div className="grid gap-5">
+            <div className="grid gap-5 md:grid-cols-2">
+              <FormField
+                error={errors.location}
+                label="Location"
+                maxLength={100}
+                onChange={(event) =>
+                  updateDraft("location", event.target.value)
+                }
+                placeholder="Not added yet"
+                value={draft.location}
+              />
               <SelectField
                 label="Profile visibility"
-                onChange={(event) => setProfileVisibility(event.target.value)}
-                options={profileVisibilityOptions}
-                value={profileVisibility}
+                onChange={(event) =>
+                  updateDraft(
+                    "visibility",
+                    event.target.value as ProfileVisibility,
+                  )
+                }
+                options={visibilityOptions}
+                value={draft.visibility}
               />
-              <div className="divide-y divide-slate-100 border-t border-slate-100">
-                {privacyPreferences.map((preference) => (
-                  <Switch
-                    checked={privacySettings[preference.key]}
-                    className="py-4 last:pb-0"
-                    description={preference.description}
-                    key={preference.key}
-                    label={preference.label}
-                    onCheckedChange={(checked) =>
-                      setPrivacySettings((current) => ({
-                        ...current,
-                        [preference.key]: checked,
-                      }))
-                    }
-                  />
-                ))}
-              </div>
-              <div>
-                <Button onClick={() => saveSettings("Privacy settings")}>
-                  Save privacy settings
-                </Button>
-              </div>
             </div>
-          </SettingsSection>
+            <FormField
+              error={errors.skills}
+              hint="Separate skills with commas."
+              label="Skills"
+              onChange={(event) =>
+                updateDraft("skills", event.target.value)
+              }
+              placeholder="No skills added yet"
+              value={draft.skills}
+            />
+          </CardContent>
+        </Card>
 
-          <SettingsSection
-            description="Choose a comfortable visual mode for your workspace."
-            icon={Palette}
-            id="appearance"
-            title="Theme settings"
-          >
+        <Card>
+          <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-5 sm:px-6">
+            <span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+              <GraduationCap className="size-4.5" />
+            </span>
+            <div>
+              <h2 className="font-semibold text-slate-950">
+                Academic details
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Campus and semester information used by CampusOne.
+              </p>
+            </div>
+          </div>
+          <CardContent className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+            <SelectField
+              error={errors.universityId}
+              label="University"
+              onChange={(event) => {
+                updateDraft("universityId", event.target.value);
+                setDraft((current) =>
+                  current ? { ...current, departmentId: "" } : current,
+                );
+              }}
+              options={universityOptions}
+              required
+              value={draft.universityId}
+            />
+            <SelectField
+              error={errors.departmentId}
+              label="Department"
+              onChange={(event) =>
+                updateDraft("departmentId", event.target.value)
+              }
+              options={[
+                {
+                  disabled: true,
+                  label: "Select department",
+                  value: "",
+                },
+                ...departmentOptions,
+              ]}
+              required
+              value={draft.departmentId}
+            />
+            <SelectField
+              error={errors.semester}
+              label="Semester"
+              onChange={(event) =>
+                updateDraft("semester", event.target.value)
+              }
+              options={semesterOptions}
+              required
+              value={draft.semester}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-5 sm:px-6">
+            <span className="grid size-10 place-items-center rounded-xl bg-violet-50 text-violet-600">
+              <Palette className="size-4.5" />
+            </span>
+            <div>
+              <h2 className="font-semibold text-slate-950">Preferences</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Preferences persisted by the current backend.
+              </p>
+            </div>
+          </div>
+          <CardContent className="grid gap-6 p-5 sm:p-6">
             <div
               aria-label="Theme preference"
               className="grid gap-3 sm:grid-cols-3"
               role="radiogroup"
             >
-              {themeOptions.map((option) => {
-                const isSelected = theme === option.id;
-                const ThemeIcon =
-                  option.id === "light"
-                    ? Sun
-                    : option.id === "dark"
-                      ? Moon
-                      : Monitor;
-
-                return (
-                  <button
-                    aria-checked={isSelected}
-                    className={cn(
-                      "relative rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-lg",
-                      isSelected
-                        ? "border-brand-300 bg-brand-50 ring-2 ring-brand-100"
-                        : "border-slate-200 bg-white hover:border-slate-300",
-                    )}
-                    key={option.id}
-                    onClick={() => {
-                      setTheme(option.id);
-                      showToast({
-                        title: `${option.title} theme selected`,
-                        message: "Your visual preference is reflected in this preview.",
-                      });
-                    }}
-                    role="radio"
-                    type="button"
-                  >
-                    <span
-                      className={cn(
-                        "grid size-10 place-items-center rounded-xl",
-                        option.id === "dark"
-                          ? "bg-slate-900 text-white"
-                          : option.id === "system"
-                            ? "bg-sky-50 text-sky-600"
-                            : "bg-amber-50 text-amber-600",
-                      )}
-                    >
-                      <ThemeIcon className="size-4.5" />
-                    </span>
-                    <span className="mt-3 block text-sm font-semibold text-slate-900">
-                      {option.title}
-                    </span>
-                    <span className="mt-1 block text-xs text-slate-500">
-                      {option.description}
-                    </span>
-                    {isSelected ? (
-                      <span className="absolute right-3 top-3 grid size-5 place-items-center rounded-full bg-brand-600 text-white">
-                        <Check className="size-3" />
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
+              {themeOptions.map((option) => (
+                <button
+                  aria-checked={draft.theme === option.value}
+                  className={cn(
+                    "rounded-2xl border p-4 text-left transition",
+                    draft.theme === option.value
+                      ? "border-brand-300 bg-brand-50 ring-2 ring-brand-100"
+                      : "border-slate-200 bg-white hover:border-slate-300",
+                  )}
+                  key={option.value}
+                  onClick={() => updateDraft("theme", option.value)}
+                  role="radio"
+                  type="button"
+                >
+                  <span className="font-semibold text-slate-900">
+                    {option.label}
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    {option.description}
+                  </span>
+                </button>
+              ))}
             </div>
+            <SelectField
+              error={errors.language}
+              label="Preferred language"
+              onChange={(event) =>
+                updateDraft("language", event.target.value)
+              }
+              options={languageOptions}
+              value={draft.language}
+            />
+            <Switch
+              checked={draft.compactMode}
+              description="Save a denser layout preference for supported screens."
+              label="Compact mode"
+              onCheckedChange={(checked) =>
+                updateDraft("compactMode", checked)
+              }
+            />
+          </CardContent>
+        </Card>
 
-            <div
-              className={cn(
-                "mt-5 rounded-2xl border p-5 transition-colors",
-                theme === "dark"
-                  ? "border-slate-800 bg-slate-950 text-white"
-                  : theme === "system"
-                    ? "border-sky-200 bg-gradient-to-r from-white to-sky-50"
-                    : "border-slate-200 bg-slate-50",
-              )}
-            >
-              <p className="text-sm font-semibold">Theme preview</p>
-              <p
-                className={cn(
-                  "mt-1 text-xs leading-5",
-                  theme === "dark" ? "text-slate-400" : "text-slate-500",
-                )}
-              >
-                CampusOne keeps contrast, typography, and focus states readable
-                in your selected interface mode.
+        <div className="flex justify-end">
+          <Button loading={isSaving} size="lg" type="submit">
+            <Save className="size-4" />
+            Save settings
+          </Button>
+        </div>
+      </form>
+
+      <Card className="border-red-200 bg-red-50/40">
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 place-items-center rounded-xl bg-red-100 text-red-600">
+              <LockKeyhole className="size-4.5" />
+            </span>
+            <div>
+              <h2 className="font-semibold text-slate-950">
+                End this session
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Log out of CampusOne on this device.
               </p>
             </div>
-          </SettingsSection>
-
-          <SettingsSection
-            description="Protect your account and review signed-in devices."
-            icon={LockKeyhole}
-            id="security"
-            title="Security settings"
-          >
-            <div className="grid gap-6">
-              <div className="rounded-2xl border border-slate-200 p-4">
-                <div className="flex items-start gap-3">
-                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
-                    <ShieldCheck className="size-4.5" />
-                  </span>
-                  <div className="flex-1">
-                    <Switch
-                      checked={twoFactorEnabled}
-                      className="py-0"
-                      description="Add a verification step when signing in on a new device."
-                      label="Two-factor authentication"
-                      onCheckedChange={(checked) => {
-                        setTwoFactorEnabled(checked);
-                        showToast({
-                          title: checked
-                            ? "Two-factor authentication enabled"
-                            : "Two-factor authentication disabled",
-                          message: "This security setting is simulated locally.",
-                          variant: checked ? "success" : "info",
-                        });
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <form
-                className="grid gap-4 rounded-2xl border border-slate-200 p-4"
-                onSubmit={handlePasswordSubmit}
-              >
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    Change password
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Use at least eight characters and avoid reused passwords.
-                  </p>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <PasswordField
-                    autoComplete="current-password"
-                    className="md:col-span-2"
-                    label="Current password"
-                    onChange={(event) => setCurrentPassword(event.target.value)}
-                    required
-                    value={currentPassword}
-                  />
-                  <PasswordField
-                    autoComplete="new-password"
-                    label="New password"
-                    onChange={(event) => setNewPassword(event.target.value)}
-                    required
-                    value={newPassword}
-                  />
-                  <PasswordField
-                    autoComplete="new-password"
-                    label="Confirm new password"
-                    onChange={(event) => setConfirmPassword(event.target.value)}
-                    required
-                    value={confirmPassword}
-                  />
-                </div>
-                <div>
-                  <Button type="submit">Update password</Button>
-                </div>
-              </form>
-
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Active sessions
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  Devices currently signed in to your CampusOne account.
-                </p>
-                <div className="mt-3 divide-y divide-slate-100 rounded-2xl border border-slate-200">
-                  {sessions.map((session) => {
-                    const DeviceIcon = session.current ? Laptop : Smartphone;
-
-                    return (
-                      <div
-                        className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center"
-                        key={session.id}
-                      >
-                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600">
-                          <DeviceIcon className="size-4.5" />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-slate-900">
-                              {session.device}
-                            </p>
-                            {session.current ? (
-                              <Badge variant="success">Current session</Badge>
-                            ) : null}
-                          </div>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {session.location} · {session.lastActive}
-                          </p>
-                        </div>
-                        {!session.current ? (
-                          <Button
-                            onClick={() => removeSession(session.id)}
-                            size="sm"
-                            variant="outline"
-                          >
-                            Sign out
-                          </Button>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </SettingsSection>
-
-          <Card className="border-red-200 bg-red-50/40">
-            <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-              <div>
-                <h2 className="font-semibold text-slate-950">Log out</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  End this CampusOne session on the current device.
-                </p>
-              </div>
-              <Button
-                onClick={() => setIsLogoutOpen(true)}
-                variant="danger"
-              >
-                <LogOut className="size-4" />
-                Log out
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <Modal
-        description="You will return to the login screen when authentication is connected."
-        footer={
-          <>
-            <Button onClick={() => setIsLogoutOpen(false)} variant="outline">
-              Stay signed in
-            </Button>
-            <Button
-              onClick={() => {
-                setIsLogoutOpen(false);
-                showToast({
-                  title: "Demo session ended",
-                  message: "No real session was changed in this frontend build.",
-                  variant: "success",
-                });
-              }}
-              variant="danger"
-            >
-              <LogOut className="size-4" />
-              Log out
-            </Button>
-          </>
-        }
-        isOpen={isLogoutOpen}
-        onClose={() => setIsLogoutOpen(false)}
-        size="sm"
-        title="Log out of CampusOne?"
-      >
-        <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-4">
-          <Avatar name={account.fullName} />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-900">
-              {account.fullName}
-            </p>
-            <p className="truncate text-xs text-slate-500">{account.email}</p>
           </div>
-        </div>
-      </Modal>
+          <Button
+            loading={isAuthLoading}
+            onClick={() => void handleLogout()}
+            variant="danger"
+          >
+            <LogOut className="size-4" />
+            Log out
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
