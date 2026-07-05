@@ -39,7 +39,20 @@ class CorsPropertiesTest {
     }
 
     @Test
-    void allowedOrigins_emptyList_failsValidation() {
-        assertThat(validator.validate(new CorsProperties())).isNotEmpty();
+    void allowedOrigins_missingOrBlank_usesSafeLoopbackDefaults() {
+        CorsProperties missing = new CorsProperties();
+        CorsProperties blank = new CorsProperties();
+        blank.setAllowedOrigins(List.of("", "  "));
+
+        assertThat(validator.validate(missing)).isEmpty();
+        assertThat(validator.validate(blank)).isEmpty();
+        assertThat(missing.getAllowedOrigins())
+                .containsExactly(
+                        "http://localhost:5173",
+                        "http://127.0.0.1:5173");
+        assertThat(blank.getAllowedOrigins())
+                .containsExactly(
+                        "http://localhost:5173",
+                        "http://127.0.0.1:5173");
     }
 }

@@ -11,8 +11,12 @@ import org.springframework.validation.annotation.Validated;
 @ConfigurationProperties(prefix = "app.cors")
 public class CorsProperties {
 
+    private static final List<String> DEFAULT_ALLOWED_ORIGINS = List.of(
+            "http://localhost:5173",
+            "http://127.0.0.1:5173");
+
     @NotEmpty(message = "CORS_ALLOWED_ORIGINS must contain at least one trusted origin")
-    private List<String> allowedOrigins = List.of();
+    private List<String> allowedOrigins = DEFAULT_ALLOWED_ORIGINS;
 
     @AssertTrue(message = "CORS origins must be exact HTTP(S) origins without wildcards or paths")
     public boolean isAllowedOriginsValid() {
@@ -25,13 +29,16 @@ public class CorsProperties {
     }
 
     public void setAllowedOrigins(List<String> allowedOrigins) {
-        this.allowedOrigins = allowedOrigins == null
+        List<String> normalizedOrigins = allowedOrigins == null
                 ? List.of()
                 : allowedOrigins.stream()
                         .map(String::trim)
                         .filter(value -> !value.isEmpty())
                         .distinct()
                         .toList();
+        this.allowedOrigins = normalizedOrigins.isEmpty()
+                ? DEFAULT_ALLOWED_ORIGINS
+                : normalizedOrigins;
     }
 
     private boolean isExactHttpOrigin(String value) {

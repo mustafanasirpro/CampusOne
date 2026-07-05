@@ -43,7 +43,7 @@ class LocalCorsConfigurationTest {
     }
 
     @Test
-    void defaultProfile_withoutTrustedOrigins_failsClosed() {
+    void defaultProfile_withoutEnvironmentOverride_usesTrustedLoopbackOrigins() {
         new ApplicationContextRunner()
                 .withInitializer(new ConfigDataApplicationContextInitializer())
                 .withPropertyValues(
@@ -51,9 +51,11 @@ class LocalCorsConfigurationTest {
                         "CORS_ALLOWED_ORIGINS=")
                 .withUserConfiguration(CorsTestConfiguration.class)
                 .run(context -> {
-                    assertThat(context).hasFailed();
-                    assertThat(context.getStartupFailure())
-                            .hasMessageContaining("app.cors");
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(CorsProperties.class).getAllowedOrigins())
+                            .containsExactly(
+                                    "http://localhost:5173",
+                                    "http://127.0.0.1:5173");
                 });
     }
 

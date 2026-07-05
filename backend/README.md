@@ -85,9 +85,9 @@ JWT signing uses:
 - `REFRESH_TOKEN_CLEANUP_INTERVAL`: optional; defaults to `24h`
 - `MAX_LOGIN_ATTEMPTS`: optional; defaults to `5`
 - `ACCOUNT_LOCK_MINUTES`: optional; defaults to `15`
-- `CORS_ALLOWED_ORIGINS`: required comma-separated exact frontend origins in
-  production; the `local` profile defaults to `http://localhost:5173` and
-  `http://127.0.0.1:5173`
+- `CORS_ALLOWED_ORIGINS`: optional comma-separated exact frontend origins;
+  defaults to `http://localhost:5173` and `http://127.0.0.1:5173`. Set it to
+  the deployed frontend origin in production.
 - `OPENAPI_ENABLED`: defaults to `false`; enable only in trusted environments
 
 Generate a different JWT secret for every environment. PowerShell:
@@ -134,14 +134,15 @@ Edit `.env` and replace:
 - `JWT_SECRET` with a newly generated Base64 secret. Never use the public
   example value outside local development.
 
-The local profile provides development-only defaults for:
+The local profile provides development defaults for:
 
 - `CORS_ALLOWED_ORIGINS=http://localhost:5173`
 - `AUTH_COOKIE_SECURE=false`
 - `OPENAPI_ENABLED=true`
 
-They are not packaged as production defaults. Without the `local` profile,
-startup still requires an explicit non-empty `CORS_ALLOWED_ORIGINS` value.
+The two exact loopback CORS origins are also safe startup defaults for packaged
+deployments. Production deployments should replace them through
+`CORS_ALLOWED_ORIGINS` so the deployed frontend can access the API.
 
 For the default values in `.env.example`, PostgreSQL should have a database
 named `campusone` and a login named `campusone`. One possible setup from an
@@ -187,7 +188,7 @@ the API's own origin). This origin check complements the refresh cookie's
 `SameSite=Strict` policy. Wildcard CORS origins are intentionally rejected.
 Swagger and OpenAPI are enabled by default only in the local profile. Production
 deployments should leave `OPENAPI_ENABLED=false`, avoid the `local` profile, and
-set `CORS_ALLOWED_ORIGINS` explicitly.
+set `CORS_ALLOWED_ORIGINS` to the exact deployed frontend origin.
 
 ## Verification
 
