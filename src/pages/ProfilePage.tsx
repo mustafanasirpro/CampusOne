@@ -1,142 +1,210 @@
 import {
-  ArrowRight,
-  Bookmark,
+  Award,
+  BookOpen,
   CheckCircle2,
-  Download,
-  Eye,
-  FileText,
+  Flame,
   GraduationCap,
   MapPin,
+  MessageSquareText,
   Pencil,
-  Plus,
   Share2,
   Sparkles,
-  Star,
+  Trophy,
 } from "lucide-react";
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
-import { DiscussionCard, StatCard } from "@/components/cards";
+import { ApiError } from "@/api/apiClient";
+import { getMyQuestions } from "@/api/discussionApi";
+import {
+  getMyGamificationProfile,
+  getMyXpHistory,
+} from "@/api/gamificationApi";
+import { getMyNotes } from "@/api/notesApi";
+import {
+  getCurrentUserProfile,
+  replaceCurrentUserSkills,
+  updateCurrentUser,
+  type CurrentUserIdentity,
+} from "@/api/userApi";
+import { useAuth } from "@/auth/useAuth";
+import { StatCard } from "@/components/cards";
 import {
   Avatar,
   Badge,
   Button,
   Card,
   CardContent,
+  EmptyState,
+  ErrorMessage,
+  LoadingSpinner,
   Modal,
   SectionTitle,
   useToast,
 } from "@/components/common";
-import { FormField, SelectField } from "@/components/forms";
-import {
-  initialStudentProfile,
-  profileAchievements,
-  profileActivity,
-  profileDepartmentOptions,
-  profileDiscussions,
-  profileNotes,
-  profileSemesterOptions,
-  profileStats,
-  profileUniversityOptions,
-  type StudentProfile,
-} from "@/data/profile";
-import { paths } from "@/routes/paths";
+import { QuestionCard } from "@/components/discussion";
+import { FormField } from "@/components/forms";
+import { NoteCard } from "@/components/notes";
+import type {
+  DiscussionQuestionPage,
+} from "@/types/discussion";
+import type {
+  GamificationProfile,
+  XpHistoryPage,
+} from "@/types/gamification";
+import type { NotePage } from "@/types/notes";
 import { cn } from "@/utils/cn";
+import { formatDateTime } from "@/utils/format";
 import { useDocumentTitle } from "@/utils/useDocumentTitle";
-
-const achievementTones = {
-  amber: {
-    icon: "bg-amber-100 text-amber-700",
-    border: "group-hover:border-amber-200",
-    progress: "bg-amber-500",
-  },
-  brand: {
-    icon: "bg-brand-100 text-brand-700",
-    border: "group-hover:border-brand-200",
-    progress: "bg-brand-500",
-  },
-  emerald: {
-    icon: "bg-emerald-100 text-emerald-700",
-    border: "group-hover:border-emerald-200",
-    progress: "bg-emerald-500",
-  },
-  sky: {
-    icon: "bg-sky-100 text-sky-700",
-    border: "group-hover:border-sky-200",
-    progress: "bg-sky-500",
-  },
-  rose: {
-    icon: "bg-rose-100 text-rose-700",
-    border: "group-hover:border-rose-200",
-    progress: "bg-rose-500",
-  },
-  violet: {
-    icon: "bg-violet-100 text-violet-700",
-    border: "group-hover:border-violet-200",
-    progress: "bg-violet-500",
-  },
-};
-
-const activityTones = {
-  brand: "bg-brand-50 text-brand-600 ring-brand-100",
-  emerald: "bg-emerald-50 text-emerald-600 ring-emerald-100",
-  amber: "bg-amber-50 text-amber-600 ring-amber-100",
-  sky: "bg-sky-50 text-sky-600 ring-sky-100",
-  rose: "bg-rose-50 text-rose-600 ring-rose-100",
-};
 
 interface ProfileDraft {
   bio: string;
-  department: string;
   fullName: string;
-  semester: string;
+  location: string;
   skills: string;
-  university: string;
 }
 
 type ProfileErrors = Partial<Record<keyof ProfileDraft, string>>;
 
-function createDraft(profile: StudentProfile): ProfileDraft {
+function requestErrorMessage(error: unknown) {
+  return error instanceof ApiError
+    ? error.message
+    : "Your profile could not be loaded. Please try again.";
+}
+
+function profileDraft(profile: CurrentUserIdentity): ProfileDraft {
   return {
+    bio: profile.bio ?? "",
     fullName: profile.fullName,
-    bio: profile.bio,
-    university: profile.university,
-    department: profile.department,
-    semester: profile.semester,
+    location: profile.location ?? "",
     skills: profile.skills.join(", "),
   };
 }
 
 export function ProfilePage() {
-  const [profile, setProfile] = useState(initialStudentProfile);
+  const [profile, setProfile] = useState<CurrentUserIdentity | null>(null);
+  const [gamification, setGamification] =
+    useState<GamificationProfile | null>(null);
+  const [notes, setNotes] = useState<NotePage | null>(null);
+  const [questions, setQuestions] =
+    useState<DiscussionQuestionPage | null>(null);
+  const [history, setHistory] = useState<XpHistoryPage | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const [draft, setDraft] = useState<ProfileDraft>(() =>
-    createDraft(initialStudentProfile),
-  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ProfileDraft>({
+    bio: "",
+    fullName: "",
+    location: "",
+    skills: "",
+  });
   const [errors, setErrors] = useState<ProfileErrors>({});
-  const [bookmarkedNotes, setBookmarkedNotes] = useState<Set<string>>(
-    new Set(["database-cheatsheet"]),
-  );
-  const [upvotedDiscussions, setUpvotedDiscussions] = useState<Set<string>>(
-    new Set(),
-  );
+  const { syncCurrentUser } = useAuth();
   const { showToast } = useToast();
-  const navigate = useNavigate();
 
-  useDocumentTitle(`${profile.fullName} · CampusOne`);
+  useDocumentTitle(
+    profile ? `${profile.fullName} · CampusOne` : "Profile · CampusOne",
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    void Promise.all([
+      getCurrentUserProfile(controller.signal),
+      getMyGamificationProfile(controller.signal),
+      getMyNotes({ page: 0, signal: controller.signal, size: 3 }),
+      getMyQuestions({ page: 0, signal: controller.signal, size: 3 }),
+      getMyXpHistory(0, 5, controller.signal),
+    ])
+      .then(
+        ([
+          profileResponse,
+          gamificationResponse,
+          notesResponse,
+          questionsResponse,
+          historyResponse,
+        ]) => {
+          if (!active) return;
+          setProfile(profileResponse);
+          setGamification(gamificationResponse);
+          setNotes(notesResponse);
+          setQuestions(questionsResponse);
+          setHistory(historyResponse);
+          setError(null);
+        },
+      )
+      .catch((requestError: unknown) => {
+        if (active) setError(requestErrorMessage(requestError));
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
+  const stats = useMemo(
+    () => [
+      {
+        description: "Community contribution points",
+        icon: Trophy,
+        label: "Total XP",
+        value: gamification?.totalXp ?? profile?.totalXp ?? 0,
+      },
+      {
+        description: "Calculated from earned XP",
+        icon: Sparkles,
+        label: "Level",
+        value: gamification?.level ?? 1,
+      },
+      {
+        description: "Current activity streak",
+        icon: Flame,
+        label: "Streak",
+        value: gamification?.currentStreak ?? 0,
+      },
+      {
+        description: "Study resources you shared",
+        icon: BookOpen,
+        label: "Notes",
+        value: notes?.totalElements ?? 0,
+      },
+      {
+        description: "Discussion questions you asked",
+        icon: MessageSquareText,
+        label: "Questions",
+        value: questions?.totalElements ?? 0,
+      },
+      {
+        description: "Gamification badges earned",
+        icon: Award,
+        label: "Badges",
+        value: gamification?.badges.length ?? 0,
+      },
+    ],
+    [gamification, notes, profile, questions],
+  );
 
   const openEditProfile = () => {
-    setDraft(createDraft(profile));
+    if (!profile) return;
+    setDraft(profileDraft(profile));
     setErrors({});
+    setSaveError(null);
     setIsEditOpen(true);
   };
 
   const updateDraft = (field: keyof ProfileDraft, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: undefined }));
+    setSaveError(null);
   };
 
-  const handleSaveProfile = (event: FormEvent<HTMLFormElement>) => {
+  const handleSaveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const nextErrors: ProfileErrors = {};
     const skills = draft.skills
@@ -145,44 +213,64 @@ export function ProfilePage() {
       .filter(Boolean);
 
     if (draft.fullName.trim().length < 2) {
-      nextErrors.fullName = "Enter your full name.";
+      nextErrors.fullName = "Enter at least 2 characters.";
+    } else if (draft.fullName.trim().length > 80) {
+      nextErrors.fullName = "Full name cannot exceed 80 characters.";
     }
-    if (draft.bio.trim().length < 20) {
-      nextErrors.bio = "Write at least 20 characters about yourself.";
+    if (draft.bio.trim().length > 500) {
+      nextErrors.bio = "Bio cannot exceed 500 characters.";
     }
-    if (!draft.university) nextErrors.university = "Select a university.";
-    if (!draft.department) nextErrors.department = "Select a department.";
-    if (!draft.semester) nextErrors.semester = "Select a semester.";
-    if (skills.length === 0) {
-      nextErrors.skills = "Add at least one skill.";
+    if (draft.location.trim().length > 100) {
+      nextErrors.location = "Location cannot exceed 100 characters.";
     }
-
+    if (
+      skills.length > 20 ||
+      skills.some((skill) => skill.length < 2 || skill.length > 40)
+    ) {
+      nextErrors.skills =
+        "Use up to 20 comma-separated skills, each 2 to 40 characters.";
+    }
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
     }
 
-    setProfile((current) => ({
-      ...current,
-      fullName: draft.fullName.trim(),
-      bio: draft.bio.trim(),
-      university: draft.university,
-      department: draft.department,
-      semester: draft.semester,
-      skills,
-    }));
-    setIsEditOpen(false);
-    showToast({
-      title: "Profile updated",
-      message: "Your changes are visible in this frontend demo.",
-      variant: "success",
-    });
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await updateCurrentUser({
+        bio: draft.bio.trim(),
+        fullName: draft.fullName.trim(),
+        location: draft.location.trim(),
+      });
+      const updated = await replaceCurrentUserSkills(skills);
+      setProfile(updated);
+      syncCurrentUser({
+        email: updated.email,
+        fullName: updated.fullName,
+      });
+      setIsEditOpen(false);
+      showToast({
+        title: "Profile updated",
+        message: "Your CampusOne profile has been saved.",
+        variant: "success",
+      });
+    } catch (requestError) {
+      setSaveError(
+        requestError instanceof ApiError
+          ? requestError.message
+          : "Your profile could not be saved. Please try again.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleShare = async () => {
+    if (!profile) return;
     const shareData = {
       title: `${profile.fullName} on CampusOne`,
-      text: `View ${profile.fullName}’s student profile on CampusOne.`,
+      text: `View ${profile.fullName}'s student profile on CampusOne.`,
       url: window.location.href,
     };
 
@@ -190,8 +278,13 @@ export function ProfilePage() {
       try {
         await navigator.share(shareData);
         return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
+      } catch (shareError) {
+        if (
+          shareError instanceof DOMException &&
+          shareError.name === "AbortError"
+        ) {
+          return;
+        }
       }
     }
 
@@ -199,70 +292,60 @@ export function ProfilePage() {
       await navigator.clipboard.writeText(window.location.href);
       showToast({
         title: "Profile link copied",
-        message: "Share it with classmates or recruiters.",
+        message: "The link is ready to share.",
         variant: "success",
       });
     } catch {
       showToast({
-        title: "Profile ready to share",
+        title: "Profile link",
         message: window.location.href,
       });
     }
   };
 
-  const toggleNoteBookmark = (id: string, title: string) => {
-    const isBookmarked = bookmarkedNotes.has(id);
-    setBookmarkedNotes((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    showToast({
-      title: isBookmarked ? "Bookmark removed" : "Note bookmarked",
-      message: title,
-      variant: isBookmarked ? "info" : "success",
-    });
-  };
+  if (isLoading) {
+    return (
+      <div className="grid min-h-[60vh] place-items-center">
+        <LoadingSpinner label="Loading your profile" />
+      </div>
+    );
+  }
 
-  const toggleDiscussionUpvote = (title: string) => {
-    const isUpvoted = upvotedDiscussions.has(title);
-    setUpvotedDiscussions((current) => {
-      const next = new Set(current);
-      if (next.has(title)) next.delete(title);
-      else next.add(title);
-      return next;
-    });
-    showToast({
-      title: isUpvoted ? "Upvote removed" : "Discussion upvoted",
-      message: title,
-      variant: isUpvoted ? "info" : "success",
-    });
-  };
+  if (error || !profile) {
+    return (
+      <ErrorMessage
+        message={error ?? "Your profile could not be loaded."}
+      />
+    );
+  }
 
   return (
     <div className="grid gap-8 pb-8">
       <Card className="overflow-hidden">
-        <div className="relative h-36 overflow-hidden bg-slate-950 sm:h-44">
-          <div className="absolute -left-20 -top-32 size-96 rounded-full bg-brand-600/35 blur-3xl" />
-          <div className="absolute -bottom-36 right-0 size-96 rounded-full bg-emerald-500/20 blur-3xl" />
-          <div
-            className="absolute inset-0 opacity-[0.08]"
-            style={{
-              backgroundImage:
-                "linear-gradient(rgba(255,255,255,.4) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.4) 1px, transparent 1px)",
-              backgroundSize: "32px 32px",
-            }}
-          />
+        <div
+          className="relative h-36 overflow-hidden bg-slate-950 bg-cover bg-center sm:h-44"
+          style={
+            profile.coverImageUrl
+              ? { backgroundImage: `url("${profile.coverImageUrl}")` }
+              : undefined
+          }
+        >
+          {!profile.coverImageUrl ? (
+            <>
+              <div className="absolute -left-20 -top-32 size-96 rounded-full bg-brand-600/35 blur-3xl" />
+              <div className="absolute -bottom-36 right-0 size-96 rounded-full bg-emerald-500/20 blur-3xl" />
+            </>
+          ) : null}
           <div className="relative flex h-full items-start justify-between p-5 sm:p-7">
             <Badge className="gap-1.5 bg-white/10 text-brand-100 ring-white/10">
               <Sparkles className="size-3.5" />
               CampusOne student profile
             </Badge>
-            <div className="hidden rounded-xl border border-white/10 bg-white/[0.07] px-3 py-2 text-right backdrop-blur sm:block">
-              <p className="text-xs text-slate-400">Community rank</p>
-              <p className="mt-0.5 text-sm font-bold text-white">Top 8%</p>
-            </div>
+            <Badge className="bg-white/10 text-white ring-white/10">
+              {profile.visibility === "PUBLIC"
+                ? "Public profile"
+                : "Private profile"}
+            </Badge>
           </div>
         </div>
 
@@ -270,7 +353,11 @@ export function ProfilePage() {
           <div className="-mt-16 flex flex-col gap-5 sm:-mt-20">
             <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div className="rounded-full bg-white p-1.5 shadow-xl ring-1 ring-slate-200">
-                <Avatar name={profile.fullName} size="xl" />
+                <Avatar
+                  name={profile.fullName}
+                  size="xl"
+                  src={profile.avatarUrl ?? undefined}
+                />
               </div>
               <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
                 <Button
@@ -293,32 +380,26 @@ export function ProfilePage() {
             </div>
 
             <div className="max-w-3xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
-                  {profile.fullName}
-                </h1>
-                <span
-                  aria-label="Verified CampusOne student"
-                  className="grid size-5 place-items-center rounded-full bg-brand-600 text-white"
-                  title="Verified student"
-                >
-                  <CheckCircle2 className="size-3.5" />
-                </span>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
+              <h1 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">
+                {profile.fullName}
+              </h1>
+              <p className="mt-1 text-sm text-slate-500">{profile.email}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
                 <span className="flex items-center gap-1.5 font-medium text-slate-700">
                   <GraduationCap className="size-4 text-brand-500" />
-                  {profile.university}
+                  {profile.university?.name || "University not added yet"}
                 </span>
-                <span>{profile.department}</span>
-                <span>{profile.semester}</span>
+                <span>
+                  {profile.department?.name || "Department not added yet"}
+                </span>
+                <span>Semester {profile.semester}</span>
                 <span className="flex items-center gap-1.5">
                   <MapPin className="size-4" />
-                  {profile.location}
+                  {profile.location || "Location not added yet"}
                 </span>
               </div>
               <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                {profile.bio}
+                {profile.bio || "Bio not added yet."}
               </p>
             </div>
           </div>
@@ -330,18 +411,14 @@ export function ProfilePage() {
           Profile statistics
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-          {profileStats.map((stat) => (
-            <div
-              className="min-w-0 transition duration-200 hover:-translate-y-1 [&>div]:h-full [&>div]:transition-shadow [&>div]:hover:shadow-xl"
+          {stats.map((stat) => (
+            <StatCard
+              description={stat.description}
+              icon={stat.icon}
               key={stat.label}
-            >
-              <StatCard
-                description={stat.description}
-                icon={stat.icon}
-                label={stat.label}
-                value={stat.value.toLocaleString()}
-              />
-            </div>
+              label={stat.label}
+              value={stat.value.toLocaleString()}
+            />
           ))}
         </div>
       </section>
@@ -351,280 +428,178 @@ export function ProfilePage() {
           <SectionTitle
             action={
               <Button onClick={openEditProfile} size="sm" variant="outline">
-                <Plus className="size-3.5" />
-                Add skill
+                <Pencil className="size-3.5" />
+                Edit skills
               </Button>
             }
-            description={`Topics and tools ${profile.fullName.split(" ")[0]} is comfortable working with.`}
+            description="Topics and tools saved on your CampusOne profile."
             title="Skills & expertise"
           />
-          <div className="mt-5 flex flex-wrap gap-2.5">
-            {profile.skills.map((skill) => (
-              <Badge
-                className="border border-brand-100 bg-brand-50 px-3 py-1.5 text-brand-700 transition hover:-translate-y-0.5 hover:bg-brand-100"
-                key={skill}
-                variant="brand"
-              >
-                {skill}
-              </Badge>
-            ))}
-          </div>
+          {profile.skills.length > 0 ? (
+            <div className="mt-5 flex flex-wrap gap-2.5">
+              {profile.skills.map((skill) => (
+                <Badge className="px-3 py-1.5" key={skill} variant="brand">
+                  {skill}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-5 text-sm text-slate-500">
+              No skills added yet.
+            </p>
+          )}
         </CardContent>
       </Card>
 
-      <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.65fr)]">
+      <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
         <section>
           <SectionTitle
-            description="Milestones earned through helpful campus contributions."
-            title="Badges & achievements"
+            description="Badges awarded by the CampusOne gamification system."
+            title="Earned badges"
           />
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            {profileAchievements.map((achievement) => {
-              const tone = achievementTones[achievement.tone];
-
-              return (
-                <Card
-                  className={cn(
-                    "group h-full transition duration-200 hover:-translate-y-1 hover:shadow-xl",
-                    tone.border,
-                  )}
-                  key={achievement.name}
-                >
-                  <CardContent className="flex h-full flex-col p-5">
-                    <div className="flex items-start gap-4">
-                      <span
-                        className={cn(
-                          "grid size-12 shrink-0 place-items-center rounded-2xl",
-                          tone.icon,
-                        )}
-                      >
-                        <achievement.icon className="size-5.5" />
-                      </span>
-                      <div>
-                        <h3 className="font-semibold text-slate-950">
-                          {achievement.name}
-                        </h3>
-                        <p className="mt-1 text-sm leading-6 text-slate-500">
-                          {achievement.description}
-                        </p>
-                      </div>
+          {gamification && gamification.badges.length > 0 ? (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              {gamification.badges.map((userBadge) => (
+                <Card key={userBadge.badge.id}>
+                  <CardContent className="flex gap-4 p-5">
+                    <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700">
+                      <Award className="size-5" />
+                    </span>
+                    <div>
+                      <h3 className="font-semibold text-slate-950">
+                        {userBadge.badge.name}
+                      </h3>
+                      <p className="mt-1 text-sm leading-6 text-slate-500">
+                        {userBadge.badge.description}
+                      </p>
+                      <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                        <CheckCircle2 className="size-3.5" />
+                        Earned {formatDateTime(userBadge.awardedAt)}
+                      </p>
                     </div>
-                    {achievement.earned ? (
-                      <div className="mt-5 flex items-center gap-2 border-t border-slate-100 pt-4 text-xs font-semibold text-emerald-700">
-                        <CheckCircle2 className="size-4" />
-                        {achievement.earned}
-                      </div>
-                    ) : (
-                      <div className="mt-5 border-t border-slate-100 pt-4">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-medium text-slate-500">
-                            Badge progress
-                          </span>
-                          <span className="font-bold text-slate-700">
-                            {achievement.progress}%
-                          </span>
-                        </div>
-                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                          <div
-                            aria-label={`${achievement.name} progress`}
-                            aria-valuemax={100}
-                            aria-valuemin={0}
-                            aria-valuenow={achievement.progress}
-                            className={cn(
-                              "h-full rounded-full transition-[width] duration-700 ease-out",
-                              tone.progress,
-                            )}
-                            role="progressbar"
-                            style={{ width: `${achievement.progress}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              className="mt-4 min-h-52"
+              description="Contribute around CampusOne to unlock your first badge."
+              icon={<Award className="size-6" />}
+              title="No badges earned yet"
+            />
+          )}
         </section>
 
-        <section className="xl:sticky xl:top-28">
+        <section>
           <SectionTitle
-            description="Recent contributions across CampusOne."
-            title="Contribution activity"
+            description="XP activity recorded by the gamification system."
+            title="Recent XP activity"
           />
-          <Card className="mt-4">
-            <CardContent className="p-5">
-              <ol className="relative">
-                {profileActivity.map((activity, index) => (
-                  <li
-                    className={cn(
-                      "relative flex gap-3 pb-6",
-                      index === profileActivity.length - 1 && "pb-0",
-                    )}
-                    key={activity.id}
+          {history && history.content.length > 0 ? (
+            <Card className="mt-4">
+              <CardContent className="divide-y divide-slate-100 p-5">
+                {history.content.map((transaction) => (
+                  <div
+                    className="flex items-start gap-3 py-4 first:pt-0 last:pb-0"
+                    key={transaction.id}
                   >
-                    {index < profileActivity.length - 1 ? (
-                      <span className="absolute bottom-0 left-5 top-10 w-px bg-slate-200" />
-                    ) : null}
-                    <span
-                      className={cn(
-                        "z-10 grid size-10 shrink-0 place-items-center rounded-xl ring-4 ring-white",
-                        activityTones[activity.tone],
-                      )}
-                    >
-                      <activity.icon className="size-4" />
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-emerald-50 font-bold text-emerald-700">
+                      +{transaction.points}
                     </span>
-                    <div className="min-w-0 pt-0.5">
-                      <p className="text-sm font-semibold leading-5 text-slate-900">
-                        {activity.title}
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {transaction.description ||
+                          transaction.actionType
+                            .toLowerCase()
+                            .replaceAll("_", " ")}
                       </p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        {activity.description}
-                      </p>
-                      <p className="mt-1 text-[11px] font-medium text-slate-400">
-                        {activity.time}
+                      <p className="mt-1 text-xs text-slate-400">
+                        {formatDateTime(transaction.createdAt)}
                       </p>
                     </div>
-                  </li>
+                  </div>
                 ))}
-              </ol>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ) : (
+            <EmptyState
+              className="mt-4 min-h-52"
+              description="Your XP transactions will appear here after eligible contributions."
+              icon={<Sparkles className="size-6" />}
+              title="No XP activity yet"
+            />
+          )}
         </section>
       </div>
 
       <section>
         <SectionTitle
-          action={
-            <Link
-              className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 transition hover:text-brand-800"
-              to={paths.notes}
-            >
-              View all notes
-              <ArrowRight className="size-3.5" />
-            </Link>
-          }
-          description="Study resources shared with the CampusOne community."
-          title="Uploaded notes"
+          description="Your latest study resources from the Notes module."
+          title="My recent notes"
         />
-        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {profileNotes.map((note) => {
-            const isBookmarked = bookmarkedNotes.has(note.id);
-
-            return (
-              <Card
-                className="group transition duration-200 hover:-translate-y-1 hover:border-brand-200 hover:shadow-xl"
-                key={note.id}
-              >
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-3">
-                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">
-                      <FileText className="size-5" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <Badge variant="brand">{note.course}</Badge>
-                      <h3 className="mt-2 font-semibold leading-6 text-slate-950">
-                        {note.title}
-                      </h3>
-                    </div>
-                    <Button
-                      aria-label={
-                        isBookmarked ? "Remove bookmark" : "Bookmark note"
-                      }
-                      onClick={() =>
-                        toggleNoteBookmark(note.id, note.title)
-                      }
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <Bookmark
-                        className={cn(
-                          "size-4.5",
-                          isBookmarked &&
-                            "fill-brand-600 text-brand-600",
-                        )}
-                      />
-                    </Button>
-                  </div>
-                  <div className="mt-5 flex items-center gap-4 border-t border-slate-100 pt-4 text-xs text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <Download className="size-3.5" />
-                      {note.downloads} downloads
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Star className="size-3.5 fill-amber-400 text-amber-400" />
-                      {note.rating}
-                    </span>
-                    <Button
-                      className="ml-auto"
-                      onClick={() => navigate(paths.notes)}
-                      size="sm"
-                      variant="ghost"
-                    >
-                      <Eye className="size-3.5" />
-                      View
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        {notes && notes.content.length > 0 ? (
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {notes.content.map((note) => (
+              <NoteCard key={note.id} note={note} owned />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            className="mt-4 min-h-52"
+            description="Notes you share will appear here."
+            icon={<BookOpen className="size-6" />}
+            title="No notes uploaded yet"
+          />
+        )}
       </section>
 
       <section>
         <SectionTitle
-          action={
-            <Link
-              className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 transition hover:text-brand-800"
-              to={paths.discussions}
-            >
-              View all discussions
-              <ArrowRight className="size-3.5" />
-            </Link>
-          }
-          description={`Questions, answers, and ideas shared by ${profile.fullName.split(" ")[0]}.`}
-          title="Recent discussions"
+          description="Your latest questions from the Discussion module."
+          title="My recent questions"
         />
-        <div className="mt-4 grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-          {profileDiscussions.map((discussion) => (
-            <div
-              className="transition duration-200 hover:-translate-y-1 [&>div]:h-full [&>div]:transition-shadow [&>div]:hover:shadow-xl"
-              key={discussion.title}
-            >
-              <DiscussionCard
-                discussion={{
-                  ...discussion,
-                  upvotes:
-                    discussion.upvotes +
-                    (upvotedDiscussions.has(discussion.title) ? 1 : 0),
-                }}
-                onOpen={() => navigate(paths.discussions)}
-                onUpvote={() => toggleDiscussionUpvote(discussion.title)}
-              />
-            </div>
-          ))}
-        </div>
+        {questions && questions.content.length > 0 ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {questions.content.map((question) => (
+              <QuestionCard key={question.id} owned question={question} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            className="mt-4 min-h-52"
+            description="Questions you ask will appear here."
+            icon={<MessageSquareText className="size-6" />}
+            title="No discussion questions yet"
+          />
+        )}
       </section>
 
       <Modal
-        description="Update the student information shown on your CampusOne profile."
+        description="These changes are saved to your CampusOne account."
         footer={
           <>
             <Button
+              disabled={isSaving}
               onClick={() => setIsEditOpen(false)}
               type="button"
               variant="ghost"
             >
               Cancel
             </Button>
-            <Button form="edit-profile-form" type="submit">
+            <Button
+              form="edit-profile-form"
+              loading={isSaving}
+              type="submit"
+            >
               Save changes
             </Button>
           </>
         }
         isOpen={isEditOpen}
-        onClose={() => setIsEditOpen(false)}
+        onClose={() => {
+          if (!isSaving) setIsEditOpen(false);
+        }}
         size="lg"
         title="Edit profile"
       >
@@ -632,13 +607,16 @@ export function ProfilePage() {
           className="grid gap-5"
           id="edit-profile-form"
           noValidate
-          onSubmit={handleSaveProfile}
+          onSubmit={(event) => void handleSaveProfile(event)}
         >
+          {saveError ? <ErrorMessage message={saveError} /> : null}
           <FormField
             error={errors.fullName}
             label="Full name"
-            onChange={(event) => updateDraft("fullName", event.target.value)}
-            placeholder="Your full name"
+            maxLength={80}
+            onChange={(event) =>
+              updateDraft("fullName", event.target.value)
+            }
             required
             value={draft.fullName}
           />
@@ -649,9 +627,6 @@ export function ProfilePage() {
               htmlFor="edit-profile-bio"
             >
               Bio
-              <span aria-hidden="true" className="ml-1 text-red-500">
-                *
-              </span>
             </label>
             <textarea
               aria-describedby={
@@ -659,73 +634,45 @@ export function ProfilePage() {
               }
               aria-invalid={Boolean(errors.bio)}
               className={cn(
-                "min-h-28 w-full resize-y rounded-xl border bg-white px-3.5 py-3 text-sm leading-6 text-slate-950 outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:ring-4",
+                "min-h-28 w-full resize-y rounded-xl border bg-white px-3.5 py-3 text-sm leading-6 text-slate-950 outline-none transition placeholder:text-slate-400 focus:ring-4",
                 errors.bio
                   ? "border-red-300 focus:border-red-400 focus:ring-red-100"
                   : "border-slate-200 focus:border-brand-400 focus:ring-brand-100",
               )}
               id="edit-profile-bio"
-              maxLength={280}
+              maxLength={500}
               onChange={(event) => updateDraft("bio", event.target.value)}
               placeholder="Tell the community what you study and enjoy building."
               value={draft.bio}
             />
-            <div className="flex items-center justify-between gap-3">
-              {errors.bio ? (
-                <p
-                  className="text-xs font-medium text-red-600"
-                  id="edit-profile-bio-error"
-                >
-                  {errors.bio}
-                </p>
-              ) : (
-                <span />
-              )}
-              <span className="text-xs text-slate-400">
-                {draft.bio.length}/280
-              </span>
-            </div>
+            {errors.bio ? (
+              <p
+                className="text-xs font-medium text-red-600"
+                id="edit-profile-bio-error"
+              >
+                {errors.bio}
+              </p>
+            ) : null}
           </div>
-
-          <div className="grid gap-5 sm:grid-cols-2">
-            <SelectField
-              error={errors.university}
-              label="University"
-              onChange={(event) =>
-                updateDraft("university", event.target.value)
-              }
-              options={profileUniversityOptions}
-              required
-              value={draft.university}
-            />
-            <SelectField
-              error={errors.department}
-              label="Department"
-              onChange={(event) =>
-                updateDraft("department", event.target.value)
-              }
-              options={profileDepartmentOptions}
-              required
-              value={draft.department}
-            />
-          </div>
-
-          <SelectField
-            error={errors.semester}
-            label="Semester"
-            onChange={(event) => updateDraft("semester", event.target.value)}
-            options={profileSemesterOptions}
-            required
-            value={draft.semester}
-          />
 
           <FormField
+            error={errors.location}
+            label="Location"
+            maxLength={100}
+            onChange={(event) =>
+              updateDraft("location", event.target.value)
+            }
+            placeholder="Islamabad, Pakistan"
+            value={draft.location}
+          />
+          <FormField
             error={errors.skills}
-            hint="Separate skills with commas."
+            hint="Separate skills with commas. Leave blank if you have not added any yet."
             label="Skills"
-            onChange={(event) => updateDraft("skills", event.target.value)}
-            placeholder="React, Java, UI/UX"
-            required
+            onChange={(event) =>
+              updateDraft("skills", event.target.value)
+            }
+            placeholder="Java, PostgreSQL, React"
             value={draft.skills}
           />
         </form>
