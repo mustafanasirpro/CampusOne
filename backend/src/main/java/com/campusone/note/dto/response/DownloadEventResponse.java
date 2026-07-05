@@ -7,5 +7,6 @@ public record DownloadEventResponse(
         UUID eventId,
         UUID noteId,
         Instant downloadedAt,
-        long downloadCount) {
+        long downloadCount,
+        String downloadUrl) {
 }
