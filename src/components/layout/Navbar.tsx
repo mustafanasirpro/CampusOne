@@ -11,9 +11,14 @@ export function Navbar() {
   const [searchValue, setSearchValue] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
-  const activeItem = [...primaryNavigation, ...secondaryNavigation].find(
-    (item) => location.pathname.startsWith(item.path),
-  );
+  const navigation = [...primaryNavigation, ...secondaryNavigation];
+  const activeItem =
+    location.pathname === paths.dashboard
+      ? navigation.find((item) => item.path === paths.dashboard)
+      : navigation
+          .filter((item) => item.path !== paths.dashboard)
+          .sort((first, second) => second.path.length - first.path.length)
+          .find((item) => location.pathname.startsWith(item.path));
 
   const handleSearch = (value: string) => {
     const query = value.trim();
