@@ -86,7 +86,8 @@ JWT signing uses:
 - `MAX_LOGIN_ATTEMPTS`: optional; defaults to `5`
 - `ACCOUNT_LOCK_MINUTES`: optional; defaults to `15`
 - `CORS_ALLOWED_ORIGINS`: required comma-separated exact frontend origins in
-  production; the `local` profile defaults to `http://localhost:5173`
+  production; the `local` profile defaults to `http://localhost:5173` and
+  `http://127.0.0.1:5173`
 - `OPENAPI_ENABLED`: defaults to `false`; enable only in trusted environments
 
 Generate a different JWT secret for every environment. PowerShell:
