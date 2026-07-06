@@ -31,8 +31,7 @@ public class NoteFileValidator {
             throw new InvalidFileUploadException("Select a PDF file to upload.");
         }
         if (requestedFileType != NoteFileType.PDF) {
-            throw new InvalidFileUploadException(
-                    "Uploaded study resources must use the PDF file type.");
+            throw new InvalidFileUploadException("Only PDF files are allowed.");
         }
 
         int maximumSizeMb = properties.getMaxUploadSizeMb();
@@ -44,11 +43,10 @@ public class NoteFileValidator {
         String originalFilename = safeOriginalFilename(
                 multipartFile.getOriginalFilename());
         if (!originalFilename.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
-            throw new InvalidFileUploadException("Only PDF files are supported.");
+            throw new InvalidFileUploadException("Only PDF files are allowed.");
         }
         if (!PDF_MIME_TYPE.equalsIgnoreCase(multipartFile.getContentType())) {
-            throw new InvalidFileUploadException(
-                    "The selected file must have the application/pdf MIME type.");
+            throw new InvalidFileUploadException("Only PDF files are allowed.");
         }
 
         byte[] content;
@@ -56,7 +54,7 @@ public class NoteFileValidator {
             content = multipartFile.getBytes();
         } catch (IOException exception) {
             throw new StorageOperationException(
-                    "The uploaded PDF could not be read.",
+                    "Storage is temporarily unavailable.",
                     exception);
         }
         if (content.length == 0) {
@@ -66,8 +64,7 @@ public class NoteFileValidator {
             throw new FileUploadTooLargeException(maximumSizeMb);
         }
         if (!hasPdfSignature(content)) {
-            throw new InvalidFileUploadException(
-                    "The selected file does not contain a valid PDF signature.");
+            throw new InvalidFileUploadException("Only PDF files are allowed.");
         }
 
         return new ValidatedNoteFile(
@@ -82,15 +79,16 @@ public class NoteFileValidator {
             throw new InvalidFileUploadException(
                     "The uploaded PDF must have a filename.");
         }
-        String normalized = filename.replace('\\', '/');
-        String basename = normalized.substring(normalized.lastIndexOf('/') + 1).trim();
-        if (basename.isBlank()
-                || basename.length() > 255
-                || basename.chars().anyMatch(Character::isISOControl)) {
+        String safeFilename = filename.trim();
+        if (safeFilename.contains("/")
+                || safeFilename.contains("\\")
+                || safeFilename.contains("..")
+                || safeFilename.length() > 255
+                || safeFilename.chars().anyMatch(Character::isISOControl)) {
             throw new InvalidFileUploadException(
                     "The uploaded PDF filename is invalid.");
         }
-        return basename;
+        return safeFilename;
     }
 
     private boolean hasPdfSignature(byte[] content) {

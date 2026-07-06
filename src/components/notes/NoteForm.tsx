@@ -60,7 +60,8 @@ type NoteFormProps =
       onSubmit: (request: UpdateNoteRequest) => Promise<void>;
     });
 
-const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_PDF_SIZE_MB = 25;
+const MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -174,6 +175,15 @@ export function NoteForm(props: NoteFormProps) {
       setSelectedFile(null);
       return;
     }
+    if (file.size === 0) {
+      setSelectedFile(null);
+      setErrors((current) => ({
+        ...current,
+        file: "Select a non-empty PDF file.",
+      }));
+      event.target.value = "";
+      return;
+    }
     if (
       file.type !== "application/pdf" ||
       !file.name.toLowerCase().endsWith(".pdf")
@@ -181,7 +191,7 @@ export function NoteForm(props: NoteFormProps) {
       setSelectedFile(null);
       setErrors((current) => ({
         ...current,
-        file: "Select a PDF file.",
+        file: "Only PDF files are allowed.",
       }));
       event.target.value = "";
       return;
@@ -190,7 +200,7 @@ export function NoteForm(props: NoteFormProps) {
       setSelectedFile(null);
       setErrors((current) => ({
         ...current,
-        file: "The PDF must not exceed 10 MB.",
+        file: `File size must be ${MAX_PDF_SIZE_MB} MB or less.`,
       }));
       event.target.value = "";
       return;
@@ -239,6 +249,7 @@ export function NoteForm(props: NoteFormProps) {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (props.isSubmitting) return;
     if (!validate()) return;
 
     const commonRequest = {
@@ -402,7 +413,7 @@ export function NoteForm(props: NoteFormProps) {
                   PDF study resource
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Upload one PDF up to 10 MB. CampusOne securely generates
+                  Upload one PDF up to 25 MB. CampusOne securely generates
                   its storage key, MIME metadata, size, and checksum.
                 </p>
               </div>
@@ -423,7 +434,7 @@ export function NoteForm(props: NoteFormProps) {
                   Select a PDF
                 </span>
                 <span className="mt-1 block text-xs text-slate-500">
-                  PDF only · maximum 10 MB
+                  PDF only, up to 25 MB
                 </span>
               </span>
               <input

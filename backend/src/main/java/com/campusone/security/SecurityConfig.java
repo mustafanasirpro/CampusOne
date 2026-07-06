@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -38,9 +40,11 @@ public class SecurityConfig {
             HttpSecurity http,
             RequestOriginValidationFilter requestOriginValidationFilter,
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            ObjectProvider<NoteManagementAuthorizationFilter>
+                    noteManagementAuthorizationFilter,
             RestAuthenticationEntryPoint authenticationEntryPoint,
             RestAccessDeniedHandler accessDeniedHandler) throws Exception {
-        return http
+        http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -63,6 +67,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/profiles/**")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/notes/my")
+                        .authenticated()
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/v1/notes/management-status")
                         .authenticated()
                         .requestMatchers(HttpMethod.GET,
                                 "/api/v1/notes",
@@ -115,8 +122,15 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(requestOriginValidationFilter, JwtAuthenticationFilter.class)
-                .build();
+                .addFilterBefore(requestOriginValidationFilter, JwtAuthenticationFilter.class);
+        NoteManagementAuthorizationFilter managementFilter =
+                noteManagementAuthorizationFilter.getIfAvailable();
+        if (managementFilter != null) {
+            http.addFilterAfter(
+                    managementFilter,
+                    JwtAuthenticationFilter.class);
+        }
+        return http.build();
     }
 
     @Bean
@@ -153,6 +167,29 @@ public class SecurityConfig {
     FilterRegistrationBean<RequestOriginValidationFilter> originFilterRegistration(
             RequestOriginValidationFilter filter) {
         FilterRegistrationBean<RequestOriginValidationFilter> registration =
+                new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    @ConditionalOnBean(
+            com.campusone.note.service.NoteAdminAuthorizationService.class)
+    NoteManagementAuthorizationFilter noteManagementAuthorizationFilter(
+            com.campusone.note.service.NoteAdminAuthorizationService
+                    authorizationService,
+            SecurityErrorResponseWriter errorResponseWriter) {
+        return new NoteManagementAuthorizationFilter(
+                authorizationService,
+                errorResponseWriter);
+    }
+
+    @Bean
+    @ConditionalOnBean(NoteManagementAuthorizationFilter.class)
+    FilterRegistrationBean<NoteManagementAuthorizationFilter>
+            noteManagementFilterRegistration(
+                    NoteManagementAuthorizationFilter filter) {
+        FilterRegistrationBean<NoteManagementAuthorizationFilter> registration =
                 new FilterRegistrationBean<>(filter);
         registration.setEnabled(false);
         return registration;

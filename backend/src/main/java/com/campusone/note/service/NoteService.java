@@ -204,8 +204,26 @@ public class NoteService {
             UUID userId,
             UUID noteId,
             UpdateNoteRequest request) {
+        return updateNoteInternal(userId, noteId, request, true);
+    }
+
+    @Transactional
+    public NoteDetailResponse updateNoteAsAdmin(
+            UUID adminUserId,
+            UUID noteId,
+            UpdateNoteRequest request) {
+        return updateNoteInternal(adminUserId, noteId, request, false);
+    }
+
+    private NoteDetailResponse updateNoteInternal(
+            UUID userId,
+            UUID noteId,
+            UpdateNoteRequest request,
+            boolean requireOwnership) {
         Note note = requireDetailedNote(noteId);
-        requireOwner(note, userId);
+        if (requireOwnership) {
+            requireOwner(note, userId);
+        }
         if (note.getModerationStatus() == NoteModerationStatus.HIDDEN) {
             throw new InvalidNoteStateException(
                     "A hidden note cannot be edited until a moderator restores it.");
@@ -244,6 +262,12 @@ public class NoteService {
         note.softDelete(clock.instant());
     }
 
+    @Transactional
+    public void deleteNoteAsAdmin(UUID noteId) {
+        Note note = requireDetailedNote(noteId);
+        note.softDelete(clock.instant());
+    }
+
     @Transactional(readOnly = true)
     public NoteDetailResponse getNote(
             UUID noteId,
@@ -251,6 +275,13 @@ public class NoteService {
         Note note = requireDetailedNote(noteId);
         requireViewable(note, viewerUserId);
         return toDetail(note, viewerUserId);
+    }
+
+    @Transactional(readOnly = true)
+    public NoteDetailResponse getNoteAsAdmin(
+            UUID noteId,
+            UUID adminUserId) {
+        return toDetail(requireDetailedNote(noteId), adminUserId);
     }
 
     @Transactional(readOnly = true)

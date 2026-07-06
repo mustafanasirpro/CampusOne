@@ -9,7 +9,11 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ApiError } from "@/api/apiClient";
-import { getMyNotes, listNotes } from "@/api/notesApi";
+import {
+  getMyNotes,
+  getNoteManagementStatus,
+  listNotes,
+} from "@/api/notesApi";
 import {
   Button,
   EmptyState,
@@ -41,8 +45,27 @@ export function NotesPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [canManage, setCanManage] = useState(false);
 
   useDocumentTitle("Notes · CampusOne");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    void getNoteManagementStatus(controller.signal)
+      .then((status) => {
+        if (active) setCanManage(status.canManage);
+      })
+      .catch(() => {
+        if (active) setCanManage(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -133,15 +156,17 @@ export function NotesPage() {
     <div className="grid gap-6 pb-8">
       <PageHeader
         actions={
-          <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
-            to={paths.noteNew}
-          >
-            <FilePlus2 className="size-4" />
-            Create note
-          </Link>
+          canManage ? (
+            <Link
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+              to={paths.noteNew}
+            >
+              <FilePlus2 className="size-4" />
+              Upload note
+            </Link>
+          ) : null
         }
-        description="Discover approved study resources or manage notes you have submitted for moderation."
+        description="Discover approved notes and past papers. Upload and management tools are available to admins."
         eyebrow="Study resources"
         title="Notes"
       />
@@ -149,18 +174,32 @@ export function NotesPage() {
       <Tabs
         activeTab={view}
         onChange={changeView}
-        tabs={[
-          {
-            count: view === "library" ? result?.totalElements : undefined,
-            label: "Notes library",
-            value: "library",
-          },
-          {
-            count: view === "mine" ? result?.totalElements : undefined,
-            label: "My notes",
-            value: "mine",
-          },
-        ]}
+        tabs={
+          canManage
+            ? [
+                {
+                  count:
+                    view === "library"
+                      ? result?.totalElements
+                      : undefined,
+                  label: "Notes library",
+                  value: "library",
+                },
+                {
+                  count:
+                    view === "mine" ? result?.totalElements : undefined,
+                  label: "Admin uploads",
+                  value: "mine",
+                },
+              ]
+            : [
+                {
+                  count: result?.totalElements,
+                  label: "Notes library",
+                  value: "library",
+                },
+              ]
+        }
       />
 
       <NotesFilterBar
@@ -213,18 +252,18 @@ export function NotesPage() {
               <Button onClick={clearFilters} variant="outline">
                 Clear filters
               </Button>
-            ) : (
+            ) : canManage ? (
               <Link
                 className="inline-flex h-10 items-center justify-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white hover:bg-brand-700"
                 to={paths.noteNew}
               >
-                Create your first note
+                Upload a note
               </Link>
-            )
+            ) : undefined
           }
           description={
             view === "mine"
-              ? "You have not submitted any notes yet."
+              ? "No notes have been uploaded by this admin account."
               : "No approved public notes match the selected course and tag."
           }
           icon={<FileSearch className="size-6" />}
@@ -249,7 +288,7 @@ export function NotesPage() {
               <NoteCard
                 key={note.id}
                 note={note}
-                owned={view === "mine"}
+                owned={canManage && view === "mine"}
               />
             ))}
           </div>

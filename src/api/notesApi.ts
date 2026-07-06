@@ -5,6 +5,7 @@ import type {
   DownloadEventResult,
   NoteDetail,
   NoteListParameters,
+  NoteManagementStatus,
   NotePage,
   NoteSort,
   RatingResult,
@@ -50,6 +51,12 @@ export function getMyNotes({
 
 export function getNoteById(noteId: string, signal?: AbortSignal) {
   return apiRequest<NoteDetail>(`/notes/${noteId}`, { signal });
+}
+
+export function getNoteManagementStatus(signal?: AbortSignal) {
+  return apiRequest<NoteManagementStatus>("/notes/management-status", {
+    signal,
+  });
 }
 
 export function createNote(request: CreateNoteRequest, file: File) {

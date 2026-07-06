@@ -19,11 +19,11 @@ import {
   bookmarkNote,
   deleteNote,
   getNoteById,
+  getNoteManagementStatus,
   rateNote,
   recordNoteDownload,
   unbookmarkNote,
 } from "@/api/notesApi";
-import { getCurrentUserIdentity } from "@/api/userApi";
 import {
   Badge,
   Button,
@@ -55,7 +55,7 @@ export function NoteDetailPage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [note, setNote] = useState<NoteDetail | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [canManage, setCanManage] = useState(false);
   const [error, setError] = useState<string | null>(() =>
     noteId ? null : "The note ID is missing.",
   );
@@ -73,12 +73,14 @@ export function NoteDetailPage() {
 
     void Promise.all([
       getNoteById(noteId, controller.signal),
-      getCurrentUserIdentity(controller.signal).catch(() => null),
+      getNoteManagementStatus(controller.signal).catch(() => ({
+        canManage: false,
+      })),
     ])
-      .then(([noteResponse, identity]) => {
+      .then(([noteResponse, managementStatus]) => {
         if (!active) return;
         setNote(noteResponse);
-        setCurrentUserId(identity?.userId ?? null);
+        setCanManage(managementStatus.canManage);
       })
       .catch((requestError: unknown) => {
         if (active) setError(actionErrorMessage(requestError));
@@ -92,11 +94,6 @@ export function NoteDetailPage() {
       controller.abort();
     };
   }, [noteId]);
-
-  const isOwner =
-    note !== null &&
-    currentUserId !== null &&
-    note.uploader.userId === currentUserId;
 
   const toggleBookmark = async () => {
     if (!note) return;
@@ -231,7 +228,7 @@ export function NoteDetailPage() {
           <ArrowLeft className="size-4" />
           Back to notes
         </Link>
-        {isOwner ? (
+        {canManage ? (
           <div className="flex flex-wrap gap-2">
             <Link
               className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"

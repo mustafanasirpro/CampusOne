@@ -14,9 +14,10 @@ import {
   Trophy,
   UserRound,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { getNoteManagementStatus } from "@/api/notesApi";
 import { useAuth } from "@/auth/useAuth";
 import {
   Badge,
@@ -31,7 +32,7 @@ import { useDocumentTitle } from "@/utils/useDocumentTitle";
 
 const workspaceCards = [
   {
-    description: "Browse, create, rate, and bookmark shared study material.",
+    description: "Browse, download, rate, and bookmark study material.",
     icon: FileText,
     label: "Notes",
     path: paths.notes,
@@ -104,21 +105,25 @@ const workspaceCards = [
 
 const quickActions = [
   {
+    adminOnly: true,
     icon: FilePlus2,
-    label: "Create a note",
+    label: "Upload a note",
     path: paths.noteNew,
   },
   {
+    adminOnly: false,
     icon: MessageSquarePlus,
     label: "Ask a question",
     path: paths.discussionQuestionNew,
   },
   {
+    adminOnly: false,
     icon: CalendarDays,
     label: "Create an event",
     path: paths.eventNew,
   },
   {
+    adminOnly: false,
     icon: BriefcaseBusiness,
     label: "Share an internship",
     path: paths.internshipNew,
@@ -136,6 +141,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [searchValue, setSearchValue] = useState("");
+  const [canManageNotes, setCanManageNotes] = useState(false);
   const firstName = currentUser?.fullName.trim().split(/\s+/)[0] || "Student";
   const currentDate = useMemo(
     () =>
@@ -146,6 +152,24 @@ export function DashboardPage() {
   );
 
   useDocumentTitle("Home · CampusOne");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    void getNoteManagementStatus(controller.signal)
+      .then((status) => {
+        if (active) setCanManageNotes(status.canManage);
+      })
+      .catch(() => {
+        if (active) setCanManageNotes(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
 
   const search = (value: string) => {
     const query = value.trim();
@@ -214,18 +238,20 @@ export function DashboardPage() {
           title="Quick actions"
         />
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {quickActions.map((action) => (
-            <Link
-              className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:text-brand-700 hover:shadow-card"
-              key={action.path}
-              to={action.path}
-            >
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700 transition group-hover:bg-brand-600 group-hover:text-white">
-                <action.icon className="size-4.5" />
-              </span>
-              {action.label}
-            </Link>
-          ))}
+          {quickActions
+            .filter((action) => !action.adminOnly || canManageNotes)
+            .map((action) => (
+              <Link
+                className="group flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:text-brand-700 hover:shadow-card"
+                key={action.path}
+                to={action.path}
+              >
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-700 transition group-hover:bg-brand-600 group-hover:text-white">
+                  <action.icon className="size-4.5" />
+                </span>
+                {action.label}
+              </Link>
+            ))}
         </div>
       </section>
 

@@ -3,10 +3,12 @@ package com.campusone.note.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -17,7 +19,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.campusone.academic.dto.response.CourseResponse;
 import com.campusone.note.dto.request.CreateNoteRequest;
 import com.campusone.note.dto.request.CreateUploadedNoteRequest;
+import com.campusone.note.dto.request.UpdateNoteRequest;
 import com.campusone.common.exception.StorageNotConfiguredException;
+import com.campusone.common.exception.UploadLimitExceededException;
+import com.campusone.common.exception.NoteManagementAccessDeniedException;
 import com.campusone.note.dto.response.FileMetadataResponse;
 import com.campusone.note.dto.response.NoteDetailResponse;
 import com.campusone.note.dto.response.NotePageResponse;
@@ -28,6 +33,7 @@ import com.campusone.note.entity.NoteModerationStatus;
 import com.campusone.note.entity.NoteVisibility;
 import com.campusone.note.entity.StorageProvider;
 import com.campusone.note.service.NoteService;
+import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.note.service.NoteUploadService;
 import com.campusone.security.CampusOneUserDetailsService;
 import com.campusone.security.CampusOneUserPrincipal;
@@ -86,6 +92,9 @@ class NoteControllerTest {
     private NoteUploadService noteUploadService;
 
     @MockitoBean
+    private NoteAdminAuthorizationService adminAuthorizationService;
+
+    @MockitoBean
     private JwtService jwtService;
 
     @MockitoBean
@@ -106,6 +115,10 @@ class NoteControllerTest {
                 principal,
                 null,
                 principal.getAuthorities());
+        when(adminAuthorizationService.canManage(
+                USER_ID,
+                "student@example.com"))
+                .thenReturn(true);
         detailResponse = detailResponse();
     }
 
@@ -159,7 +172,7 @@ class NoteControllerTest {
     }
 
     @Test
-    void createNote_authenticatedValidRequest_returnsCreated() throws Exception {
+    void createNote_adminValidRequest_returnsCreated() throws Exception {
         when(noteService.createNote(eq(USER_ID), any(CreateNoteRequest.class)))
                 .thenReturn(detailResponse);
 
@@ -172,6 +185,23 @@ class NoteControllerTest {
                         "Location",
                         "/api/v1/notes/" + NOTE_ID))
                 .andExpect(jsonPath("$.moderationStatus").value("PENDING"));
+    }
+
+    @Test
+    void createNote_normalUser_isForbidden() throws Exception {
+        rejectNoteManagement();
+
+        mockMvc.perform(post("/api/v1/notes")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validCreateJson()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("NOTE_ADMIN_REQUIRED"))
+                .andExpect(jsonPath("$.message")
+                        .value("Only admins can upload or manage notes."));
+
+        verify(noteService, never())
+                .createNote(eq(USER_ID), any(CreateNoteRequest.class));
     }
 
     @Test
@@ -222,7 +252,7 @@ class NoteControllerTest {
     }
 
     @Test
-    void uploadNote_authenticatedMultipartRequest_returnsCreated()
+    void uploadNote_adminMultipartRequest_returnsCreated()
             throws Exception {
         when(noteUploadService.uploadAndCreate(
                 eq(USER_ID),
@@ -243,6 +273,25 @@ class NoteControllerTest {
     }
 
     @Test
+    void uploadNote_normalUser_isForbidden() throws Exception {
+        rejectNoteManagement();
+
+        mockMvc.perform(multipart("/api/v1/notes/upload")
+                        .file(validUploadRequestPart())
+                        .file(validPdfPart())
+                        .with(authentication(authentication)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("NOTE_ADMIN_REQUIRED"))
+                .andExpect(jsonPath("$.message")
+                        .value("Only admins can upload or manage notes."));
+
+        verify(noteUploadService, never()).uploadAndCreate(
+                eq(USER_ID),
+                any(CreateUploadedNoteRequest.class),
+                any());
+    }
+
+    @Test
     void uploadNote_storageNotConfigured_returnsCleanServiceUnavailable()
             throws Exception {
         when(noteUploadService.uploadAndCreate(
@@ -259,7 +308,28 @@ class NoteControllerTest {
                 .andExpect(jsonPath("$.code")
                         .value("STORAGE_NOT_CONFIGURED"))
                 .andExpect(jsonPath("$.message")
-                        .value("File upload is not configured yet."));
+                        .value("Storage is temporarily unavailable."));
+    }
+
+    @Test
+    void uploadNote_dailyLimitReached_returnsCleanRateLimitError()
+            throws Exception {
+        when(noteUploadService.uploadAndCreate(
+                eq(USER_ID),
+                any(CreateUploadedNoteRequest.class),
+                any()))
+                .thenThrow(new UploadLimitExceededException(
+                        "Daily upload limit reached."));
+
+        mockMvc.perform(multipart("/api/v1/notes/upload")
+                        .file(validUploadRequestPart())
+                        .file(validPdfPart())
+                        .with(authentication(authentication)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code")
+                        .value("UPLOAD_LIMIT_REACHED"))
+                .andExpect(jsonPath("$.message")
+                        .value("Daily upload limit reached."));
     }
 
     @Test
@@ -268,6 +338,92 @@ class NoteControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"title\":\"Updated OOP Notes\"}"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateNote_normalUser_isForbidden() throws Exception {
+        rejectNoteManagement();
+
+        mockMvc.perform(patch("/api/v1/notes/{noteId}", NOTE_ID)
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Updated OOP Notes\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("Only admins can upload or manage notes."));
+
+        verify(noteService, never()).updateNoteAsAdmin(
+                eq(USER_ID),
+                eq(NOTE_ID),
+                any(UpdateNoteRequest.class));
+    }
+
+    @Test
+    void updateNote_admin_canManageAnyNote() throws Exception {
+        when(noteService.updateNoteAsAdmin(
+                eq(USER_ID),
+                eq(NOTE_ID),
+                any(UpdateNoteRequest.class)))
+                .thenReturn(detailResponse);
+
+        mockMvc.perform(patch("/api/v1/notes/{noteId}", NOTE_ID)
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Updated OOP Notes\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(NOTE_ID.toString()));
+    }
+
+    @Test
+    void deleteNote_normalUser_isForbidden() throws Exception {
+        rejectNoteManagement();
+
+        mockMvc.perform(delete("/api/v1/notes/{noteId}", NOTE_ID)
+                        .with(authentication(authentication)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message")
+                        .value("Only admins can upload or manage notes."));
+
+        verify(noteService, never()).deleteNoteAsAdmin(NOTE_ID);
+    }
+
+    @Test
+    void deleteNote_admin_canManageAnyNote() throws Exception {
+        mockMvc.perform(delete("/api/v1/notes/{noteId}", NOTE_ID)
+                        .with(authentication(authentication)))
+                .andExpect(status().isNoContent());
+
+        verify(noteService).deleteNoteAsAdmin(NOTE_ID);
+    }
+
+    @Test
+    void managementStatus_withoutAuthentication_isUnauthorized()
+            throws Exception {
+        mockMvc.perform(get("/api/v1/notes/management-status"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void managementStatus_admin_returnsTrue() throws Exception {
+        when(adminAuthorizationService.canManage(
+                USER_ID,
+                "student@example.com"))
+                .thenReturn(true);
+
+        mockMvc.perform(get("/api/v1/notes/management-status")
+                        .with(authentication(authentication)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.canManage").value(true));
+    }
+
+    private void rejectNoteManagement() {
+        when(adminAuthorizationService.canManage(
+                USER_ID,
+                "student@example.com"))
+                .thenReturn(false);
+        doThrow(new NoteManagementAccessDeniedException())
+                .when(adminAuthorizationService)
+                .requireAdmin(USER_ID, "student@example.com");
     }
 
     private String validCreateJson() {

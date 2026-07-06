@@ -41,5 +41,8 @@ class ApiDocumentationAliasControllerTest {
         mockMvc.perform(get("/swagger-ui/index.html"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/api/v1/swagger-ui"));
+        mockMvc.perform(get("/api/v1/swagger-ui/index.html"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/api/v1/swagger-ui"));
     }
 }

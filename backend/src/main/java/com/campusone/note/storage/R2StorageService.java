@@ -50,12 +50,13 @@ public class R2StorageService implements StorageService {
                 .contentDisposition("inline; filename=\"" + safeHeaderFilename(
                         file.originalFilename()) + "\"")
                 .metadata(Map.of("sha256", file.checksumSha256()))
+                .ifNoneMatch("*")
                 .build();
         try {
             s3Client.putObject(request, RequestBody.fromBytes(file.content()));
         } catch (SdkException exception) {
             throw new StorageOperationException(
-                    "CampusOne could not store the uploaded PDF. Please try again.",
+                    "Storage is temporarily unavailable.",
                     exception);
         }
         return new StoredObject(

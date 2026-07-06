@@ -14,6 +14,7 @@ import com.campusone.note.repository.NoteRatingRepository;
 import com.campusone.note.repository.NoteRepository;
 import com.campusone.note.repository.NoteVersionRepository;
 import com.campusone.note.repository.TagRepository;
+import com.campusone.note.repository.UploadQuotaRepository;
 import com.campusone.user.repository.RoleRepository;
 import com.campusone.user.repository.SkillRepository;
 import com.campusone.user.repository.UserPreferenceRepository;
@@ -77,6 +78,9 @@ class SecurityApplicationContextTest {
     @MockitoBean
     private NoteModerationActionRepository noteModerationActionRepository;
 
+    @MockitoBean
+    private UploadQuotaRepository uploadQuotaRepository;
+
     @Autowired
     private SecurityConfig securityConfig;
 
@@ -87,6 +91,10 @@ class SecurityApplicationContextTest {
     private JwtService jwtService;
 
     @Autowired
+    private NoteManagementAuthorizationFilter
+            noteManagementAuthorizationFilter;
+
+    @Autowired
     private Clock clock;
 
     @Test
@@ -94,6 +102,7 @@ class SecurityApplicationContextTest {
         assertThat(securityConfig).isNotNull();
         assertThat(jwtAuthenticationFilter).isNotNull();
         assertThat(jwtService).isNotNull();
+        assertThat(noteManagementAuthorizationFilter).isNotNull();
         assertThat(clock).isNotNull();
     }
 }

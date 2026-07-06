@@ -91,6 +91,10 @@ export interface NotePage {
   totalPages: number;
 }
 
+export interface NoteManagementStatus {
+  canManage: boolean;
+}
+
 export interface CreateNoteRequest {
   courseId: string;
   description: string;

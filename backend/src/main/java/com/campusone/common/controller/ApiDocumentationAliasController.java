@@ -28,7 +28,8 @@ public class ApiDocumentationAliasController {
         "/swagger-ui",
         "/swagger-ui/",
         "/swagger-ui.html",
-        "/swagger-ui/index.html"
+        "/swagger-ui/index.html",
+        "/api/v1/swagger-ui/index.html"
     })
     public String redirectSwaggerUi() {
         return "redirect:/api/v1/swagger-ui";

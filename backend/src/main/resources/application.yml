@@ -71,7 +71,10 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   storage:
     provider: ${STORAGE_PROVIDER:disabled}
-    max-upload-size-mb: ${MAX_UPLOAD_SIZE_MB:10}
+    max-upload-size-mb: ${MAX_UPLOAD_SIZE_MB:25}
+    admin-max-uploads-per-day: ${ADMIN_MAX_UPLOADS_PER_DAY:200}
+    admin-max-storage-mb-per-month: ${ADMIN_MAX_STORAGE_MB_PER_MONTH:5000}
+    global-upload-storage-cap-mb: ${GLOBAL_UPLOAD_STORAGE_CAP_MB:8192}
     download-url-ttl: ${STORAGE_DOWNLOAD_URL_TTL:10m}
     r2:
       endpoint: ${R2_ENDPOINT:}
@@ -80,3 +83,5 @@ app:
       bucket: ${R2_BUCKET:}
       region: ${R2_REGION:auto}
       public-base-url: ${R2_PUBLIC_BASE_URL:}
+  notes:
+    admin-upload-emails: ${ADMIN_UPLOAD_EMAILS:}

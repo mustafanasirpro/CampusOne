@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -30,6 +31,9 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @Value("${app.storage.max-upload-size-mb:25}")
+    private int maximumUploadSizeMb = 25;
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ErrorResponse> handleValidation(
@@ -206,7 +210,19 @@ public class GlobalExceptionHandler {
         return response(
                 HttpStatus.PAYLOAD_TOO_LARGE,
                 "FILE_TOO_LARGE",
-                "The uploaded PDF exceeds the configured size limit.",
+                "File size must be " + maximumUploadSizeMb + " MB or less.",
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(UploadLimitExceededException.class)
+    ResponseEntity<ErrorResponse> handleUploadLimitExceeded(
+            UploadLimitExceededException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.TOO_MANY_REQUESTS,
+                "UPLOAD_LIMIT_REACHED",
+                exception.getMessage(),
                 request,
                 Map.of());
     }
@@ -267,6 +283,18 @@ public class GlobalExceptionHandler {
                 HttpStatus.FORBIDDEN,
                 "ACCESS_DENIED",
                 "You do not have permission to perform this action.",
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(NoteManagementAccessDeniedException.class)
+    ResponseEntity<ErrorResponse> handleNoteManagementAccessDenied(
+            NoteManagementAccessDeniedException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.FORBIDDEN,
+                "NOTE_ADMIN_REQUIRED",
+                exception.getMessage(),
                 request,
                 Map.of());
     }

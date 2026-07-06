@@ -8,8 +8,10 @@ import com.campusone.note.dto.request.UpdateNoteRequest;
 import com.campusone.note.dto.response.BookmarkStateResponse;
 import com.campusone.note.dto.response.DownloadEventResponse;
 import com.campusone.note.dto.response.NoteDetailResponse;
+import com.campusone.note.dto.response.NoteManagementStatusResponse;
 import com.campusone.note.dto.response.NotePageResponse;
 import com.campusone.note.dto.response.RatingResponse;
+import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.note.service.NoteService;
 import com.campusone.note.service.NoteUploadService;
 import com.campusone.security.CampusOneUserPrincipal;
@@ -48,24 +50,28 @@ public class NoteController {
 
     private final NoteService noteService;
     private final NoteUploadService noteUploadService;
+    private final NoteAdminAuthorizationService adminAuthorizationService;
 
     public NoteController(
             NoteService noteService,
-            NoteUploadService noteUploadService) {
+            NoteUploadService noteUploadService,
+            NoteAdminAuthorizationService adminAuthorizationService) {
         this.noteService = noteService;
         this.noteUploadService = noteUploadService;
+        this.adminAuthorizationService = adminAuthorizationService;
     }
 
     @PostMapping
     @Operation(
-            summary = "Create a note from existing file metadata",
-            description = "Deprecated compatibility endpoint. "
+            summary = "Create a note from existing file metadata (admin only)",
+            description = "Admin-only deprecated compatibility endpoint. "
                     + "Use /api/v1/notes/upload for real PDF uploads.",
             deprecated = true)
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<NoteDetailResponse> createNote(
             @AuthenticationPrincipal CampusOneUserPrincipal principal,
             @Valid @RequestBody CreateNoteRequest request) {
+        requireAdmin(principal);
         NoteDetailResponse response =
                 noteService.createNote(principal.getUserId(), request);
         return ResponseEntity.created(
@@ -77,8 +83,9 @@ public class NoteController {
             path = "/upload",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
-            summary = "Create a note and upload its PDF",
-            description = "Accepts a JSON `note` part and an application/pdf "
+            summary = "Create a note and upload its PDF (admin only)",
+            description = "Admin-only multipart endpoint. Accepts a JSON "
+                    + "`note` part and an application/pdf "
                     + "`file` part. CampusOne validates and stores the PDF in "
                     + "configured S3-compatible storage.")
     @SecurityRequirement(name = "bearerAuth")
@@ -86,6 +93,7 @@ public class NoteController {
             @AuthenticationPrincipal CampusOneUserPrincipal principal,
             @Valid @RequestPart("note") CreateUploadedNoteRequest request,
             @RequestPart("file") MultipartFile file) {
+        requireAdmin(principal);
         NoteDetailResponse response = noteUploadService.uploadAndCreate(
                 principal.getUserId(),
                 request,
@@ -108,7 +116,7 @@ public class NoteController {
     }
 
     @GetMapping("/my")
-    @Operation(summary = "List the authenticated student's notes")
+    @Operation(summary = "List notes uploaded by the authenticated account")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<NotePageResponse> listMyNotes(
             @AuthenticationPrincipal CampusOneUserPrincipal principal,
@@ -129,30 +137,45 @@ public class NoteController {
             @PathVariable UUID noteId,
             @AuthenticationPrincipal CampusOneUserPrincipal principal) {
         UUID viewerUserId = principal == null ? null : principal.getUserId();
+        if (principal != null && canManage(principal)) {
+            return ResponseEntity.ok(
+                    noteService.getNoteAsAdmin(noteId, viewerUserId));
+        }
         return ResponseEntity.ok(noteService.getNote(noteId, viewerUserId));
     }
 
+    @GetMapping("/management-status")
+    @Operation(summary = "Check whether the current user can manage notes")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<NoteManagementStatusResponse> getManagementStatus(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal) {
+        return ResponseEntity.ok(new NoteManagementStatusResponse(
+                canManage(principal)));
+    }
+
     @PatchMapping("/{noteId}")
-    @Operation(summary = "Update an owned note")
+    @Operation(summary = "Update a note (admin only)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<NoteDetailResponse> updateNote(
             @PathVariable UUID noteId,
             @AuthenticationPrincipal CampusOneUserPrincipal principal,
             @Valid @RequestBody UpdateNoteRequest request) {
+        requireAdmin(principal);
         return ResponseEntity.ok(
-                noteService.updateNote(
+                noteService.updateNoteAsAdmin(
                         principal.getUserId(),
                         noteId,
                         request));
     }
 
     @DeleteMapping("/{noteId}")
-    @Operation(summary = "Soft-delete an owned note")
+    @Operation(summary = "Soft-delete a note (admin only)")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> deleteNote(
             @PathVariable UUID noteId,
             @AuthenticationPrincipal CampusOneUserPrincipal principal) {
-        noteService.deleteNote(principal.getUserId(), noteId);
+        requireAdmin(principal);
+        noteService.deleteNoteAsAdmin(noteId);
         return ResponseEntity.noContent().build();
     }
 
@@ -208,5 +231,17 @@ public class NoteController {
                                 + "/download-events/"
                                 + response.eventId()))
                 .body(response);
+    }
+
+    private boolean canManage(CampusOneUserPrincipal principal) {
+        return adminAuthorizationService.canManage(
+                principal.getUserId(),
+                principal.getUsername());
+    }
+
+    private void requireAdmin(CampusOneUserPrincipal principal) {
+        adminAuthorizationService.requireAdmin(
+                principal.getUserId(),
+                principal.getUsername());
     }
 }

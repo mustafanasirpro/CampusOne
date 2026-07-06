@@ -7,7 +7,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class StorageProperties {
 
     private String provider = "disabled";
-    private int maxUploadSizeMb = 10;
+    private int maxUploadSizeMb = 25;
+    private int adminMaxUploadsPerDay = 200;
+    private int adminMaxStorageMbPerMonth = 5000;
+    private int globalUploadStorageCapMb = 8192;
     private Duration downloadUrlTtl = Duration.ofMinutes(10);
     private final R2 r2 = new R2();
 
@@ -24,7 +27,37 @@ public class StorageProperties {
     }
 
     public void setMaxUploadSizeMb(int maxUploadSizeMb) {
-        this.maxUploadSizeMb = maxUploadSizeMb > 0 ? maxUploadSizeMb : 10;
+        this.maxUploadSizeMb = maxUploadSizeMb > 0 ? maxUploadSizeMb : 25;
+    }
+
+    public int getAdminMaxUploadsPerDay() {
+        return adminMaxUploadsPerDay;
+    }
+
+    public void setAdminMaxUploadsPerDay(int adminMaxUploadsPerDay) {
+        this.adminMaxUploadsPerDay =
+                adminMaxUploadsPerDay > 0 ? adminMaxUploadsPerDay : 200;
+    }
+
+    public int getAdminMaxStorageMbPerMonth() {
+        return adminMaxStorageMbPerMonth;
+    }
+
+    public void setAdminMaxStorageMbPerMonth(
+            int adminMaxStorageMbPerMonth) {
+        this.adminMaxStorageMbPerMonth =
+                adminMaxStorageMbPerMonth > 0
+                        ? adminMaxStorageMbPerMonth
+                        : 5000;
+    }
+
+    public int getGlobalUploadStorageCapMb() {
+        return globalUploadStorageCapMb;
+    }
+
+    public void setGlobalUploadStorageCapMb(int globalUploadStorageCapMb) {
+        this.globalUploadStorageCapMb =
+                globalUploadStorageCapMb > 0 ? globalUploadStorageCapMb : 8192;
     }
 
     public Duration getDownloadUrlTtl() {

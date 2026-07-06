@@ -92,7 +92,15 @@ JWT signing uses:
 - `R2_REGION`: optional; defaults to `auto`
 - `R2_PUBLIC_BASE_URL`: optional public bucket/custom-domain URL; when omitted,
   the backend creates short-lived private presigned GET URLs
-- `MAX_UPLOAD_SIZE_MB`: optional; defaults to `10`
+- `MAX_UPLOAD_SIZE_MB`: optional maximum admin PDF size; defaults to `25`
+- `ADMIN_MAX_UPLOADS_PER_DAY`: optional per-admin daily upload count;
+  defaults to `200`
+- `ADMIN_MAX_STORAGE_MB_PER_MONTH`: optional per-admin monthly uploaded
+  bytes; defaults to `5000`
+- `GLOBAL_UPLOAD_STORAGE_CAP_MB`: optional global monthly uploaded bytes;
+  defaults to `8192` (8 GB)
+- `ADMIN_UPLOAD_EMAILS`: optional comma-separated fallback note-admin emails;
+  active `ADMIN` assignments in the moderators table are preferred
 - `STORAGE_DOWNLOAD_URL_TTL`: optional presigned URL lifetime; defaults to `10m`
 
 Generate a different JWT secret for every environment. PowerShell:
@@ -155,7 +163,12 @@ The note upload endpoint accepts multipart form data at
 `POST /api/v1/notes/upload`, with a JSON `note` part and an
 `application/pdf` `file` part. The backend validates the PDF, generates an
 owner-scoped object key, uploads it to R2, and stores only its metadata in
-PostgreSQL.
+PostgreSQL. Uploads and note create/edit/delete operations require an active
+`ADMIN` assignment (or an email explicitly listed in `ADMIN_UPLOAD_EMAILS`).
+Normal users retain view, download, bookmark, and rating access. Uploads are
+limited to PDF files.
+Quota checks use UTC calendar days/months and PostgreSQL transaction locks so
+concurrent requests and multiple backend instances cannot bypass the limits.
 
 Configure these Render environment variables:
 
@@ -167,7 +180,11 @@ R2_SECRET_ACCESS_KEY=<secret>
 R2_BUCKET=<bucket-name>
 R2_REGION=auto
 R2_PUBLIC_BASE_URL=
-MAX_UPLOAD_SIZE_MB=10
+MAX_UPLOAD_SIZE_MB=25
+ADMIN_MAX_UPLOADS_PER_DAY=200
+ADMIN_MAX_STORAGE_MB_PER_MONTH=5000
+GLOBAL_UPLOAD_STORAGE_CAP_MB=8192
+ADMIN_UPLOAD_EMAILS=
 ```
 
 Use an R2 API token restricted to Object Read & Write for the selected bucket.

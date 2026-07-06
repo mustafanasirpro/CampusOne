@@ -30,7 +30,7 @@ class StorageConfigurationTest {
                             "%PDF-".getBytes(java.nio.charset.StandardCharsets.US_ASCII),
                             "a".repeat(64))))
                     .isInstanceOf(StorageNotConfiguredException.class)
-                    .hasMessage("File upload is not configured yet.");
+                    .hasMessage("Storage is temporarily unavailable.");
         });
     }
 

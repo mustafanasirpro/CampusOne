@@ -1,10 +1,19 @@
-import { ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, LockKeyhole } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { ApiError } from "@/api/apiClient";
-import { createNote } from "@/api/notesApi";
-import { ErrorMessage, PageHeader, useToast } from "@/components/common";
+import {
+  createNote,
+  getNoteManagementStatus,
+} from "@/api/notesApi";
+import {
+  EmptyState,
+  ErrorMessage,
+  LoadingSpinner,
+  PageHeader,
+  useToast,
+} from "@/components/common";
 import { NoteForm } from "@/components/notes";
 import { paths } from "@/routes/paths";
 import type { CreateNoteRequest } from "@/types/notes";
@@ -18,10 +27,37 @@ export function CreateNotePage() {
   const [fieldErrors, setFieldErrors] = useState<
     Record<string, string[]>
   >({});
+  const [canManage, setCanManage] = useState<boolean | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   useDocumentTitle("Create note · CampusOne");
 
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    void getNoteManagementStatus(controller.signal)
+      .then((status) => {
+        if (active) setCanManage(status.canManage);
+      })
+      .catch((requestError: unknown) => {
+        if (!active) return;
+        setAccessError(
+          requestError instanceof ApiError
+            ? requestError.message
+            : "Admin access could not be checked. Please try again.",
+        );
+        setCanManage(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
   const handleSubmit = async (request: CreateNoteRequest, file: File) => {
+    if (!canManage || isSubmitting) return;
     setIsSubmitting(true);
     setError(null);
     setFieldErrors({});
@@ -44,6 +80,35 @@ export function CreateNotePage() {
       setIsSubmitting(false);
     }
   };
+
+  if (canManage === null) {
+    return (
+      <div className="grid min-h-[60vh] place-items-center">
+        <LoadingSpinner label="Checking admin access" />
+      </div>
+    );
+  }
+
+  if (!canManage) {
+    return (
+      <div className="grid gap-4">
+        {accessError ? <ErrorMessage message={accessError} /> : null}
+        <EmptyState
+          action={
+            <Link
+              className="inline-flex h-10 items-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white hover:bg-brand-700"
+              to={paths.notes}
+            >
+              Back to notes
+            </Link>
+          }
+          description="Only admins can upload notes and past papers."
+          icon={<LockKeyhole className="size-6" />}
+          title="Admin access required"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6 pb-8">

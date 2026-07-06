@@ -41,7 +41,7 @@ The repository currently contains:
 - Premium landing, login, and signup experiences
 - Responsive student dashboard and navigation
 - Student profiles, preferences, activity, skills, and achievements
-- Notes library with real PDF uploads, search, filters, bookmarks, and downloads
+- Notes library with admin-managed PDF uploads, search, filters, bookmarks, and downloads
 - Discussion and Q&A experiences with voting and replies
 - Student marketplace listings, wishlists, and seller previews
 - Internship discovery and saved opportunities
@@ -57,7 +57,7 @@ The repository currently contains:
 - Rotating opaque refresh tokens stored as SHA-256 hashes
 - Session logout, replay protection, account lockout, and strict CORS handling
 - Student profiles, skills, preferences, and visibility controls
-- R2-backed PDF note uploads, metadata, tags, ratings, downloads, and moderation
+- Admin-only R2-backed PDF note uploads, metadata, tags, ratings, downloads, and moderation
 - Marketplace listing CRUD, filters, images metadata, and soft deletion
 - Discussion questions, answers, votes, accepted answers, and pagination
 - Event creation, participation, ownership, capacity, and visibility rules
@@ -122,7 +122,7 @@ the project runnable without an AI API key.
 | Authentication | Registration, login, JWT access tokens, refresh rotation, logout, lockout |
 | Academic core | Universities, departments, courses, and reference data |
 | User profiles | Profile editing, skills, preferences, visibility |
-| Notes | PDF upload/download, metadata CRUD, tags, ratings, bookmarks, download events |
+| Notes | Admin-only PDF upload/management, public browsing, tags, ratings, bookmarks, download events |
 | Marketplace | Listing CRUD, filters, image metadata, ownership, soft deletion |
 | Discussions | Questions, answers, voting, accepted answers |
 | Events | Event CRUD, participation, capacity, visibility |
@@ -259,7 +259,11 @@ configuration import. Operating-system environment variables take precedence.
 | `R2_BUCKET` | R2 | Bucket that stores note PDFs |
 | `R2_REGION` | No | Defaults to `auto`, as required by R2's S3-compatible API |
 | `R2_PUBLIC_BASE_URL` | No | Public bucket/custom-domain base URL; when omitted, private presigned download URLs are generated |
-| `MAX_UPLOAD_SIZE_MB` | No | Maximum PDF size; defaults to `10` |
+| `MAX_UPLOAD_SIZE_MB` | No | Maximum admin PDF size; defaults to `25` MB |
+| `ADMIN_MAX_UPLOADS_PER_DAY` | No | Per-admin daily upload count; defaults to `200` |
+| `ADMIN_MAX_STORAGE_MB_PER_MONTH` | No | Per-admin monthly uploaded storage; defaults to `5000` MB |
+| `GLOBAL_UPLOAD_STORAGE_CAP_MB` | No | Global monthly upload safety cap; defaults to `8192` MB (8 GB) |
+| `ADMIN_UPLOAD_EMAILS` | No | Optional comma-separated fallback note-admin emails; prefer active `ADMIN` moderator assignments |
 | `STORAGE_DOWNLOAD_URL_TTL` | No | Private presigned download lifetime; defaults to `10m` |
 | `FLYWAY_URL` | No | Optional migration-role JDBC URL; falls back to `DB_URL` |
 | `FLYWAY_USERNAME` | No | Optional migration user; falls back to `DB_USERNAME` |
@@ -340,7 +344,7 @@ token.
 - [x] Connect the React frontend to the REST APIs
 - [x] Store uploaded note PDFs in S3-compatible object storage
 - [ ] Add email verification and password recovery
-- [ ] Add note and image uploads through private object storage
+- [ ] Add image uploads through private object storage
 - [ ] Implement administration and moderation workflows
 - [ ] Connect notification and XP triggers across domain modules
 - [ ] Add production deployment and release automation

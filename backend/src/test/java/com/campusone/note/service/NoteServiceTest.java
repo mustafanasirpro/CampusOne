@@ -395,6 +395,39 @@ class NoteServiceTest {
     }
 
     @Test
+    void updateNoteAsAdmin_nonOwnerUpdate_isAllowed() {
+        when(noteRepository.findDetailedById(NOTE_ID))
+                .thenReturn(Optional.of(note));
+        when(noteBookmarkRepository.existsById(any())).thenReturn(false);
+        when(noteRatingRepository.findById(any())).thenReturn(Optional.empty());
+
+        NoteDetailResponse response = noteService.updateNoteAsAdmin(
+                OTHER_USER_ID,
+                NOTE_ID,
+                new UpdateNoteRequest(
+                        null,
+                        "Admin Updated OOP Notes",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null));
+
+        assertThat(response.title()).isEqualTo("Admin Updated OOP Notes");
+    }
+
+    @Test
+    void deleteNoteAsAdmin_nonOwnerDelete_isAllowed() {
+        when(noteRepository.findDetailedById(NOTE_ID))
+                .thenReturn(Optional.of(note));
+
+        noteService.deleteNoteAsAdmin(NOTE_ID);
+
+        assertThat(note.getDeletedAt()).isEqualTo(NOW);
+    }
+
+    @Test
     void bookmarkAndUnbookmark_accessibleNote_areIdempotent() {
         setModerationStatus(note, NoteModerationStatus.APPROVED);
         when(noteRepository.findDetailedById(NOTE_ID)).thenReturn(Optional.of(note));

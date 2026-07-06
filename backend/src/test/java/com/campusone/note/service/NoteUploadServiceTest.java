@@ -32,6 +32,9 @@ class NoteUploadServiceTest {
     private StorageService storageService;
 
     @Mock
+    private UploadQuotaService uploadQuotaService;
+
+    @Mock
     private NoteService noteService;
 
     @Test
@@ -64,6 +67,7 @@ class NoteUploadServiceTest {
                 .thenThrow(new IllegalStateException("Database unavailable"));
         NoteUploadService uploadService = new NoteUploadService(
                 fileValidator,
+                uploadQuotaService,
                 storageService,
                 noteService);
 
@@ -73,6 +77,7 @@ class NoteUploadServiceTest {
                 multipartFile))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("Database unavailable");
+        verify(uploadQuotaService).enforce(USER_ID, file.sizeBytes());
         verify(storageService).delete(storedObject);
     }
 

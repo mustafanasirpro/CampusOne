@@ -82,6 +82,7 @@ class R2StorageServiceTest {
                 .isEqualTo("campusone-notes");
         assertThat(requestCaptor.getValue().key())
                 .matches("notes/" + USER_ID + "/2026/[0-9a-f-]+-oop-final-2026.pdf");
+        assertThat(requestCaptor.getValue().ifNoneMatch()).isEqualTo("*");
         assertThat(storedObject.storageProvider())
                 .isEqualTo(StorageProvider.S3_COMPATIBLE);
         assertThat(storedObject.checksumSha256()).isEqualTo("a".repeat(64));

@@ -40,6 +40,19 @@ class NoteFileValidatorTest {
     }
 
     @Test
+    void validate_emptyPdf_isRejected() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "past-paper.pdf",
+                "application/pdf",
+                new byte[0]);
+
+        assertThatThrownBy(() -> validator.validate(file, NoteFileType.PDF))
+                .isInstanceOf(InvalidFileUploadException.class)
+                .hasMessage("Select a PDF file to upload.");
+    }
+
+    @Test
     void validate_spoofedPdf_rejectsMissingPdfSignature() {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
@@ -49,7 +62,7 @@ class NoteFileValidatorTest {
 
         assertThatThrownBy(() -> validator.validate(file, NoteFileType.PDF))
                 .isInstanceOf(InvalidFileUploadException.class)
-                .hasMessageContaining("valid PDF signature");
+                .hasMessage("Only PDF files are allowed.");
     }
 
     @Test
@@ -62,7 +75,33 @@ class NoteFileValidatorTest {
 
         assertThatThrownBy(() -> validator.validate(file, NoteFileType.PDF))
                 .isInstanceOf(InvalidFileUploadException.class)
-                .hasMessageContaining("application/pdf");
+                .hasMessage("Only PDF files are allowed.");
+    }
+
+    @Test
+    void validate_nonPdfExtension_isRejected() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "past-paper.exe",
+                "application/pdf",
+                "%PDF-1.7".getBytes(StandardCharsets.US_ASCII));
+
+        assertThatThrownBy(() -> validator.validate(file, NoteFileType.PDF))
+                .isInstanceOf(InvalidFileUploadException.class)
+                .hasMessage("Only PDF files are allowed.");
+    }
+
+    @Test
+    void validate_pathTraversalFilename_isRejected() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "../past-paper.pdf",
+                "application/pdf",
+                "%PDF-1.7".getBytes(StandardCharsets.US_ASCII));
+
+        assertThatThrownBy(() -> validator.validate(file, NoteFileType.PDF))
+                .isInstanceOf(InvalidFileUploadException.class)
+                .hasMessage("The uploaded PDF filename is invalid.");
     }
 
     @Test
@@ -76,6 +115,6 @@ class NoteFileValidatorTest {
 
         assertThatThrownBy(() -> validator.validate(file, NoteFileType.PDF))
                 .isInstanceOf(FileUploadTooLargeException.class)
-                .hasMessageContaining("1 MB");
+                .hasMessage("File size must be 1 MB or less.");
     }
 }

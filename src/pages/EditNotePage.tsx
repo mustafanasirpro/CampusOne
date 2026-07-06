@@ -3,8 +3,11 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { ApiError } from "@/api/apiClient";
-import { getNoteById, updateNote } from "@/api/notesApi";
-import { getCurrentUserIdentity } from "@/api/userApi";
+import {
+  getNoteById,
+  getNoteManagementStatus,
+  updateNote,
+} from "@/api/notesApi";
 import {
   EmptyState,
   ErrorMessage,
@@ -22,7 +25,7 @@ export function EditNotePage() {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [note, setNote] = useState<NoteDetail | null>(null);
-  const [isOwner, setIsOwner] = useState(false);
+  const [canManage, setCanManage] = useState(false);
   const [isLoading, setIsLoading] = useState(Boolean(noteId));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(() =>
@@ -43,12 +46,12 @@ export function EditNotePage() {
 
     void Promise.all([
       getNoteById(noteId, controller.signal),
-      getCurrentUserIdentity(controller.signal),
+      getNoteManagementStatus(controller.signal),
     ])
-      .then(([noteResponse, identity]) => {
+      .then(([noteResponse, managementStatus]) => {
         if (!active) return;
         setNote(noteResponse);
-        setIsOwner(noteResponse.uploader.userId === identity.userId);
+        setCanManage(managementStatus.canManage);
       })
       .catch((requestError: unknown) => {
         if (!active) return;
@@ -69,7 +72,7 @@ export function EditNotePage() {
   }, [noteId]);
 
   const handleSubmit = async (request: UpdateNoteRequest) => {
-    if (!noteId) return;
+    if (!noteId || !canManage || isSubmitting) return;
     setIsSubmitting(true);
     setSubmitError(null);
     setFieldErrors({});
@@ -119,7 +122,7 @@ export function EditNotePage() {
     );
   }
 
-  if (!isOwner) {
+  if (!canManage) {
     return (
       <EmptyState
         action={
@@ -130,9 +133,9 @@ export function EditNotePage() {
             View note
           </Link>
         }
-        description="Only the student who uploaded this note can edit it."
+        description="Only admins can upload notes and past papers."
         icon={<LockKeyhole className="size-6" />}
-        title="Owner access required"
+        title="Admin access required"
       />
     );
   }
@@ -149,7 +152,7 @@ export function EditNotePage() {
 
       <PageHeader
         description="Update descriptive note fields while keeping the currently uploaded file."
-        eyebrow="Your notes"
+        eyebrow="Admin notes"
         title="Edit note"
       />
 
