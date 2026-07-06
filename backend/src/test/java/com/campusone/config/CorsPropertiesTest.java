@@ -49,10 +49,25 @@ class CorsPropertiesTest {
         assertThat(missing.getAllowedOrigins())
                 .containsExactly(
                         "http://localhost:5173",
-                        "http://127.0.0.1:5173");
+                        "http://127.0.0.1:5173",
+                        "https://campus-one-ruby.vercel.app",
+                        "https://campusone.dev",
+                        "https://www.campusone.dev");
         assertThat(blank.getAllowedOrigins())
                 .containsExactly(
                         "http://localhost:5173",
-                        "http://127.0.0.1:5173");
+                        "http://127.0.0.1:5173",
+                        "https://campus-one-ruby.vercel.app",
+                        "https://campusone.dev",
+                        "https://www.campusone.dev");
+    }
+
+    @Test
+    void allowedOrigins_trailingSlash_isNormalized() {
+        CorsProperties properties = new CorsProperties();
+        properties.setAllowedOrigins(List.of("https://campusone.dev/"));
+
+        assertThat(validator.validate(properties)).isEmpty();
+        assertThat(properties.getAllowedOrigins()).contains("https://campusone.dev");
     }
 }
