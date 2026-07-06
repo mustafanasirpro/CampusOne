@@ -23,6 +23,7 @@ class RefreshTokenCookieFactoryTest {
     void setUp() {
         AuthSessionProperties properties = new AuthSessionProperties();
         properties.setCookieSecure(true);
+        properties.setCookieSameSite("Strict");
         cookieFactory = new RefreshTokenCookieFactory(
                 properties,
                 Clock.fixed(NOW, ZoneOffset.UTC));
