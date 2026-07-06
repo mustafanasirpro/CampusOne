@@ -26,6 +26,7 @@ app:
   auth:
     refresh-token-ttl: 7d
     cookie-secure: false
+    cookie-same-site: Strict
     max-login-attempts: 5
     account-lock-duration: 15m
   cors:
