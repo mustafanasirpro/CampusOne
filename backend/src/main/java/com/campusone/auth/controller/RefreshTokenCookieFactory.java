@@ -13,8 +13,6 @@ import org.springframework.stereotype.Component;
 public class RefreshTokenCookieFactory {
 
     private static final String COOKIE_PATH = "/api/v1/auth";
-    private static final String SAME_SITE = "Strict";
-
     private final AuthSessionProperties properties;
     private final Clock clock;
 
@@ -59,7 +57,7 @@ public class RefreshTokenCookieFactory {
                 .from(properties.getRefreshTokenCookieName(), value)
                 .httpOnly(true)
                 .secure(properties.isCookieSecure())
-                .sameSite(SAME_SITE)
+                .sameSite(properties.getCookieSameSite())
                 .path(COOKIE_PATH);
     }
 }
