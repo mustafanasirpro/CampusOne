@@ -56,7 +56,8 @@ The application reads its PostgreSQL connection from:
 - `DB_URL`
 - `DB_USERNAME`
 - `DB_PASSWORD`
-- `SERVER_PORT`: hosting-platform server port, supplied by Render
+- `SERVER_PORT`: optional Spring server port override
+- `PORT`: hosting-platform port, used when `SERVER_PORT` is absent
 
 Flyway defaults to the same values locally. Production can use a separate
 migration role by setting `FLYWAY_URL`, `FLYWAY_USERNAME`, and
@@ -73,14 +74,16 @@ JWT signing uses:
 - `JWT_ACCESS_TOKEN_TTL`: optional; defaults to `15m`
 - `REFRESH_TOKEN_TTL_DAYS`: optional; defaults to `7`
 - `AUTH_COOKIE_SECURE`: defaults to `true`; set to `false` only for local HTTP
+- `AUTH_COOKIE_SAME_SITE`: defaults to `None` for cross-domain deployments;
+  local development uses `Strict`
 - `REFRESH_TOKEN_CLEANUP_INTERVAL`: optional; defaults to `24h`
 - `MAX_LOGIN_ATTEMPTS`: optional; defaults to `5`
 - `ACCOUNT_LOCK_MINUTES`: optional; defaults to `15`
-- `CORS_ALLOWED_ORIGINS`: optional comma-separated exact frontend origins;
-  defaults to `http://localhost:5173` and `http://127.0.0.1:5173`. Set it to
-  the deployed frontend origin in production.
-- `APP_CORS_ALLOWED_ORIGINS`: Spring-style deployment alias for the same
-  exact-origin CORS property
+- `APP_CORS_ALLOWED_ORIGINS`: comma-separated exact frontend origins for
+  Render. Use
+  `https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app,http://localhost:5173,http://127.0.0.1:5173`
+  for the current CampusOne deployment.
+- `CORS_ALLOWED_ORIGINS`: legacy alias for the same exact-origin CORS property
 - `OPENAPI_ENABLED`: defaults to `true`; set to `false` to disable API
   documentation
 - `STORAGE_PROVIDER`: set to `r2` to enable real note PDF uploads; defaults to
@@ -119,8 +122,8 @@ openssl rand -base64 32
 ```
 
 `JWT_SECRET` must use standard Base64. Raw passphrases and Base64URL values
-containing `_` or `-` are rejected at startup. The value in `.env.example` is
-public development data and must not be reused as a real secret.
+containing `_` or `-` are rejected at startup. The `.env.example` file contains
+only placeholders; replace them before running or deploying.
 
 ### Local setup with `.env`
 
@@ -149,13 +152,15 @@ Edit `.env` and replace:
 
 The local profile provides development defaults for:
 
-- `CORS_ALLOWED_ORIGINS=http://localhost:5173`
 - `AUTH_COOKIE_SECURE=false`
+- `AUTH_COOKIE_SAME_SITE=Strict`
+- `APP_CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173`
 - `OPENAPI_ENABLED=true`
 
-The two exact loopback CORS origins are also safe startup defaults for packaged
-deployments. Production deployments should replace them through
-`CORS_ALLOWED_ORIGINS` so the deployed frontend can access the API.
+The exact loopback origins and the current exact production origins are safe
+startup defaults for packaged deployments. Production deployments should still
+set `APP_CORS_ALLOWED_ORIGINS` explicitly so future frontend domains can be
+added without code changes.
 
 ### Cloudflare R2 note storage
 
@@ -220,24 +225,26 @@ $env:JWT_SECRET = "<generated-standard-base64-secret>"
 $env:JWT_AUDIENCE = "campusone-api"
 $env:REFRESH_TOKEN_TTL_DAYS = "7"
 $env:AUTH_COOKIE_SECURE = "false"
-$env:CORS_ALLOWED_ORIGINS = "http://localhost:5173"
+$env:AUTH_COOKIE_SAME_SITE = "Strict"
+$env:APP_CORS_ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 $env:OPENAPI_ENABLED = "true"
 mvn spring-boot:run
 ```
 
 Refresh tokens are never returned in JSON or stored in plaintext. Login places
-the opaque token in an HttpOnly, `SameSite=Strict` cookie scoped to
-`/api/v1/auth`; the cookie is always host-only, and PostgreSQL stores only its
-SHA-256 hash. Set
-`AUTH_COOKIE_SECURE=true` in every HTTPS environment.
+the opaque token in an HttpOnly cookie scoped to `/api/v1/auth`; the cookie is
+always host-only, and PostgreSQL stores only its SHA-256 hash. Set
+`AUTH_COOKIE_SECURE=true` in every HTTPS environment. The deployed
+`campusone.dev` frontend talks to the Render API on a different site, so
+production should use `AUTH_COOKIE_SAME_SITE=None`.
 
 Unsafe browser requests are accepted only from exact configured origins (or
 the API's own origin). This origin check complements the refresh cookie's
-`SameSite=Strict` policy. Wildcard CORS origins are intentionally rejected.
+SameSite setting. Wildcard CORS origins are intentionally rejected.
 Swagger and OpenAPI are enabled by default and remain publicly reachable through
 the documented routes. Set `OPENAPI_ENABLED=false` only when API documentation
 should be disabled. Production deployments should avoid the `local` profile and
-set `CORS_ALLOWED_ORIGINS` to the exact deployed frontend origin.
+set `APP_CORS_ALLOWED_ORIGINS` to the exact deployed frontend origins.
 
 ## Verification
 
