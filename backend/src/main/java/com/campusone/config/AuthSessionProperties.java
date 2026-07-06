@@ -20,6 +20,9 @@ public class AuthSessionProperties {
 
     private boolean cookieSecure = true;
 
+    @NotBlank
+    private String cookieSameSite = "None";
+
     @Positive
     private int maxLoginAttempts = 5;
 
@@ -31,6 +34,18 @@ public class AuthSessionProperties {
         return refreshTokenTtl != null
                 && !refreshTokenTtl.isZero()
                 && !refreshTokenTtl.isNegative();
+    }
+
+    @AssertTrue(message = "cookie SameSite must be Strict, Lax, or None")
+    public boolean isCookieSameSiteValid() {
+        return "Strict".equalsIgnoreCase(cookieSameSite)
+                || "Lax".equalsIgnoreCase(cookieSameSite)
+                || "None".equalsIgnoreCase(cookieSameSite);
+    }
+
+    @AssertTrue(message = "SameSite=None refresh cookies must be secure")
+    public boolean isSameSiteNoneSecure() {
+        return !"None".equalsIgnoreCase(cookieSameSite) || cookieSecure;
     }
 
     @AssertTrue(message = "account lock duration must be greater than zero")
@@ -62,6 +77,16 @@ public class AuthSessionProperties {
 
     public void setCookieSecure(boolean cookieSecure) {
         this.cookieSecure = cookieSecure;
+    }
+
+    public String getCookieSameSite() {
+        return cookieSameSite;
+    }
+
+    public void setCookieSameSite(String cookieSameSite) {
+        this.cookieSameSite = cookieSameSite == null
+                ? ""
+                : cookieSameSite.trim();
     }
 
     public int getMaxLoginAttempts() {
