@@ -23,7 +23,10 @@ class LocalCorsConfigurationTest {
             assertThat(context.getBean(CorsProperties.class).getAllowedOrigins())
                     .containsExactly(
                             "http://localhost:5173",
-                            "http://127.0.0.1:5173");
+                            "http://127.0.0.1:5173",
+                            "https://campus-one-ruby.vercel.app",
+                            "https://campusone.dev",
+                            "https://www.campusone.dev");
         });
     }
 
@@ -37,6 +40,11 @@ class LocalCorsConfigurationTest {
                     assertThat(context).hasNotFailed();
                     assertThat(context.getBean(CorsProperties.class).getAllowedOrigins())
                             .containsExactly(
+                                    "http://localhost:5173",
+                                    "http://127.0.0.1:5173",
+                                    "https://campus-one-ruby.vercel.app",
+                                    "https://campusone.dev",
+                                    "https://www.campusone.dev",
                                     "https://app.campusone.pk",
                                     "https://admin.campusone.pk");
                 });
@@ -55,7 +63,10 @@ class LocalCorsConfigurationTest {
                     assertThat(context.getBean(CorsProperties.class).getAllowedOrigins())
                             .containsExactly(
                                     "http://localhost:5173",
-                                    "http://127.0.0.1:5173");
+                                    "http://127.0.0.1:5173",
+                                    "https://campus-one-ruby.vercel.app",
+                                    "https://campusone.dev",
+                                    "https://www.campusone.dev");
                 });
     }
 
