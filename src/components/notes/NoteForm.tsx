@@ -413,8 +413,8 @@ export function NoteForm(props: NoteFormProps) {
                   PDF study resource
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  Upload one PDF up to 25 MB. CampusOne securely generates
-                  its storage key, MIME metadata, size, and checksum.
+                  Upload one PDF up to 25 MB. CampusOne handles secure
+                  storage and file metadata automatically.
                 </p>
               </div>
             </div>
