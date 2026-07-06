@@ -6,9 +6,13 @@ import {
 import type { AuthSession } from "@/auth/types";
 
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+const deployedBackendBaseUrl =
+  "https://campusone-backend-otc4.onrender.com/api/v1";
+const localBackendBaseUrl = "http://localhost:8080/api/v1";
 
 export const API_BASE_URL = (
-  configuredBaseUrl || "http://localhost:8080/api/v1"
+  configuredBaseUrl ||
+  (import.meta.env.PROD ? deployedBackendBaseUrl : localBackendBaseUrl)
 ).replace(/\/+$/, "");
 
 interface ErrorPayload {
@@ -146,7 +150,7 @@ export async function apiRequest<T>(
       throw error;
     }
     throw new ApiError(
-      "Unable to reach CampusOne. Check that the backend is running.",
+      "Unable to reach CampusOne. Check that the backend is running and allows this frontend domain.",
       0,
       "NETWORK_ERROR",
     );
