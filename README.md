@@ -239,18 +239,20 @@ configuration import. Operating-system environment variables take precedence.
 | `DB_URL` | Yes | PostgreSQL JDBC URL |
 | `DB_USERNAME` | Yes | Runtime database user |
 | `DB_PASSWORD` | Yes | Runtime database password |
-| `SERVER_PORT` | Render | Port supplied by the hosting platform |
+| `SERVER_PORT` | Render | Optional Spring server port override |
+| `PORT` | Render | Hosting-platform port; used when `SERVER_PORT` is absent |
 | `JWT_SECRET` | Yes | Standard Base64 secret containing at least 256 bits |
 | `JWT_ISSUER` | No | Defaults to `campusone-backend` |
 | `JWT_AUDIENCE` | No | Defaults to `campusone-api` |
 | `JWT_ACCESS_TOKEN_TTL` | No | Defaults to `15m` |
 | `REFRESH_TOKEN_TTL_DAYS` | No | Defaults to `7` |
 | `AUTH_COOKIE_SECURE` | Production | Defaults to `true`; local profile uses `false` |
+| `AUTH_COOKIE_SAME_SITE` | Production | Defaults to `None` for cross-domain deployments; local profile uses `Strict` |
 | `REFRESH_TOKEN_CLEANUP_INTERVAL` | No | Defaults to `24h` |
 | `MAX_LOGIN_ATTEMPTS` | No | Defaults to `5` |
 | `ACCOUNT_LOCK_MINUTES` | No | Defaults to `15` |
-| `CORS_ALLOWED_ORIGINS` | No | Comma-separated exact frontend origins; defaults to local Vite origins and should be overridden in production |
-| `APP_CORS_ALLOWED_ORIGINS` | No | Spring-style deployment alias for the same exact-origin CORS setting |
+| `APP_CORS_ALLOWED_ORIGINS` | Production | Comma-separated exact frontend origins for Render, for example `https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app` |
+| `CORS_ALLOWED_ORIGINS` | No | Legacy alias for the same exact-origin CORS setting |
 | `OPENAPI_ENABLED` | No | Enabled by default; set to `false` to disable API documentation |
 | `STORAGE_PROVIDER` | Uploads | Set to `r2` to enable real note uploads; otherwise upload requests return a clean configuration error |
 | `R2_ENDPOINT` | R2 | Cloudflare account S3 API endpoint |
@@ -277,6 +279,14 @@ key and file metadata. On Render, set `STORAGE_PROVIDER=r2` and every required
 
 ```text
 VITE_API_BASE_URL=https://campusone-backend-otc4.onrender.com/api/v1
+```
+
+For the deployed backend, Render should include:
+
+```text
+APP_CORS_ALLOWED_ORIGINS=https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app,http://localhost:5173,http://127.0.0.1:5173
+AUTH_COOKIE_SECURE=true
+AUTH_COOKIE_SAME_SITE=None
 ```
 
 ## 💻 Running Locally
