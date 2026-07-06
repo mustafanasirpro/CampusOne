@@ -208,12 +208,17 @@ public class SecurityConfig {
                 "OPTIONS"));
         configuration.setAllowedHeaders(List.of(
                 "Authorization",
-                "Content-Type"));
+                "Content-Type",
+                "Accept",
+                "Origin",
+                "X-Requested-With"));
+        configuration.setExposedHeaders(List.of(
+                "Location"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", configuration);
+        source.registerCorsConfiguration("/**", configuration);
         return source;
     }
 }
