@@ -40,7 +40,25 @@ public class R2StorageService implements StorageService {
 
     @Override
     public StoredObject upload(UUID ownerId, ValidatedNoteFile file) {
-        String objectKey = objectKey(ownerId, file.originalFilename());
+        String objectKey = objectKey(
+                "notes",
+                ownerId,
+                file.originalFilename(),
+                "document.pdf");
+        return uploadObject(objectKey, file);
+    }
+
+    @Override
+    public StoredObject uploadMarketplaceImage(UUID ownerId, ValidatedNoteFile file) {
+        String objectKey = objectKey(
+                "marketplace",
+                ownerId,
+                file.originalFilename(),
+                "image");
+        return uploadObject(objectKey, file);
+    }
+
+    private StoredObject uploadObject(String objectKey, ValidatedNoteFile file) {
         String bucket = properties.getR2().getBucket();
         PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(bucket)
@@ -72,20 +90,42 @@ public class R2StorageService implements StorageService {
     @Override
     public String createDownloadUrl(FileAsset fileAsset) {
         requireDownloadable(fileAsset);
+        return createObjectUrl(
+                fileAsset.getStorageProvider(),
+                fileAsset.getBucketName(),
+                fileAsset.getObjectKey(),
+                fileAsset.getMimeType(),
+                fileAsset.getOriginalFilename());
+    }
+
+    @Override
+    public String createObjectUrl(
+            StorageProvider storageProvider,
+            String bucketName,
+            String objectKey,
+            String mimeType,
+            String originalFilename) {
+        if (storageProvider != StorageProvider.S3_COMPATIBLE
+                || !properties.getR2().getBucket().equals(bucketName)
+                || objectKey == null
+                || objectKey.isBlank()) {
+            throw new StorageOperationException(
+                    "This stored file is not available.");
+        }
         String publicBaseUrl = properties.getR2().getPublicBaseUrl();
         if (!publicBaseUrl.isBlank()) {
             return publicBaseUrl.replaceAll("/+$", "")
                     + "/"
-                    + fileAsset.getObjectKey();
+                    + objectKey;
         }
 
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                .bucket(fileAsset.getBucketName())
-                .key(fileAsset.getObjectKey())
-                .responseContentType(fileAsset.getMimeType())
+                .bucket(bucketName)
+                .key(objectKey)
+                .responseContentType(mimeType)
                 .responseContentDisposition(
                         "inline; filename=\""
-                                + safeHeaderFilename(fileAsset.getOriginalFilename())
+                                + safeHeaderFilename(originalFilename)
                                 + "\"")
                 .build();
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
@@ -127,18 +167,27 @@ public class R2StorageService implements StorageService {
     }
 
     private String objectKey(UUID ownerId, String originalFilename) {
+        return objectKey("notes", ownerId, originalFilename, "document.pdf");
+    }
+
+    private String objectKey(
+            String prefix,
+            UUID ownerId,
+            String originalFilename,
+            String fallbackFilename) {
         int year = Year.now(clock).getValue();
-        return "notes/"
+        return prefix
+                + "/"
                 + ownerId
                 + "/"
                 + year
                 + "/"
                 + UUID.randomUUID()
                 + "-"
-                + safeObjectFilename(originalFilename);
+                + safeObjectFilename(originalFilename, fallbackFilename);
     }
 
-    private String safeObjectFilename(String filename) {
+    private String safeObjectFilename(String filename, String fallbackFilename) {
         String ascii = Normalizer.normalize(filename, Normalizer.Form.NFKD)
                 .replaceAll("\\p{M}", "")
                 .replaceAll("[^A-Za-z0-9._-]+", "-")
@@ -147,12 +196,18 @@ public class R2StorageService implements StorageService {
                 .replaceAll("^[.-]+|[.-]+$", "")
                 .toLowerCase(Locale.ROOT);
         if (ascii.isBlank()) {
-            return "document.pdf";
+            return fallbackFilename;
         }
         if (ascii.length() <= 120) {
             return ascii;
         }
-        return ascii.substring(0, 116) + ".pdf";
+        int dot = ascii.lastIndexOf('.');
+        String extension = dot > 0 && dot >= ascii.length() - 8
+                ? ascii.substring(dot)
+                : "";
+        int maxBaseLength = Math.max(1, 120 - extension.length());
+        return ascii.substring(0, Math.min(maxBaseLength, ascii.length()))
+                + extension;
     }
 
     private String safeHeaderFilename(String filename) {
