@@ -1,5 +1,17 @@
-import { ImagePlus, Save, Trash2 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import {
+  ImagePlus,
+  Save,
+  Trash2,
+  UploadCloud,
+} from "lucide-react";
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 
 import { Button, Card, CardContent } from "@/components/common";
 import { FormField, SelectField } from "@/components/forms";
@@ -10,27 +22,32 @@ import {
 import type {
   CreateMarketplaceListingRequest,
   MarketplaceCategory,
-  MarketplaceImageRequest,
   MarketplaceItemCondition,
   MarketplaceListingDetail,
   MarketplaceListingUpdateStatus,
   UpdateMarketplaceListingRequest,
 } from "@/types/marketplace";
 import { cn } from "@/utils/cn";
+import { formatFileSize } from "@/components/notes";
 
 interface MarketplaceFormState {
   category: MarketplaceCategory;
   condition: MarketplaceItemCondition;
   currency: string;
   description: string;
-  images: MarketplaceImageRequest[];
   price: string;
   status: MarketplaceListingUpdateStatus;
   title: string;
 }
 
+interface SelectedImage {
+  file: File;
+  id: string;
+  previewUrl: string;
+}
+
 type MarketplaceFormErrors = Partial<
-  Record<keyof MarketplaceFormState | `image-${number}`, string>
+  Record<keyof MarketplaceFormState | "images", string>
 >;
 
 interface CommonMarketplaceFormProps {
@@ -42,15 +59,25 @@ interface CommonMarketplaceFormProps {
 type MarketplaceListingFormProps =
   | (CommonMarketplaceFormProps & {
       mode: "create";
-      onSubmit: (request: CreateMarketplaceListingRequest) => Promise<void>;
+      onSubmit: (
+        request: CreateMarketplaceListingRequest,
+        imageFiles: File[],
+      ) => Promise<void>;
     })
   | (CommonMarketplaceFormProps & {
       initialListing: MarketplaceListingDetail;
       mode: "edit";
-      onSubmit: (request: UpdateMarketplaceListingRequest) => Promise<void>;
+      onSubmit: (
+        request: UpdateMarketplaceListingRequest,
+        imageFiles?: File[],
+      ) => Promise<void>;
     });
 
-const httpUrlPattern = /^https?:\/\/\S+$/i;
+const MAX_IMAGES = 5;
+const MAX_IMAGE_SIZE_MB = 5;
+const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+const allowedImageTypes = ["image/jpeg", "image/png", "image/webp"];
+const allowedImageExtensions = [".jpg", ".jpeg", ".png", ".webp"];
 
 function initialState(
   initialListing?: MarketplaceListingDetail,
@@ -60,14 +87,8 @@ function initialState(
     condition: initialListing?.condition ?? "USED",
     currency: initialListing?.currency ?? "PKR",
     description: initialListing?.description ?? "",
-    images:
-      initialListing?.images.map((image) => ({
-        altText: image.altText,
-        imageUrl: image.imageUrl,
-      })) ?? [],
     price: initialListing ? String(initialListing.price) : "",
-    status:
-      initialListing?.status === "SOLD" ? "SOLD" : "ACTIVE",
+    status: initialListing?.status === "SOLD" ? "SOLD" : "ACTIVE",
     title: initialListing?.title ?? "",
   };
 }
@@ -115,29 +136,29 @@ function TextAreaField({
   );
 }
 
-function sameImages(
-  first: MarketplaceImageRequest[],
-  second: MarketplaceImageRequest[],
-) {
-  return (
-    first.length === second.length &&
-    first.every(
-      (image, index) =>
-        image.imageUrl === second[index]?.imageUrl &&
-        (image.altText ?? null) === (second[index]?.altText ?? null),
-    )
-  );
-}
-
 export function MarketplaceListingForm(
   props: MarketplaceListingFormProps,
 ) {
+  const imageInputId = useId();
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const initialListing =
     props.mode === "edit" ? props.initialListing : undefined;
   const [form, setForm] = useState<MarketplaceFormState>(() =>
     initialState(initialListing),
   );
+  const [selectedImages, setSelectedImages] = useState<SelectedImage[]>([]);
+  const selectedImagesRef = useRef<SelectedImage[]>([]);
   const [errors, setErrors] = useState<MarketplaceFormErrors>({});
+
+  useEffect(() => {
+    selectedImagesRef.current = selectedImages;
+  }, [selectedImages]);
+
+  useEffect(() => () => {
+    selectedImagesRef.current.forEach((image) =>
+      URL.revokeObjectURL(image.previewUrl),
+    );
+  }, []);
 
   const update = <Key extends keyof MarketplaceFormState>(
     key: Key,
@@ -148,23 +169,71 @@ export function MarketplaceListingForm(
   };
 
   const backendError = (key: string) =>
-    props.backendFieldErrors?.[key]?.[0];
+    props.backendFieldErrors?.[key]?.[0] ??
+    props.backendFieldErrors?.[`listing.${key}`]?.[0];
 
-  const updateImage = (
-    index: number,
-    key: keyof MarketplaceImageRequest,
-    value: string,
-  ) => {
-    update(
-      "images",
-      form.images.map((image, imageIndex) =>
-        imageIndex === index ? { ...image, [key]: value } : image,
-      ),
-    );
-    setErrors((current) => ({
+  const validateImage = (file: File) => {
+    const lowerName = file.name.toLowerCase();
+    if (file.size === 0) {
+      return "Select a non-empty image file.";
+    }
+    if (
+      !allowedImageTypes.includes(file.type) ||
+      !allowedImageExtensions.some((extension) =>
+        lowerName.endsWith(extension),
+      )
+    ) {
+      return "Only JPG, PNG, or WebP images are allowed.";
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      return `Each image must be ${MAX_IMAGE_SIZE_MB} MB or less.`;
+    }
+    return null;
+  };
+
+  const selectImages = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    setErrors((current) => ({ ...current, images: undefined }));
+    if (files.length === 0) return;
+
+    if (selectedImages.length + files.length > MAX_IMAGES) {
+      setErrors((current) => ({
+        ...current,
+        images: `You can upload up to ${MAX_IMAGES} images.`,
+      }));
+      event.target.value = "";
+      return;
+    }
+
+    const invalidMessage = files
+      .map(validateImage)
+      .find((message) => Boolean(message));
+    if (invalidMessage) {
+      setErrors((current) => ({ ...current, images: invalidMessage }));
+      event.target.value = "";
+      return;
+    }
+
+    setSelectedImages((current) => [
       ...current,
-      [`image-${index}`]: undefined,
-    }));
+      ...files.map((file) => ({
+        file,
+        id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+        previewUrl: URL.createObjectURL(file),
+      })),
+    ]);
+    event.target.value = "";
+  };
+
+  const removeSelectedImage = (imageId: string) => {
+    setSelectedImages((current) => {
+      const removed = current.find((image) => image.id === imageId);
+      if (removed) URL.revokeObjectURL(removed.previewUrl);
+      return current.filter((image) => image.id !== imageId);
+    });
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
   };
 
   const validate = () => {
@@ -184,18 +253,9 @@ export function MarketplaceListingForm(
     if (!/^[A-Z]{3}$/.test(form.currency.trim().toUpperCase())) {
       nextErrors.currency = "Use a three-letter currency code such as PKR.";
     }
-    if (form.images.length > 6) {
-      nextErrors.images = "A listing can have at most six images.";
+    if (selectedImages.length > MAX_IMAGES) {
+      nextErrors.images = `You can upload up to ${MAX_IMAGES} images.`;
     }
-    form.images.forEach((image, index) => {
-      if (!httpUrlPattern.test(image.imageUrl.trim())) {
-        nextErrors[`image-${index}`] =
-          "Enter a complete HTTP or HTTPS image URL.";
-      } else if ((image.altText?.trim().length ?? 0) > 160) {
-        nextErrors[`image-${index}`] =
-          "Image description cannot exceed 160 characters.";
-      }
-    });
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -203,6 +263,7 @@ export function MarketplaceListingForm(
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (props.isSubmitting) return;
     if (!validate()) return;
 
     const request: CreateMarketplaceListingRequest = {
@@ -210,16 +271,13 @@ export function MarketplaceListingForm(
       condition: form.condition,
       currency: form.currency.trim().toUpperCase(),
       description: form.description.trim(),
-      images: form.images.map((image) => ({
-        altText: image.altText?.trim() || null,
-        imageUrl: image.imageUrl.trim(),
-      })),
       price: Number(form.price),
       title: form.title.trim(),
     };
+    const imageFiles = selectedImages.map((image) => image.file);
 
     if (props.mode === "create") {
-      await props.onSubmit(request);
+      await props.onSubmit(request, imageFiles);
       return;
     }
 
@@ -242,17 +300,13 @@ export function MarketplaceListingForm(
     if (request.condition !== props.initialListing.condition) {
       updateRequest.condition = request.condition;
     }
-    const initialImages = props.initialListing.images.map((image) => ({
-      altText: image.altText,
-      imageUrl: image.imageUrl,
-    }));
-    if (!sameImages(request.images, initialImages)) {
-      updateRequest.images = request.images;
-    }
     if (form.status !== props.initialListing.status) {
       updateRequest.status = form.status;
     }
-    await props.onSubmit(updateRequest);
+    await props.onSubmit(
+      updateRequest,
+      imageFiles.length > 0 ? imageFiles : undefined,
+    );
   };
 
   return (
@@ -368,87 +422,130 @@ export function MarketplaceListingForm(
                 Listing images
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Add up to six public HTTP or HTTPS image URLs.
+                Upload up to {MAX_IMAGES} JPG, PNG, or WebP images. Each image
+                must be {MAX_IMAGE_SIZE_MB} MB or less.
               </p>
             </div>
-            <Button
-              disabled={form.images.length >= 6}
-              onClick={() =>
-                update("images", [
-                  ...form.images,
-                  { altText: "", imageUrl: "" },
-                ])
-              }
-              variant="outline"
-            >
-              <ImagePlus className="size-4" />
-              Add image
-            </Button>
           </div>
 
+          <label
+            className={cn(
+              "grid cursor-pointer place-items-center gap-3 rounded-2xl border-2 border-dashed px-5 py-8 text-center transition",
+              errors.images || backendError("images")
+                ? "border-red-300 bg-red-50 hover:border-red-400"
+                : "border-slate-300 bg-slate-50 hover:border-brand-400 hover:bg-brand-50/40",
+              props.isSubmitting ? "cursor-not-allowed opacity-70" : "",
+            )}
+            htmlFor={imageInputId}
+          >
+            <UploadCloud className="size-8 text-brand-600" />
+            <span>
+              <span className="block text-sm font-semibold text-slate-800">
+                Select images
+              </span>
+              <span className="mt-1 block text-xs text-slate-500">
+                JPG, PNG, or WebP · up to {MAX_IMAGE_SIZE_MB} MB each
+              </span>
+            </span>
+            <input
+              accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+              className="sr-only"
+              disabled={
+                props.isSubmitting || selectedImages.length >= MAX_IMAGES
+              }
+              id={imageInputId}
+              multiple
+              onChange={selectImages}
+              ref={imageInputRef}
+              type="file"
+            />
+          </label>
+
           {errors.images || backendError("images") ? (
-            <p className="text-sm font-medium text-red-600">
+            <p className="text-sm font-medium text-red-600" role="alert">
               {errors.images ?? backendError("images")}
             </p>
           ) : null}
 
-          {form.images.length === 0 ? (
+          {props.mode === "edit" &&
+          selectedImages.length === 0 &&
+          props.initialListing.images.length > 0 ? (
+            <div className="grid gap-3">
+              <p className="text-sm font-semibold text-slate-700">
+                Current images
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {props.initialListing.images.map((image) => (
+                  <div
+                    className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
+                    key={image.id}
+                  >
+                    <img
+                      alt={image.altText ?? props.initialListing.title}
+                      className="aspect-[4/3] w-full object-cover"
+                      src={image.imageUrl}
+                    />
+                    <p className="truncate p-3 text-xs text-slate-500">
+                      Upload new images to replace the current gallery.
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {selectedImages.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
               Images are optional. Listings without images receive a clean
               placeholder.
             </div>
           ) : (
-            <div className="grid gap-4">
-              {form.images.map((image, index) => (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {selectedImages.map((image, index) => (
                 <div
-                  className="grid gap-4 rounded-xl border border-slate-200 p-4 md:grid-cols-[1fr_18rem_auto] md:items-start"
-                  key={index}
+                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                  key={image.id}
                 >
-                  <FormField
-                    error={
-                      errors[`image-${index}`] ??
-                      backendError(`images[${index}].imageUrl`)
-                    }
-                    label={`Image ${index + 1} URL`}
-                    maxLength={2048}
-                    onChange={(event) =>
-                      updateImage(index, "imageUrl", event.target.value)
-                    }
-                    placeholder="https://example.com/item.jpg"
-                    required
-                    type="url"
-                    value={image.imageUrl}
+                  <img
+                    alt={`Selected listing image ${index + 1}`}
+                    className="aspect-[4/3] w-full object-cover"
+                    src={image.previewUrl}
                   />
-                  <FormField
-                    error={backendError(`images[${index}].altText`)}
-                    label="Image description"
-                    maxLength={160}
-                    onChange={(event) =>
-                      updateImage(index, "altText", event.target.value)
-                    }
-                    placeholder="Front cover of the textbook"
-                    value={image.altText ?? ""}
-                  />
-                  <Button
-                    aria-label={`Remove image ${index + 1}`}
-                    className="md:mt-7"
-                    onClick={() =>
-                      update(
-                        "images",
-                        form.images.filter(
-                          (_, imageIndex) => imageIndex !== index,
-                        ),
-                      )
-                    }
-                    size="icon"
-                    variant="ghost"
-                  >
-                    <Trash2 className="size-4 text-red-600" />
-                  </Button>
+                  <div className="grid gap-3 p-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-800">
+                        {image.file.name}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {formatFileSize(image.file.size)}
+                      </p>
+                    </div>
+                    <Button
+                      disabled={props.isSubmitting}
+                      onClick={() => removeSelectedImage(image.id)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Trash2 className="size-4" />
+                      Remove image
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
+
+          {selectedImages.length < MAX_IMAGES ? (
+            <Button
+              className="w-fit"
+              disabled={props.isSubmitting}
+              onClick={() => imageInputRef.current?.click()}
+              variant="outline"
+            >
+              <ImagePlus className="size-4" />
+              Add more images
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
 
