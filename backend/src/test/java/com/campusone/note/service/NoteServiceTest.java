@@ -14,6 +14,7 @@ import com.campusone.academic.entity.Department;
 import com.campusone.academic.entity.University;
 import com.campusone.academic.mapper.CourseMapper;
 import com.campusone.academic.repository.CourseRepository;
+import com.campusone.academic.repository.DepartmentRepository;
 import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.common.exception.ResourceNotFoundException;
 import com.campusone.note.dto.request.CreateNoteRequest;
@@ -114,6 +115,9 @@ class NoteServiceTest {
     private CourseRepository courseRepository;
 
     @Mock
+    private DepartmentRepository departmentRepository;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -121,6 +125,9 @@ class NoteServiceTest {
 
     @Mock
     private StorageService storageService;
+
+    @Mock
+    private NoteAdminAuthorizationService adminAuthorizationService;
 
     private NoteService noteService;
     private User owner;
@@ -141,6 +148,7 @@ class NoteServiceTest {
                 noteDownloadEventRepository,
                 noteModerationActionRepository,
                 courseRepository,
+                departmentRepository,
                 userRepository,
                 new NoteMapper(
                          new CourseMapper(),
@@ -148,6 +156,7 @@ class NoteServiceTest {
                          new TagMapper()),
                 integrationService,
                 storageService,
+                adminAuthorizationService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         University university = new University(
@@ -304,6 +313,7 @@ class NoteServiceTest {
                 any(),
                 any(),
                 any(),
+                any(),
                 any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(note)));
 
@@ -321,6 +331,7 @@ class NoteServiceTest {
         verify(noteRepository).findPublicNotes(
                 eq(NoteModerationStatus.APPROVED),
                 eq(NoteVisibility.PUBLIC),
+                isNull(),
                 isNull(),
                 isNull(),
                 org.mockito.ArgumentMatchers.any(Pageable.class));
