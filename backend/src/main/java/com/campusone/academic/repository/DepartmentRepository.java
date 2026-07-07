@@ -10,6 +10,8 @@ public interface DepartmentRepository extends JpaRepository<Department, UUID> {
 
     List<Department> findAllByUniversityIdOrderByNameAsc(UUID universityId);
 
+    Optional<Department> findFirstByActiveTrueOrderByNameAsc();
+
     Optional<Department> findByUniversityIdAndCodeIgnoreCase(UUID universityId, String code);
 
     Optional<Department> findByIdAndUniversityId(UUID departmentId, UUID universityId);
