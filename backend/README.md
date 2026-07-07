@@ -20,6 +20,8 @@ The backend is a modular Spring Boot API for CampusOne:
 - Public and private student profile visibility
 - Notes with real R2-backed PDF upload and tracked downloads
 - Marketplace, discussions, events, internships, and notifications
+- Admin approval queues for user-submitted marketplace listings, events,
+  discussion questions, and internships
 - Global search, gamification, AI study tools, and moderation workflows
 - Consistent validation, authentication, authorization, and API error responses
 
@@ -86,16 +88,22 @@ JWT signing uses:
 - `CORS_ALLOWED_ORIGINS`: legacy alias for the same exact-origin CORS property
 - `OPENAPI_ENABLED`: defaults to `true`; set to `false` to disable API
   documentation
-- `STORAGE_PROVIDER`: set to `r2` to enable real note PDF uploads; defaults to
-  disabled so missing storage credentials never prevent startup
+- `STORAGE_PROVIDER`: set to `r2` to enable real note PDF uploads and
+  marketplace image uploads; defaults to disabled so missing storage
+  credentials never prevent startup
 - `R2_ENDPOINT`: Cloudflare R2 S3 API endpoint
 - `R2_ACCESS_KEY_ID`: R2 API token access key
 - `R2_SECRET_ACCESS_KEY`: R2 API token secret key
-- `R2_BUCKET`: bucket used for note PDFs
+- `R2_BUCKET`: bucket used for uploaded files; CampusOne stores notes under
+  `notes/` and marketplace images under `marketplace/`
 - `R2_REGION`: optional; defaults to `auto`
 - `R2_PUBLIC_BASE_URL`: optional public bucket/custom-domain URL; when omitted,
   the backend creates short-lived private presigned GET URLs
 - `MAX_UPLOAD_SIZE_MB`: optional maximum admin PDF size; defaults to `25`
+- `MARKETPLACE_MAX_IMAGES_PER_LISTING`: optional maximum marketplace images
+  per listing; defaults to `5`
+- `MARKETPLACE_MAX_IMAGE_SIZE_MB`: optional maximum marketplace image size;
+  defaults to `5`
 - `ADMIN_MAX_UPLOADS_PER_DAY`: optional per-admin daily upload count;
   defaults to `200`
 - `ADMIN_MAX_STORAGE_MB_PER_MONTH`: optional per-admin monthly uploaded
@@ -162,7 +170,7 @@ startup defaults for packaged deployments. Production deployments should still
 set `APP_CORS_ALLOWED_ORIGINS` explicitly so future frontend domains can be
 added without code changes.
 
-### Cloudflare R2 note storage
+### Cloudflare R2 file storage
 
 The note upload endpoint accepts multipart form data at
 `POST /api/v1/notes/upload`, with a JSON `note` part and an
@@ -175,6 +183,20 @@ limited to PDF files.
 Quota checks use UTC calendar days/months and PostgreSQL transaction locks so
 concurrent requests and multiple backend instances cannot bypass the limits.
 
+Marketplace listings can also upload images through multipart form data at
+`POST /api/v1/marketplace/listings/upload` and
+`PATCH /api/v1/marketplace/listings/{listingId}/upload`. Images are stored in
+the same R2 bucket under `marketplace/`; PostgreSQL stores image metadata and
+the generated object URL only. The frontend no longer asks students to paste
+image URLs. Supported image types are JPG, PNG, and WebP.
+
+User-submitted marketplace listings, events, discussion questions, and
+internships are created as pending review and are hidden from public lists and
+global search until an admin approves them from
+`/api/v1/admin/moderation/pending`. Admin-created content is approved
+immediately. Notes remain admin-managed; normal users can view, download,
+bookmark, and rate approved notes but cannot upload or manage notes.
+
 Configure these Render environment variables:
 
 ```text
@@ -186,6 +208,8 @@ R2_BUCKET=<bucket-name>
 R2_REGION=auto
 R2_PUBLIC_BASE_URL=
 MAX_UPLOAD_SIZE_MB=25
+MARKETPLACE_MAX_IMAGES_PER_LISTING=5
+MARKETPLACE_MAX_IMAGE_SIZE_MB=5
 ADMIN_MAX_UPLOADS_PER_DAY=200
 ADMIN_MAX_STORAGE_MB_PER_MONTH=5000
 GLOBAL_UPLOAD_STORAGE_CAP_MB=8192
