@@ -96,7 +96,8 @@ export interface NoteManagementStatus {
 }
 
 export interface CreateNoteRequest {
-  courseId: string;
+  courseCode: string;
+  courseName?: string;
   description: string;
   fileType: NoteFileType;
   semester: number;
@@ -107,7 +108,8 @@ export interface CreateNoteRequest {
 }
 
 export interface UpdateNoteRequest {
-  courseId?: string;
+  courseCode?: string;
+  courseName?: string;
   description?: string;
   fileType?: NoteFileType;
   semester?: number;
@@ -118,6 +120,7 @@ export interface UpdateNoteRequest {
 }
 
 export interface NoteListParameters {
+  course?: string;
   courseId?: string;
   page?: number;
   signal?: AbortSignal;
