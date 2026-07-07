@@ -23,6 +23,7 @@ import com.campusone.internship.exception.InternshipConflictException;
 import com.campusone.internship.mapper.InternshipMapper;
 import com.campusone.internship.repository.InternshipRepository;
 import com.campusone.internship.repository.SavedInternshipRepository;
+import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.math.BigDecimal;
@@ -68,6 +69,9 @@ class InternshipServiceTest {
     @Mock
     private CommunityIntegrationService integrationService;
 
+    @Mock
+    private NoteAdminAuthorizationService adminAuthorizationService;
+
     private InternshipService internshipService;
     private User poster;
     private User student;
@@ -84,11 +88,16 @@ class InternshipServiceTest {
                 userRepository,
                 new InternshipMapper(),
                 integrationService,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                adminAuthorizationService);
         lenient().when(savedRepository.findSavedInternshipIds(
                         any(UUID.class),
                         any()))
                 .thenReturn(List.of());
+        lenient().when(adminAuthorizationService.canManage(
+                        any(UUID.class),
+                        any()))
+                .thenReturn(true);
     }
 
     @Test
@@ -157,6 +166,7 @@ class InternshipServiceTest {
                 InternshipSort.NEWEST);
 
         verify(internshipRepository).findVisibleInternships(
+                any(),
                 eq(null),
                 eq(null),
                 eq(null),
@@ -434,6 +444,7 @@ class InternshipServiceTest {
     void listSavedInternships_returnsSavedPage() {
         when(internshipRepository.findSavedByUser(
                 eq(STUDENT_ID),
+                any(),
                 any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(internship)));
         when(savedRepository.findSavedInternshipIds(
@@ -470,6 +481,7 @@ class InternshipServiceTest {
             Boolean paid,
             String searchPattern) {
         when(internshipRepository.findVisibleInternships(
+                any(),
                 eq(status),
                 eq(type),
                 eq(mode),
