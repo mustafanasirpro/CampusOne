@@ -9,7 +9,9 @@ import com.campusone.moderation.entity.ModeratorRole;
 import com.campusone.moderation.exception.ModeratorAccessDeniedException;
 import com.campusone.moderation.mapper.ModerationMapper;
 import com.campusone.moderation.repository.ModeratorRepository;
+import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.user.entity.User;
+import com.campusone.user.repository.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +33,12 @@ class ModeratorAuthorizationServiceTest {
     @Mock
     private ModeratorRepository moderatorRepository;
 
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private NoteAdminAuthorizationService adminAuthorizationService;
+
     private ModeratorAuthorizationService service;
     private Moderator moderator;
 
@@ -50,13 +58,16 @@ class ModeratorAuthorizationServiceTest {
         ReflectionTestUtils.setField(moderator, "updatedAt", NOW);
         service = new ModeratorAuthorizationService(
                 moderatorRepository,
-                new ModerationMapper());
+                new ModerationMapper(),
+                userRepository,
+                adminAuthorizationService);
     }
 
     @Test
     void getStatus_normalUser_returnsInactive() {
         when(moderatorRepository.findDetailedByUserId(USER_ID))
                 .thenReturn(Optional.empty());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
         var response = service.getStatus(USER_ID);
 
