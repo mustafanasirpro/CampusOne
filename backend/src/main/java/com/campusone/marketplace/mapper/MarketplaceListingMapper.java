@@ -6,6 +6,7 @@ import com.campusone.marketplace.dto.response.MarketplaceListingSummaryResponse;
 import com.campusone.marketplace.dto.response.MarketplaceSellerResponse;
 import com.campusone.marketplace.entity.MarketplaceListing;
 import com.campusone.marketplace.entity.MarketplaceListingImage;
+import com.campusone.note.storage.StorageService;
 import com.campusone.user.entity.StudentProfile;
 import java.util.Comparator;
 import java.util.List;
@@ -13,6 +14,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class MarketplaceListingMapper {
+
+    private final StorageService storageService;
+
+    public MarketplaceListingMapper(StorageService storageService) {
+        this.storageService = storageService;
+    }
 
     public MarketplaceListingSummaryResponse toSummary(
             MarketplaceListing listing) {
@@ -59,9 +66,28 @@ public class MarketplaceListingMapper {
     private MarketplaceImageResponse toImage(MarketplaceListingImage image) {
         return new MarketplaceImageResponse(
                 image.getId(),
-                image.getImageUrl(),
+                imageUrl(image),
                 image.getAltText(),
-                image.getDisplayOrder());
+                image.getDisplayOrder(),
+                image.getOriginalFilename(),
+                image.getMimeType(),
+                image.getSizeBytes());
+    }
+
+    private String imageUrl(MarketplaceListingImage image) {
+        if (image.getObjectKey() == null) {
+            return image.getImageUrl();
+        }
+        try {
+            return storageService.createObjectUrl(
+                    image.getStorageProvider(),
+                    image.getBucketName(),
+                    image.getObjectKey(),
+                    image.getMimeType(),
+                    image.getOriginalFilename());
+        } catch (RuntimeException exception) {
+            return image.getImageUrl();
+        }
     }
 
     private MarketplaceSellerResponse toSeller(MarketplaceListing listing) {
