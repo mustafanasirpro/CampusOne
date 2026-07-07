@@ -14,15 +14,16 @@ import {
   ModerationActionsPanel,
   ModeratorStatusCard,
   MyReportsPanel,
+  PendingApprovalsPanel,
 } from "@/components/moderation";
 import type { ModeratorStatus } from "@/types/moderation";
 import { useDocumentTitle } from "@/utils/useDocumentTitle";
 
-type AdminTab = "actions" | "my-reports" | "reports";
+type AdminTab = "actions" | "approvals" | "my-reports" | "reports";
 
 export function AdminPage() {
   const [status, setStatus] = useState<ModeratorStatus | null>(null);
-  const [activeTab, setActiveTab] = useState<AdminTab>("reports");
+  const [activeTab, setActiveTab] = useState<AdminTab>("approvals");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -35,7 +36,7 @@ export function AdminPage() {
       .then((response) => {
         if (!active) return;
         setStatus(response);
-        setActiveTab(response.activeModerator ? "reports" : "my-reports");
+        setActiveTab(response.activeModerator ? "approvals" : "my-reports");
         setError(null);
       })
       .catch((requestError: unknown) => {
@@ -79,6 +80,10 @@ export function AdminPage() {
                 onChange={setActiveTab}
                 tabs={[
                   {
+                    label: "Approvals",
+                    value: "approvals",
+                  },
+                  {
                     label: "Reports",
                     value: "reports",
                   },
@@ -93,6 +98,7 @@ export function AdminPage() {
                 ]}
               />
               <section aria-live="polite">
+                {activeTab === "approvals" ? <PendingApprovalsPanel /> : null}
                 {activeTab === "reports" ? <AdminReportsPanel /> : null}
                 {activeTab === "actions" ? <ModerationActionsPanel /> : null}
                 {activeTab === "my-reports" ? <MyReportsPanel /> : null}
