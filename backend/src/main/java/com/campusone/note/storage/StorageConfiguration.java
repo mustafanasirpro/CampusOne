@@ -80,9 +80,18 @@ public class StorageConfiguration {
     MultipartConfigElement multipartConfigElement(
             StorageProperties properties) {
         DataSize maximumFileSize =
-                DataSize.ofMegabytes(properties.getMaxUploadSizeMb());
+                DataSize.ofMegabytes(Math.max(
+                        properties.getMaxUploadSizeMb(),
+                        properties.getMarketplaceMaxImageSizeMb()));
         DataSize maximumRequestSize = DataSize.ofBytes(
-                maximumFileSize.toBytes() + DataSize.ofMegabytes(1).toBytes());
+                Math.max(
+                        DataSize.ofMegabytes(properties.getMaxUploadSizeMb())
+                                .toBytes(),
+                        DataSize.ofMegabytes(
+                                (long) properties.getMarketplaceMaxImageSizeMb()
+                                        * properties.getMarketplaceMaxImagesPerListing())
+                                .toBytes())
+                        + DataSize.ofMegabytes(1).toBytes());
         MultipartConfigFactory factory = new MultipartConfigFactory();
         factory.setMaxFileSize(maximumFileSize);
         factory.setMaxRequestSize(maximumRequestSize);
