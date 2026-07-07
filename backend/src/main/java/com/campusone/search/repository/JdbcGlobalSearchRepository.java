@@ -141,7 +141,7 @@ public class JdbcGlobalSearchRepository
             LEFT JOIN student_profiles profile
                 ON profile.user_id = question.author_user_id
             WHERE question.deleted = FALSE
-              AND question.status <> 'HIDDEN'
+              AND question.status IN ('OPEN', 'RESOLVED', 'CLOSED')
               AND (
                     LOWER(question.title)
                         LIKE :searchPattern ESCAPE '\\'
@@ -184,6 +184,7 @@ public class JdbcGlobalSearchRepository
                 ON profile.user_id = event.organizer_user_id
             WHERE event.deleted = FALSE
               AND event.visibility = 'PUBLIC'
+              AND event.status IN ('UPCOMING', 'CANCELLED', 'COMPLETED')
               AND (
                     LOWER(event.title)
                         LIKE :searchPattern ESCAPE '\\'
@@ -229,6 +230,7 @@ public class JdbcGlobalSearchRepository
             LEFT JOIN student_profiles profile
                 ON profile.user_id = internship.poster_user_id
             WHERE internship.deleted = FALSE
+              AND internship.status IN ('OPEN', 'CLOSED', 'EXPIRED')
               AND (
                     LOWER(internship.title)
                         LIKE :searchPattern ESCAPE '\\'
@@ -255,6 +257,7 @@ public class JdbcGlobalSearchRepository
                 internship.created_at
             FROM internships internship
             WHERE internship.deleted = FALSE
+              AND internship.status IN ('OPEN', 'CLOSED', 'EXPIRED')
               AND LOWER(internship.company_name)
                     LIKE :searchPattern ESCAPE '\\'
             """;
