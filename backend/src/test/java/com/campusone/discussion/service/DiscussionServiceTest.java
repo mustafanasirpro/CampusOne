@@ -29,6 +29,7 @@ import com.campusone.discussion.repository.DiscussionAnswerRepository;
 import com.campusone.discussion.repository.DiscussionAnswerVoteRepository;
 import com.campusone.discussion.repository.DiscussionQuestionRepository;
 import com.campusone.discussion.repository.DiscussionQuestionVoteRepository;
+import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.time.Instant;
@@ -79,6 +80,9 @@ class DiscussionServiceTest {
     @Mock
     private CommunityIntegrationService integrationService;
 
+    @Mock
+    private NoteAdminAuthorizationService adminAuthorizationService;
+
     private DiscussionService discussionService;
     private User owner;
     private User otherUser;
@@ -98,7 +102,8 @@ class DiscussionServiceTest {
                 answerVoteRepository,
                 userRepository,
                 new DiscussionMapper(),
-                integrationService);
+                integrationService,
+                adminAuthorizationService);
 
         lenient().when(answerRepository.findVisibleByQuestionId(
                         any(UUID.class),
@@ -109,6 +114,10 @@ class DiscussionServiceTest {
                         any(),
                         any(UUID.class)))
                 .thenReturn(List.of());
+        lenient().when(adminAuthorizationService.canManage(
+                        any(UUID.class),
+                        any()))
+                .thenReturn(true);
     }
 
     @Test
@@ -133,7 +142,7 @@ class DiscussionServiceTest {
     @Test
     void listQuestions_returnsVisiblePage() {
         when(questionRepository.findVisibleQuestions(
-                eq(DiscussionQuestionStatus.HIDDEN),
+                any(),
                 eq(DiscussionCategory.PROGRAMMING),
                 eq("%spring%"),
                 any(Pageable.class)))
