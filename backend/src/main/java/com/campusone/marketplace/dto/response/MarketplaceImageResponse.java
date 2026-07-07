@@ -6,5 +6,8 @@ public record MarketplaceImageResponse(
         UUID id,
         String imageUrl,
         String altText,
-        int displayOrder) {
+        int displayOrder,
+        String originalFilename,
+        String mimeType,
+        Long sizeBytes) {
 }
