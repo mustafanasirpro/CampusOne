@@ -6,7 +6,12 @@ export type InternshipType =
   | "REMOTE_INTERNSHIP";
 
 export type InternshipWorkMode = "ONSITE" | "REMOTE" | "HYBRID";
-export type InternshipStatus = "OPEN" | "CLOSED" | "EXPIRED";
+export type InternshipStatus =
+  | "PENDING_REVIEW"
+  | "OPEN"
+  | "CLOSED"
+  | "EXPIRED"
+  | "REJECTED";
 export type InternshipSort =
   | "NEWEST"
   | "OLDEST"
@@ -100,4 +105,3 @@ export interface InternshipListParameters {
   status?: InternshipStatus;
   workMode?: InternshipWorkMode;
 }
-
