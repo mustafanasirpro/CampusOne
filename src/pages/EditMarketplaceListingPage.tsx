@@ -81,13 +81,14 @@ export function EditMarketplaceListingPage() {
 
   const handleSubmit = async (
     request: UpdateMarketplaceListingRequest,
+    imageFiles?: File[],
   ) => {
     if (!listingId) return;
     setIsSubmitting(true);
     setSubmitError(null);
     setFieldErrors({});
     try {
-      const updated = await updateListing(listingId, request);
+      const updated = await updateListing(listingId, request, imageFiles);
       showToast({
         title: "Listing updated",
         message: "Your marketplace listing changes were saved.",
@@ -160,7 +161,7 @@ export function EditMarketplaceListingPage() {
       </Link>
 
       <PageHeader
-        description="Update listing details, replace image links, or mark the item as sold."
+        description="Update listing details, replace uploaded images, or mark the item as sold."
         eyebrow="Your listings"
         title="Edit listing"
       />
