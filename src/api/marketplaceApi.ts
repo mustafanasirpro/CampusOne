@@ -56,7 +56,23 @@ export function getListingById(
 
 export function createListing(
   request: CreateMarketplaceListingRequest,
+  imageFiles: File[] = [],
 ) {
+  if (imageFiles.length > 0) {
+    const formData = new FormData();
+    formData.append(
+      "listing",
+      new Blob([JSON.stringify({ ...request, images: [] })], {
+        type: "application/json",
+      }),
+    );
+    imageFiles.forEach((file) => formData.append("images", file));
+    return apiRequest<MarketplaceListingDetail>(`${listingsPath}/upload`, {
+      body: formData,
+      method: "POST",
+    });
+  }
+
   return apiRequest<MarketplaceListingDetail>(listingsPath, {
     body: JSON.stringify(request),
     method: "POST",
@@ -66,7 +82,26 @@ export function createListing(
 export function updateListing(
   listingId: string,
   request: UpdateMarketplaceListingRequest,
+  imageFiles?: File[],
 ) {
+  if (imageFiles !== undefined) {
+    const formData = new FormData();
+    formData.append(
+      "listing",
+      new Blob([JSON.stringify({ ...request, images: undefined })], {
+        type: "application/json",
+      }),
+    );
+    imageFiles.forEach((file) => formData.append("images", file));
+    return apiRequest<MarketplaceListingDetail>(
+      `${listingsPath}/${listingId}/upload`,
+      {
+        body: formData,
+        method: "PATCH",
+      },
+    );
+  }
+
   return apiRequest<MarketplaceListingDetail>(
     `${listingsPath}/${listingId}`,
     {
