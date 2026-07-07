@@ -74,6 +74,8 @@ app:
   storage:
     provider: ${STORAGE_PROVIDER:disabled}
     max-upload-size-mb: ${MAX_UPLOAD_SIZE_MB:25}
+    marketplace-max-images-per-listing: ${MARKETPLACE_MAX_IMAGES_PER_LISTING:5}
+    marketplace-max-image-size-mb: ${MARKETPLACE_MAX_IMAGE_SIZE_MB:5}
     admin-max-uploads-per-day: ${ADMIN_MAX_UPLOADS_PER_DAY:200}
     admin-max-storage-mb-per-month: ${ADMIN_MAX_STORAGE_MB_PER_MONTH:5000}
     global-upload-storage-cap-mb: ${GLOBAL_UPLOAD_STORAGE_CAP_MB:8192}
