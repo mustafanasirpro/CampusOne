@@ -5,12 +5,22 @@ import com.campusone.note.entity.NoteVisibility;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
 
 public record UpdateNoteRequest(
         UUID courseId,
+
+        @Size(min = 2, max = 30, message = "Use a normal course code like CSC275.")
+        @Pattern(
+                regexp = "^[A-Za-z0-9][A-Za-z0-9._ -]*$",
+                message = "Use a normal course code like CSC275.")
+        String courseCode,
+
+        @Size(min = 2, max = 160)
+        String courseName,
 
         @Size(min = 5, max = 160)
         String title,
@@ -33,12 +43,36 @@ public record UpdateNoteRequest(
         List<@NotBlank @Size(min = 2, max = 40) String> tags) {
 
     public UpdateNoteRequest {
+        courseCode = trim(courseCode);
+        courseName = trim(courseName);
         title = trim(title);
         description = trim(description);
         teacherName = trim(teacherName);
         if (tags != null) {
             tags = tags.stream().map(UpdateNoteRequest::trim).toList();
         }
+    }
+
+    public UpdateNoteRequest(
+            UUID courseId,
+            String title,
+            String description,
+            String teacherName,
+            Integer semester,
+            NoteFileType fileType,
+            NoteVisibility visibility,
+            List<String> tags) {
+        this(
+                courseId,
+                null,
+                null,
+                title,
+                description,
+                teacherName,
+                semester,
+                fileType,
+                visibility,
+                tags);
     }
 
     private static String trim(String value) {
