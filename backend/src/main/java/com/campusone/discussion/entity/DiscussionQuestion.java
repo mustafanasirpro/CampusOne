@@ -139,6 +139,18 @@ public class DiscussionQuestion {
         deleted = true;
     }
 
+    public void submitForReview() {
+        status = DiscussionQuestionStatus.PENDING_REVIEW;
+    }
+
+    public void approve() {
+        status = DiscussionQuestionStatus.OPEN;
+    }
+
+    public void reject() {
+        status = DiscussionQuestionStatus.REJECTED;
+    }
+
     public void recordView() {
         viewCount = Math.addExact(viewCount, 1);
     }
