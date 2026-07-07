@@ -8,10 +8,12 @@ export type DiscussionCategory =
   | "OTHER";
 
 export type DiscussionQuestionStatus =
+  | "PENDING_REVIEW"
   | "OPEN"
   | "RESOLVED"
   | "CLOSED"
-  | "HIDDEN";
+  | "HIDDEN"
+  | "REJECTED";
 
 export type DiscussionQuestionUpdateStatus = "OPEN" | "CLOSED";
 
@@ -127,4 +129,3 @@ export interface DiscussionQuestionListParameters {
   size?: number;
   sort?: DiscussionQuestionSort;
 }
-
