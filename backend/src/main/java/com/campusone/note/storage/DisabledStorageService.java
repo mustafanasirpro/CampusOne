@@ -12,7 +12,22 @@ public class DisabledStorageService implements StorageService {
     }
 
     @Override
+    public StoredObject uploadMarketplaceImage(UUID ownerId, ValidatedNoteFile file) {
+        throw new StorageNotConfiguredException();
+    }
+
+    @Override
     public String createDownloadUrl(FileAsset fileAsset) {
+        throw new StorageNotConfiguredException();
+    }
+
+    @Override
+    public String createObjectUrl(
+            com.campusone.note.entity.StorageProvider storageProvider,
+            String bucketName,
+            String objectKey,
+            String mimeType,
+            String originalFilename) {
         throw new StorageNotConfiguredException();
     }
 
