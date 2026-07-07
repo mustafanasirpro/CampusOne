@@ -127,6 +127,7 @@ class NoteControllerTest {
         when(noteService.listPublicNotes(
                 null,
                 null,
+                null,
                 0,
                 20,
                 com.campusone.note.dto.request.NoteSort.NEWEST))
