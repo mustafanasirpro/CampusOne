@@ -37,7 +37,13 @@ export function internshipWorkModeLabel(value: InternshipWorkMode) {
 }
 
 export function internshipStatusLabel(value: InternshipStatus) {
-  return { CLOSED: "Closed", EXPIRED: "Expired", OPEN: "Open" }[value];
+  return {
+    CLOSED: "Closed",
+    EXPIRED: "Expired",
+    OPEN: "Open",
+    PENDING_REVIEW: "Pending review",
+    REJECTED: "Rejected",
+  }[value];
 }
 
 export function formatInternshipDeadline(value: string) {
