@@ -18,6 +18,7 @@ import com.campusone.event.exception.EventConflictException;
 import com.campusone.event.mapper.EventMapper;
 import com.campusone.event.repository.CampusEventRepository;
 import com.campusone.event.repository.EventParticipantRepository;
+import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.time.Instant;
@@ -41,18 +42,21 @@ public class EventService {
     private final UserRepository userRepository;
     private final EventMapper eventMapper;
     private final CommunityIntegrationService integrationService;
+    private final NoteAdminAuthorizationService adminAuthorizationService;
 
     public EventService(
             CampusEventRepository eventRepository,
             EventParticipantRepository participantRepository,
             UserRepository userRepository,
             EventMapper eventMapper,
-            CommunityIntegrationService integrationService) {
+            CommunityIntegrationService integrationService,
+            NoteAdminAuthorizationService adminAuthorizationService) {
         this.eventRepository = eventRepository;
         this.participantRepository = participantRepository;
         this.userRepository = userRepository;
         this.eventMapper = eventMapper;
         this.integrationService = integrationService;
+        this.adminAuthorizationService = adminAuthorizationService;
     }
 
     @Transactional
@@ -60,7 +64,7 @@ public class EventService {
             UUID userId,
             CreateEventRequest request) {
         User organizer = requireUser(userId);
-        CampusEvent event = eventRepository.save(new CampusEvent(
+        CampusEvent event = new CampusEvent(
                 organizer,
                 request.title(),
                 request.description(),
@@ -68,7 +72,13 @@ public class EventService {
                 request.startTime(),
                 request.endTime(),
                 request.capacity(),
-                request.visibility()));
+                request.visibility());
+        if (!adminAuthorizationService.canManage(
+                organizer.getId(),
+                organizer.getEmail())) {
+            event.submitForReview();
+        }
+        event = eventRepository.save(event);
         integrationService.eventCreated(userId, event.getId());
         return eventMapper.toDetail(event, false, true);
     }
@@ -81,11 +91,17 @@ public class EventService {
             int page,
             int size,
             EventSort sort) {
+        PageRequest pageRequest = PageRequest.of(page, size, sort.toSort());
+        if (status == EventStatus.PENDING_REVIEW
+                || status == EventStatus.REJECTED) {
+            return toPage(Page.empty(pageRequest), viewerUserId);
+        }
         Page<CampusEvent> events = eventRepository.findPublicEvents(
                 EventVisibility.PUBLIC,
+                Set.of(EventStatus.PENDING_REVIEW, EventStatus.REJECTED),
                 status,
                 toSearchPattern(search),
-                PageRequest.of(page, size, sort.toSort()));
+                pageRequest);
         return toPage(events, viewerUserId);
     }
 
@@ -141,6 +157,11 @@ public class EventService {
                 request.capacity(),
                 request.visibility(),
                 request.status());
+        if (!adminAuthorizationService.canManage(
+                event.getOrganizer().getId(),
+                event.getOrganizer().getEmail())) {
+            event.submitForReview();
+        }
         if (changed) {
             integrationService.eventUpdated(
                     participantRepository.findParticipantUserIds(eventId),
@@ -358,11 +379,24 @@ public class EventService {
     private void requireViewable(
             CampusEvent event,
             UUID viewerUserId) {
-        if (event.getVisibility() == EventVisibility.PRIVATE
-                && (viewerUserId == null
-                        || !event.isOwnedBy(viewerUserId))) {
-            throw new ResourceNotFoundException("Event");
+        boolean owner = viewerUserId != null && event.isOwnedBy(viewerUserId);
+        if (owner || (event.getVisibility() == EventVisibility.PUBLIC
+                && event.getStatus() != EventStatus.PENDING_REVIEW
+                && event.getStatus() != EventStatus.REJECTED)) {
+            return;
         }
+        if (viewerUserId != null && isAdmin(viewerUserId)) {
+            return;
+        }
+        throw new ResourceNotFoundException("Event");
+    }
+
+    private boolean isAdmin(UUID userId) {
+        return userRepository.findById(userId)
+                .map(user -> adminAuthorizationService.canManage(
+                        user.getId(),
+                        user.getEmail()))
+                .orElse(false);
     }
 
     private void requireOrganizer(CampusEvent event, UUID userId) {
