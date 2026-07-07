@@ -254,14 +254,16 @@ configuration import. Operating-system environment variables take precedence.
 | `APP_CORS_ALLOWED_ORIGINS` | Production | Comma-separated exact frontend origins for Render, for example `https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app` |
 | `CORS_ALLOWED_ORIGINS` | No | Legacy alias for the same exact-origin CORS setting |
 | `OPENAPI_ENABLED` | No | Enabled by default; set to `false` to disable API documentation |
-| `STORAGE_PROVIDER` | Uploads | Set to `r2` to enable real note uploads; otherwise upload requests return a clean configuration error |
+| `STORAGE_PROVIDER` | Uploads | Set to `r2` to enable real note PDF and marketplace image uploads; otherwise upload requests return a clean configuration error |
 | `R2_ENDPOINT` | R2 | Cloudflare account S3 API endpoint |
 | `R2_ACCESS_KEY_ID` | R2 | R2 API token access key |
 | `R2_SECRET_ACCESS_KEY` | R2 | R2 API token secret key |
-| `R2_BUCKET` | R2 | Bucket that stores note PDFs |
+| `R2_BUCKET` | R2 | Bucket that stores note PDFs under `notes/` and marketplace images under `marketplace/` |
 | `R2_REGION` | No | Defaults to `auto`, as required by R2's S3-compatible API |
 | `R2_PUBLIC_BASE_URL` | No | Public bucket/custom-domain base URL; when omitted, private presigned download URLs are generated |
 | `MAX_UPLOAD_SIZE_MB` | No | Maximum admin PDF size; defaults to `25` MB |
+| `MARKETPLACE_MAX_IMAGES_PER_LISTING` | No | Maximum marketplace images per listing; defaults to `5` |
+| `MARKETPLACE_MAX_IMAGE_SIZE_MB` | No | Maximum marketplace image size; defaults to `5` MB |
 | `ADMIN_MAX_UPLOADS_PER_DAY` | No | Per-admin daily upload count; defaults to `200` |
 | `ADMIN_MAX_STORAGE_MB_PER_MONTH` | No | Per-admin monthly uploaded storage; defaults to `5000` MB |
 | `GLOBAL_UPLOAD_STORAGE_CAP_MB` | No | Global monthly upload safety cap; defaults to `8192` MB (8 GB) |
@@ -273,9 +275,11 @@ configuration import. Operating-system environment variables take precedence.
 
 Secrets and local `.env` files must never be committed.
 
-Cloudflare R2 stores the PDF bytes; PostgreSQL stores only the generated object
-key and file metadata. On Render, set `STORAGE_PROVIDER=r2` and every required
-`R2_*` credential above. The Vercel frontend requires only:
+Cloudflare R2 stores uploaded PDF/image bytes; PostgreSQL stores only generated
+object keys, public/signed URLs, and file metadata. Notes use the `notes/`
+prefix and marketplace images use the `marketplace/` prefix in the same bucket.
+On Render, set `STORAGE_PROVIDER=r2` and every required `R2_*` credential above.
+The Vercel frontend requires only:
 
 ```text
 VITE_API_BASE_URL=https://campusone-backend-otc4.onrender.com/api/v1
@@ -352,7 +356,8 @@ token.
 - [x] Profiles, notes, marketplace, discussions, events, and internships
 - [x] Notifications, global search, gamification, and local AI study tools
 - [x] Connect the React frontend to the REST APIs
-- [x] Store uploaded note PDFs in S3-compatible object storage
+- [x] Store uploaded note PDFs and marketplace images in S3-compatible object storage
+- [x] Gate user-submitted listings, events, discussion questions, and internships behind admin approval
 - [ ] Add email verification and password recovery
 - [ ] Add image uploads through private object storage
 - [ ] Implement administration and moderation workflows
