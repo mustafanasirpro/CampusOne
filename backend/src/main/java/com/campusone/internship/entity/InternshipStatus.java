@@ -1,7 +1,9 @@
 package com.campusone.internship.entity;
 
 public enum InternshipStatus {
+    PENDING_REVIEW,
     OPEN,
     CLOSED,
-    EXPIRED
+    EXPIRED,
+    REJECTED
 }
