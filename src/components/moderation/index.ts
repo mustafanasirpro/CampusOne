@@ -5,6 +5,7 @@ export * from "./ModerationActionsPanel";
 export * from "./ModerationPagination";
 export * from "./ModeratorStatusCard";
 export * from "./MyReportsPanel";
+export * from "./PendingApprovalsPanel";
 export * from "./ReportDetailModal";
 export * from "./ReportList";
 export * from "./ReportStatusBadge";
