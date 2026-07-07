@@ -15,7 +15,9 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -27,7 +29,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/marketplace/listings")
@@ -50,6 +54,27 @@ public class MarketplaceListingController {
             @Valid @RequestBody CreateMarketplaceListingRequest request) {
         MarketplaceListingDetailResponse response =
                 listingService.createListing(principal.getUserId(), request);
+        return ResponseEntity.created(
+                        URI.create("/api/v1/marketplace/listings/" + response.id()))
+                .body(response);
+    }
+
+    @PostMapping(
+            path = "/upload",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Create a marketplace listing with uploaded images",
+            description = "Accepts a JSON `listing` part and up to the "
+                    + "configured number of JPG, PNG, or WebP `images` parts.")
+    public ResponseEntity<MarketplaceListingDetailResponse> createListingWithImages(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @Valid @RequestPart("listing") CreateMarketplaceListingRequest request,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        MarketplaceListingDetailResponse response =
+                listingService.createListingWithUploadedImages(
+                        principal.getUserId(),
+                        request,
+                        images);
         return ResponseEntity.created(
                         URI.create("/api/v1/marketplace/listings/" + response.id()))
                 .body(response);
@@ -84,8 +109,12 @@ public class MarketplaceListingController {
     @GetMapping("/{listingId}")
     @Operation(summary = "Get a marketplace listing")
     public ResponseEntity<MarketplaceListingDetailResponse> getListing(
-            @PathVariable UUID listingId) {
-        return ResponseEntity.ok(listingService.getListing(listingId));
+            @PathVariable UUID listingId,
+            @AuthenticationPrincipal CampusOneUserPrincipal principal) {
+        UUID viewerUserId = principal == null ? null : principal.getUserId();
+        return ResponseEntity.ok(listingService.getListing(
+                listingId,
+                viewerUserId));
     }
 
     @PatchMapping("/{listingId}")
@@ -98,6 +127,23 @@ public class MarketplaceListingController {
                 principal.getUserId(),
                 listingId,
                 request));
+    }
+
+    @PatchMapping(
+            path = "/{listingId}/upload",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Update an owned marketplace listing and replace images")
+    public ResponseEntity<MarketplaceListingDetailResponse> updateListingWithImages(
+            @PathVariable UUID listingId,
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @Valid @RequestPart("listing") UpdateMarketplaceListingRequest request,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        return ResponseEntity.ok(listingService.updateListingWithUploadedImages(
+                principal.getUserId(),
+                listingId,
+                request,
+                images));
     }
 
     @DeleteMapping("/{listingId}")
