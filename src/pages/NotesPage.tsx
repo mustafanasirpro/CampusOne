@@ -30,16 +30,14 @@ import { useDocumentTitle } from "@/utils/useDocumentTitle";
 type NotesView = "library" | "mine";
 
 const pageSize = 12;
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function NotesPage() {
   const [view, setView] = useState<NotesView>("library");
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<NoteSort>("NEWEST");
-  const [courseId, setCourseId] = useState("");
+  const [course, setCourse] = useState("");
   const [tag, setTag] = useState("");
-  const [appliedCourseId, setAppliedCourseId] = useState("");
+  const [appliedCourse, setAppliedCourse] = useState("");
   const [appliedTag, setAppliedTag] = useState("");
   const [result, setResult] = useState<NotePage | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +78,7 @@ export function NotesPage() {
             sort,
           })
         : listNotes({
-            courseId: appliedCourseId || undefined,
+            course: appliedCourse || undefined,
             page,
             signal: controller.signal,
             size: pageSize,
@@ -109,7 +107,7 @@ export function NotesPage() {
       active = false;
       controller.abort();
     };
-  }, [appliedCourseId, appliedTag, page, refreshKey, sort, view]);
+  }, [appliedCourse, appliedTag, page, refreshKey, sort, view]);
 
   const changeView = (nextView: NotesView) => {
     setIsLoading(true);
@@ -120,10 +118,10 @@ export function NotesPage() {
   };
 
   const applyFilters = () => {
-    const normalizedCourseId = courseId.trim();
+    const normalizedCourse = course.trim();
     const normalizedTag = tag.trim();
-    if (normalizedCourseId && !uuidPattern.test(normalizedCourseId)) {
-      setError("Course ID must be a valid UUID.");
+    if (normalizedCourse && normalizedCourse.length < 2) {
+      setError("Course filter must contain at least 2 characters.");
       setIsLoading(false);
       return;
     }
@@ -135,7 +133,7 @@ export function NotesPage() {
 
     setIsLoading(true);
     setError(null);
-    setAppliedCourseId(normalizedCourseId);
+    setAppliedCourse(normalizedCourse);
     setAppliedTag(normalizedTag);
     setPage(0);
     setRefreshKey((current) => current + 1);
@@ -144,9 +142,9 @@ export function NotesPage() {
   const clearFilters = () => {
     setIsLoading(true);
     setError(null);
-    setCourseId("");
+    setCourse("");
     setTag("");
-    setAppliedCourseId("");
+    setAppliedCourse("");
     setAppliedTag("");
     setPage(0);
     setRefreshKey((current) => current + 1);
@@ -203,11 +201,11 @@ export function NotesPage() {
       />
 
       <NotesFilterBar
-        courseId={courseId}
+        course={course}
         disabled={view === "mine"}
         onApply={applyFilters}
         onClear={clearFilters}
-        onCourseIdChange={setCourseId}
+        onCourseChange={setCourse}
         onSortChange={(value) => {
           setIsLoading(true);
           setError(null);
@@ -248,7 +246,7 @@ export function NotesPage() {
         <EmptyState
           action={
             view === "library" &&
-            (appliedCourseId || appliedTag) ? (
+            (appliedCourse || appliedTag) ? (
               <Button onClick={clearFilters} variant="outline">
                 Clear filters
               </Button>
