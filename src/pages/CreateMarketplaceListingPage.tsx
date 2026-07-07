@@ -23,12 +23,13 @@ export function CreateMarketplaceListingPage() {
 
   const handleSubmit = async (
     request: CreateMarketplaceListingRequest,
+    imageFiles: File[],
   ) => {
     setIsSubmitting(true);
     setError(null);
     setFieldErrors({});
     try {
-      const listing = await createListing(request);
+      const listing = await createListing(request, imageFiles);
       showToast({
         title: "Listing published",
         message: "Your item is now visible in the campus marketplace.",
@@ -58,7 +59,7 @@ export function CreateMarketplaceListingPage() {
       </Link>
 
       <PageHeader
-        description="Publish an item with clear details, price, condition, and optional image links."
+        description="Publish an item with clear details, price, condition, and optional uploaded images."
         eyebrow="Marketplace"
         title="Create a listing"
       />
