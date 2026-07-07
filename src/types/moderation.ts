@@ -32,6 +32,8 @@ export type ModerationActionType =
   | "REPORT_REVIEWED"
   | "REPORT_RESOLVED"
   | "REPORT_DISMISSED"
+  | "CONTENT_APPROVED"
+  | "CONTENT_REJECTED"
   | "CONTENT_WARNING"
   | "CONTENT_HIDDEN"
   | "CONTENT_RESTORED"
@@ -50,12 +52,12 @@ export interface ModeratorStatus {
 }
 
 export interface ReporterSummary {
-  fullName: string;
+  fullName: string | null;
   userId: string;
 }
 
 export interface ModeratorSummary {
-  fullName: string;
+  fullName: string | null;
   userId: string;
 }
 
@@ -107,6 +109,35 @@ export interface ModerationActionPage {
   size: number;
   totalElements: number;
   totalPages: number;
+}
+
+export interface PendingApprovalItem {
+  description: string;
+  detailUrl: string | null;
+  id: string;
+  previewUrl: string | null;
+  status: string;
+  submittedAt: string;
+  submittedBy: ReporterSummary;
+  targetType: ModerationTargetType;
+  title: string;
+}
+
+export interface PendingApprovalPage {
+  content: PendingApprovalItem[];
+  first: boolean;
+  last: boolean;
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface PendingApprovalListParameters {
+  page?: number;
+  signal?: AbortSignal;
+  size?: number;
+  targetType?: ModerationTargetType;
 }
 
 export interface CreateReportRequest {
