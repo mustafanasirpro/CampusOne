@@ -29,6 +29,8 @@ export function discussionStatusLabel(status: DiscussionQuestionStatus) {
     CLOSED: "Closed",
     HIDDEN: "Hidden",
     OPEN: "Open",
+    PENDING_REVIEW: "Pending review",
+    REJECTED: "Rejected",
     RESOLVED: "Resolved",
   }[status];
 }
