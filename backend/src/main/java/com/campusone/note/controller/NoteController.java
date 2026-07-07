@@ -107,12 +107,20 @@ public class NoteController {
     @Operation(summary = "List approved public notes")
     public ResponseEntity<NotePageResponse> listPublicNotes(
             @RequestParam(required = false) UUID courseId,
+            @RequestParam(required = false) @Size(min = 2, max = 100) String course,
+            @RequestParam(required = false) @Size(min = 2, max = 30) String courseCode,
             @RequestParam(required = false) @Size(min = 2, max = 40) String tag,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
             @RequestParam(defaultValue = "NEWEST") NoteSort sort) {
         return ResponseEntity.ok(
-                noteService.listPublicNotes(courseId, tag, page, size, sort));
+                noteService.listPublicNotes(
+                        courseId,
+                        firstNonBlank(course, courseCode),
+                        tag,
+                        page,
+                        size,
+                        sort));
     }
 
     @GetMapping("/my")
@@ -243,5 +251,15 @@ public class NoteController {
         adminAuthorizationService.requireAdmin(
                 principal.getUserId(),
                 principal.getUsername());
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
     }
 }
