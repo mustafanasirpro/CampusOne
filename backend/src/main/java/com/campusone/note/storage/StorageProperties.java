@@ -11,6 +11,8 @@ public class StorageProperties {
     private int adminMaxUploadsPerDay = 200;
     private int adminMaxStorageMbPerMonth = 5000;
     private int globalUploadStorageCapMb = 8192;
+    private int marketplaceMaxImagesPerListing = 5;
+    private int marketplaceMaxImageSizeMb = 5;
     private Duration downloadUrlTtl = Duration.ofMinutes(10);
     private final R2 r2 = new R2();
 
@@ -58,6 +60,27 @@ public class StorageProperties {
     public void setGlobalUploadStorageCapMb(int globalUploadStorageCapMb) {
         this.globalUploadStorageCapMb =
                 globalUploadStorageCapMb > 0 ? globalUploadStorageCapMb : 8192;
+    }
+
+    public int getMarketplaceMaxImagesPerListing() {
+        return marketplaceMaxImagesPerListing;
+    }
+
+    public void setMarketplaceMaxImagesPerListing(
+            int marketplaceMaxImagesPerListing) {
+        this.marketplaceMaxImagesPerListing =
+                marketplaceMaxImagesPerListing > 0
+                        ? marketplaceMaxImagesPerListing
+                        : 5;
+    }
+
+    public int getMarketplaceMaxImageSizeMb() {
+        return marketplaceMaxImageSizeMb;
+    }
+
+    public void setMarketplaceMaxImageSizeMb(int marketplaceMaxImageSizeMb) {
+        this.marketplaceMaxImageSizeMb =
+                marketplaceMaxImageSizeMb > 0 ? marketplaceMaxImageSizeMb : 5;
     }
 
     public Duration getDownloadUrlTtl() {
