@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +20,8 @@ import com.campusone.marketplace.entity.MarketplaceListing;
 import com.campusone.marketplace.entity.MarketplaceListingStatus;
 import com.campusone.marketplace.mapper.MarketplaceListingMapper;
 import com.campusone.marketplace.repository.MarketplaceListingRepository;
+import com.campusone.note.service.NoteAdminAuthorizationService;
+import com.campusone.note.storage.StorageService;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.math.BigDecimal;
@@ -58,6 +61,15 @@ class MarketplaceListingServiceTest {
     @Mock
     private CommunityIntegrationService integrationService;
 
+    @Mock
+    private MarketplaceImageValidator imageValidator;
+
+    @Mock
+    private StorageService storageService;
+
+    @Mock
+    private NoteAdminAuthorizationService adminAuthorizationService;
+
     private MarketplaceListingService listingService;
     private User owner;
     private MarketplaceListing listing;
@@ -69,9 +81,16 @@ class MarketplaceListingServiceTest {
         listingService = new MarketplaceListingService(
                 listingRepository,
                 userRepository,
-                new MarketplaceListingMapper(),
+                new MarketplaceListingMapper(storageService),
                 integrationService,
+                imageValidator,
+                storageService,
+                adminAuthorizationService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
+        lenient().when(adminAuthorizationService.canManage(
+                        any(UUID.class),
+                        any()))
+                .thenReturn(true);
     }
 
     @Test
