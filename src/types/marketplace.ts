@@ -14,7 +14,12 @@ export type MarketplaceItemCondition =
   | "USED"
   | "FAIR";
 
-export type MarketplaceListingStatus = "ACTIVE" | "SOLD" | "DELETED";
+export type MarketplaceListingStatus =
+  | "PENDING_REVIEW"
+  | "ACTIVE"
+  | "SOLD"
+  | "REJECTED"
+  | "DELETED";
 export type MarketplaceListingUpdateStatus = "ACTIVE" | "SOLD";
 
 export interface MarketplaceImage {
@@ -22,6 +27,9 @@ export interface MarketplaceImage {
   displayOrder: number;
   id: string;
   imageUrl: string;
+  mimeType?: string | null;
+  originalFilename?: string | null;
+  sizeBytes?: number | null;
 }
 
 export interface MarketplaceSeller {
@@ -71,7 +79,7 @@ export interface CreateMarketplaceListingRequest {
   condition: MarketplaceItemCondition;
   currency: string;
   description: string;
-  images: MarketplaceImageRequest[];
+  images?: MarketplaceImageRequest[];
   price: number;
   title: string;
 }
