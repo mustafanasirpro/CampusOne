@@ -53,6 +53,8 @@ export const moderationActionOptions: Array<{
   { label: "Report reviewed", value: "REPORT_REVIEWED" },
   { label: "Report resolved", value: "REPORT_RESOLVED" },
   { label: "Report dismissed", value: "REPORT_DISMISSED" },
+  { label: "Content approved", value: "CONTENT_APPROVED" },
+  { label: "Content rejected", value: "CONTENT_REJECTED" },
   { label: "Content warning", value: "CONTENT_WARNING" },
   { label: "Content hidden", value: "CONTENT_HIDDEN" },
   { label: "Content restored", value: "CONTENT_RESTORED" },
