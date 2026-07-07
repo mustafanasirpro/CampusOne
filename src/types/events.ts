@@ -1,5 +1,10 @@
 export type EventVisibility = "PUBLIC" | "PRIVATE";
-export type EventStatus = "UPCOMING" | "CANCELLED" | "COMPLETED";
+export type EventStatus =
+  | "PENDING_REVIEW"
+  | "UPCOMING"
+  | "CANCELLED"
+  | "COMPLETED"
+  | "REJECTED";
 export type EventSort = "NEWEST" | "OLDEST" | "UPCOMING";
 
 export interface EventOrganizer {
@@ -76,4 +81,3 @@ export interface EventListParameters {
   sort?: EventSort;
   status?: EventStatus;
 }
-
