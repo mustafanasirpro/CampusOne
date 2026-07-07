@@ -19,6 +19,7 @@ import com.campusone.internship.exception.InternshipConflictException;
 import com.campusone.internship.mapper.InternshipMapper;
 import com.campusone.internship.repository.InternshipRepository;
 import com.campusone.internship.repository.SavedInternshipRepository;
+import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.time.Clock;
@@ -43,6 +44,7 @@ public class InternshipService {
     private final InternshipMapper internshipMapper;
     private final CommunityIntegrationService integrationService;
     private final Clock clock;
+    private final NoteAdminAuthorizationService adminAuthorizationService;
 
     public InternshipService(
             InternshipRepository internshipRepository,
@@ -50,13 +52,15 @@ public class InternshipService {
             UserRepository userRepository,
             InternshipMapper internshipMapper,
             CommunityIntegrationService integrationService,
-            Clock clock) {
+            Clock clock,
+            NoteAdminAuthorizationService adminAuthorizationService) {
         this.internshipRepository = internshipRepository;
         this.savedRepository = savedRepository;
         this.userRepository = userRepository;
         this.internshipMapper = internshipMapper;
         this.integrationService = integrationService;
         this.clock = clock;
+        this.adminAuthorizationService = adminAuthorizationService;
     }
 
     @Transactional
@@ -65,7 +69,7 @@ public class InternshipService {
             CreateInternshipRequest request) {
         validateFutureDeadline(request.deadline());
         User poster = requireUser(userId);
-        Internship internship = internshipRepository.save(new Internship(
+        Internship internship = new Internship(
                 poster,
                 request.title(),
                 request.companyName(),
@@ -77,7 +81,13 @@ public class InternshipService {
                 request.stipendAmount(),
                 request.currency(),
                 request.applyUrl(),
-                request.deadline()));
+                request.deadline());
+        if (!adminAuthorizationService.canManage(
+                poster.getId(),
+                poster.getEmail())) {
+            internship.submitForReview();
+        }
+        internship = internshipRepository.save(internship);
         integrationService.internshipCreated(userId, internship.getId());
         return internshipMapper.toDetail(internship, false, true);
     }
@@ -95,6 +105,9 @@ public class InternshipService {
             InternshipSort sort) {
         Page<Internship> internships =
                 internshipRepository.findVisibleInternships(
+                        Set.of(
+                                InternshipStatus.PENDING_REVIEW,
+                                InternshipStatus.REJECTED),
                         status,
                         internshipType,
                         workMode,
@@ -109,6 +122,7 @@ public class InternshipService {
             UUID internshipId,
             UUID viewerUserId) {
         Internship internship = requireInternship(internshipId);
+        requireViewable(internship, viewerUserId);
         return toDetail(internship, viewerUserId);
     }
 
@@ -157,6 +171,11 @@ public class InternshipService {
                 request.applyUrl(),
                 request.deadline(),
                 request.status());
+        if (!adminAuthorizationService.canManage(
+                internship.getPoster().getId(),
+                internship.getPoster().getEmail())) {
+            internship.submitForReview();
+        }
         return toDetail(internship, userId);
     }
 
@@ -172,6 +191,7 @@ public class InternshipService {
             UUID userId,
             UUID internshipId) {
         Internship internship = requireInternshipForUpdate(internshipId);
+        requireViewable(internship, userId);
         SavedInternshipId savedId =
                 new SavedInternshipId(internshipId, userId);
         if (savedRepository.existsById(savedId)) {
@@ -206,6 +226,9 @@ public class InternshipService {
         Page<Internship> internships =
                 internshipRepository.findSavedByUser(
                         userId,
+                        Set.of(
+                                InternshipStatus.PENDING_REVIEW,
+                                InternshipStatus.REJECTED),
                         PageRequest.of(page, size, sort.toSort()));
         return toPage(internships, userId);
     }
@@ -214,7 +237,8 @@ public class InternshipService {
     public SavedInternshipResponse getSavedState(
             UUID userId,
             UUID internshipId) {
-        requireInternship(internshipId);
+        Internship internship = requireInternship(internshipId);
+        requireViewable(internship, userId);
         SavedInternshipId savedId =
                 new SavedInternshipId(internshipId, userId);
         return savedRepository.findById(savedId)
@@ -319,6 +343,26 @@ public class InternshipService {
             throw new AccessDeniedException(
                     "Only the internship poster may modify this internship.");
         }
+    }
+
+    private void requireViewable(Internship internship, UUID viewerUserId) {
+        boolean owner = viewerUserId != null && internship.isOwnedBy(viewerUserId);
+        if (owner || (internship.getStatus() != InternshipStatus.PENDING_REVIEW
+                && internship.getStatus() != InternshipStatus.REJECTED)) {
+            return;
+        }
+        if (viewerUserId != null && isAdmin(viewerUserId)) {
+            return;
+        }
+        throw new ResourceNotFoundException("Internship");
+    }
+
+    private boolean isAdmin(UUID userId) {
+        return userRepository.findById(userId)
+                .map(user -> adminAuthorizationService.canManage(
+                        user.getId(),
+                        user.getEmail()))
+                .orElse(false);
     }
 
     private InternshipConflictException conflict(
