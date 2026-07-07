@@ -1,17 +1,21 @@
 package com.campusone.moderation.controller;
 
 import com.campusone.moderation.dto.request.DismissReportRequest;
+import com.campusone.moderation.dto.request.RejectContentRequest;
 import com.campusone.moderation.dto.request.ResolveReportRequest;
 import com.campusone.moderation.dto.response.ContentReportDetailResponse;
 import com.campusone.moderation.dto.response.ContentReportPageResponse;
 import com.campusone.moderation.dto.response.ModerationActionPageResponse;
 import com.campusone.moderation.dto.response.ModerationActionResponse;
 import com.campusone.moderation.dto.response.ModeratorStatusResponse;
+import com.campusone.moderation.dto.response.PendingApprovalItemResponse;
+import com.campusone.moderation.dto.response.PendingApprovalPageResponse;
 import com.campusone.moderation.entity.ModerationActionType;
 import com.campusone.moderation.entity.ModerationSort;
 import com.campusone.moderation.entity.ModerationTargetType;
 import com.campusone.moderation.entity.ReportReason;
 import com.campusone.moderation.entity.ReportStatus;
+import com.campusone.moderation.service.ContentApprovalService;
 import com.campusone.moderation.service.ModerationAdminService;
 import com.campusone.moderation.service.ModeratorAuthorizationService;
 import com.campusone.security.CampusOneUserPrincipal;
@@ -42,12 +46,15 @@ public class ModerationAdminController {
 
     private final ModerationAdminService adminService;
     private final ModeratorAuthorizationService authorizationService;
+    private final ContentApprovalService contentApprovalService;
 
     public ModerationAdminController(
             ModerationAdminService adminService,
-            ModeratorAuthorizationService authorizationService) {
+            ModeratorAuthorizationService authorizationService,
+            ContentApprovalService contentApprovalService) {
         this.adminService = adminService;
         this.authorizationService = authorizationService;
+        this.contentApprovalService = contentApprovalService;
     }
 
     @GetMapping("/me")
@@ -56,6 +63,48 @@ public class ModerationAdminController {
             @AuthenticationPrincipal CampusOneUserPrincipal principal) {
         return ResponseEntity.ok(authorizationService.getStatus(
                 principal.getUserId()));
+    }
+
+    @GetMapping("/pending")
+    @Operation(summary = "List user-submitted content pending approval")
+    public ResponseEntity<PendingApprovalPageResponse> listPendingApprovals(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @RequestParam(required = false)
+            ModerationTargetType targetType,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(50)
+            int size) {
+        return ResponseEntity.ok(contentApprovalService.listPending(
+                principal.getUserId(),
+                targetType,
+                page,
+                size));
+    }
+
+    @PatchMapping("/{targetType}/{targetId}/approve")
+    @Operation(summary = "Approve pending user-submitted content")
+    public ResponseEntity<PendingApprovalItemResponse> approveContent(
+            @PathVariable ModerationTargetType targetType,
+            @PathVariable UUID targetId,
+            @AuthenticationPrincipal CampusOneUserPrincipal principal) {
+        return ResponseEntity.ok(contentApprovalService.approve(
+                principal.getUserId(),
+                targetType,
+                targetId));
+    }
+
+    @PatchMapping("/{targetType}/{targetId}/reject")
+    @Operation(summary = "Reject pending user-submitted content")
+    public ResponseEntity<PendingApprovalItemResponse> rejectContent(
+            @PathVariable ModerationTargetType targetType,
+            @PathVariable UUID targetId,
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @Valid @RequestBody RejectContentRequest request) {
+        return ResponseEntity.ok(contentApprovalService.reject(
+                principal.getUserId(),
+                targetType,
+                targetId,
+                request.reason()));
     }
 
     @GetMapping("/reports")
