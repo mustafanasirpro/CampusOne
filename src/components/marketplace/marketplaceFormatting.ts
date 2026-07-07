@@ -47,6 +47,8 @@ export function statusLabel(status: MarketplaceListingStatus) {
   return {
     ACTIVE: "Active",
     DELETED: "Deleted",
+    PENDING_REVIEW: "Pending review",
+    REJECTED: "Rejected",
     SOLD: "Sold",
   }[status];
 }
