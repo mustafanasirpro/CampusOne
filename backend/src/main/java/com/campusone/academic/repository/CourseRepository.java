@@ -13,4 +13,10 @@ public interface CourseRepository extends JpaRepository<Course, UUID> {
     Optional<Course> findByDepartmentIdAndCourseCodeIgnoreCase(
             UUID departmentId,
             String courseCode);
+
+    Optional<Course> findFirstByCourseCodeIgnoreCaseAndActiveTrueOrderByCourseCodeAsc(
+            String courseCode);
+
+    Optional<Course> findFirstByTitleIgnoreCaseAndActiveTrueOrderByCourseCodeAsc(
+            String title);
 }
