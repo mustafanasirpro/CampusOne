@@ -5,6 +5,8 @@ export function eventStatusLabel(status: EventStatus) {
   return {
     CANCELLED: "Cancelled",
     COMPLETED: "Completed",
+    PENDING_REVIEW: "Pending review",
+    REJECTED: "Rejected",
     UPCOMING: "Upcoming",
   }[status];
 }
