@@ -26,12 +26,14 @@ import com.campusone.discussion.repository.DiscussionAnswerRepository;
 import com.campusone.discussion.repository.DiscussionAnswerVoteRepository;
 import com.campusone.discussion.repository.DiscussionQuestionRepository;
 import com.campusone.discussion.repository.DiscussionQuestionVoteRepository;
+import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -52,6 +54,7 @@ public class DiscussionService {
     private final UserRepository userRepository;
     private final DiscussionMapper discussionMapper;
     private final CommunityIntegrationService integrationService;
+    private final NoteAdminAuthorizationService adminAuthorizationService;
 
     public DiscussionService(
             DiscussionQuestionRepository questionRepository,
@@ -60,7 +63,8 @@ public class DiscussionService {
             DiscussionAnswerVoteRepository answerVoteRepository,
             UserRepository userRepository,
             DiscussionMapper discussionMapper,
-            CommunityIntegrationService integrationService) {
+            CommunityIntegrationService integrationService,
+            NoteAdminAuthorizationService adminAuthorizationService) {
         this.questionRepository = questionRepository;
         this.answerRepository = answerRepository;
         this.questionVoteRepository = questionVoteRepository;
@@ -68,6 +72,7 @@ public class DiscussionService {
         this.userRepository = userRepository;
         this.discussionMapper = discussionMapper;
         this.integrationService = integrationService;
+        this.adminAuthorizationService = adminAuthorizationService;
     }
 
     @Transactional
@@ -75,12 +80,17 @@ public class DiscussionService {
             UUID userId,
             CreateQuestionRequest request) {
         User author = requireUser(userId);
-        DiscussionQuestion question = questionRepository.save(
-                new DiscussionQuestion(
-                        author,
-                        request.title(),
-                        request.body(),
-                        request.category()));
+        DiscussionQuestion question = new DiscussionQuestion(
+                author,
+                request.title(),
+                request.body(),
+                request.category());
+        if (!adminAuthorizationService.canManage(
+                author.getId(),
+                author.getEmail())) {
+            question.submitForReview();
+        }
+        question = questionRepository.save(question);
         integrationService.discussionQuestionCreated(userId, question.getId());
         return discussionMapper.toQuestionDetail(
                 question,
@@ -98,7 +108,10 @@ public class DiscussionService {
             QuestionSort sort) {
         Page<DiscussionQuestion> questions =
                 questionRepository.findVisibleQuestions(
-                        DiscussionQuestionStatus.HIDDEN,
+                        Set.of(
+                                DiscussionQuestionStatus.HIDDEN,
+                                DiscussionQuestionStatus.PENDING_REVIEW,
+                                DiscussionQuestionStatus.REJECTED),
                         category,
                         toSearchPattern(search),
                         PageRequest.of(page, size, sort.toSort()));
@@ -150,6 +163,11 @@ public class DiscussionService {
                 request.status() == null
                         ? null
                         : request.status().toQuestionStatus());
+        if (!adminAuthorizationService.canManage(
+                question.getAuthor().getId(),
+                question.getAuthor().getEmail())) {
+            question.submitForReview();
+        }
         return toQuestionDetail(question, userId);
     }
 
@@ -529,11 +547,24 @@ public class DiscussionService {
     private void requireViewable(
             DiscussionQuestion question,
             UUID viewerUserId) {
-        if (question.getStatus() == DiscussionQuestionStatus.HIDDEN
-                && (viewerUserId == null
-                        || !question.isOwnedBy(viewerUserId))) {
-            throw new ResourceNotFoundException("Discussion question");
+        boolean owner = viewerUserId != null && question.isOwnedBy(viewerUserId);
+        if (owner || (question.getStatus() != DiscussionQuestionStatus.HIDDEN
+                && question.getStatus() != DiscussionQuestionStatus.PENDING_REVIEW
+                && question.getStatus() != DiscussionQuestionStatus.REJECTED)) {
+            return;
         }
+        if (viewerUserId != null && isAdmin(viewerUserId)) {
+            return;
+        }
+        throw new ResourceNotFoundException("Discussion question");
+    }
+
+    private boolean isAdmin(UUID userId) {
+        return userRepository.findById(userId)
+                .map(user -> adminAuthorizationService.canManage(
+                        user.getId(),
+                        user.getEmail()))
+                .orElse(false);
     }
 
     private void requireOwner(
