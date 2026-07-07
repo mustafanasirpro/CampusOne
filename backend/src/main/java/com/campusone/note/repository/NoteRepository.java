@@ -32,6 +32,11 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
               and note.visibility = :visibility
               and (:courseId is null or note.course.id = :courseId)
               and (
+                    :courseQuery is null
+                    or lower(note.course.courseCode) like :courseQuery escape '\\'
+                    or lower(note.course.title) like :courseQuery escape '\\'
+              )
+              and (
                     :normalizedTag is null
                     or exists (
                         select tag.id
@@ -44,8 +49,24 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
             @Param("status") NoteModerationStatus status,
             @Param("visibility") NoteVisibility visibility,
             @Param("courseId") UUID courseId,
+            @Param("courseQuery") String courseQuery,
             @Param("normalizedTag") String normalizedTag,
             Pageable pageable);
+
+    default Page<Note> findPublicNotes(
+            NoteModerationStatus status,
+            NoteVisibility visibility,
+            UUID courseId,
+            String normalizedTag,
+            Pageable pageable) {
+        return findPublicNotes(
+                status,
+                visibility,
+                courseId,
+                null,
+                normalizedTag,
+                pageable);
+    }
 
     @EntityGraph(attributePaths = {
         "uploader",
