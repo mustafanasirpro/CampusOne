@@ -30,7 +30,8 @@ type FormErrors = Partial<
 >;
 
 interface NoteFormState {
-  courseId: string;
+  courseCode: string;
+  courseName: string;
   description: string;
   fileType: NoteFileType;
   semester: string;
@@ -62,8 +63,7 @@ type NoteFormProps =
 
 const MAX_PDF_SIZE_MB = 25;
 const MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024;
-const uuidPattern =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const courseCodePattern = /^[A-Za-z0-9][A-Za-z0-9._ -]{1,29}$/;
 
 const fileTypeOptions = [
   "PDF",
@@ -88,7 +88,8 @@ const semesterOptions = Array.from({ length: 8 }, (_, index) => ({
 
 function initialState(initialNote?: NoteDetail): NoteFormState {
   return {
-    courseId: initialNote?.course.id ?? "",
+    courseCode: initialNote?.course.courseCode ?? "",
+    courseName: initialNote?.course.title ?? "",
     description: initialNote?.description ?? "",
     fileType: initialNote?.fileType ?? "PDF",
     semester: String(initialNote?.semester ?? 1),
@@ -220,8 +221,11 @@ export function NoteForm(props: NoteFormProps) {
     const nextErrors: FormErrors = {};
     const tags = normalizedTags(form.tags);
 
-    if (!uuidPattern.test(form.courseId.trim())) {
-      nextErrors.courseId = "Enter a valid course UUID.";
+    if (!courseCodePattern.test(form.courseCode.trim())) {
+      nextErrors.courseCode = "Use a normal course code like CSC275.";
+    }
+    if (form.courseName.trim() && form.courseName.trim().length < 2) {
+      nextErrors.courseName = "Course name must contain at least 2 characters.";
     }
     if (form.title.trim().length < 5) {
       nextErrors.title = "Title must contain at least 5 characters.";
@@ -253,7 +257,8 @@ export function NoteForm(props: NoteFormProps) {
     if (!validate()) return;
 
     const commonRequest = {
-      courseId: form.courseId.trim(),
+      courseCode: form.courseCode.trim().toUpperCase(),
+      courseName: form.courseName.trim() || undefined,
       description: form.description.trim(),
       fileType: props.mode === "create" ? ("PDF" as const) : form.fileType,
       semester: Number(form.semester),
@@ -271,8 +276,11 @@ export function NoteForm(props: NoteFormProps) {
 
     const initialTags = props.initialNote.tags.map((tag) => tag.name);
     const updateRequest: UpdateNoteRequest = {};
-    if (commonRequest.courseId !== props.initialNote.course.id) {
-      updateRequest.courseId = commonRequest.courseId;
+    if (commonRequest.courseCode !== props.initialNote.course.courseCode) {
+      updateRequest.courseCode = commonRequest.courseCode;
+    }
+    if ((commonRequest.courseName ?? "") !== props.initialNote.course.title) {
+      updateRequest.courseName = commonRequest.courseName;
     }
     if (commonRequest.title !== props.initialNote.title) {
       updateRequest.title = commonRequest.title;
@@ -331,14 +339,26 @@ export function NoteForm(props: NoteFormProps) {
 
           <div className="grid gap-5 md:grid-cols-2">
             <FormField
-              error={errors.courseId ?? backendError("courseId")}
-              hint="Use the course ID supplied by your CampusOne course directory."
-              label="Course ID"
-              onChange={(event) => update("courseId", event.target.value)}
-              placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+              error={errors.courseCode ?? backendError("courseCode")}
+              hint="Use a normal course code like CSC275, OOP, or DBMS."
+              label="Course code"
+              onChange={(event) => update("courseCode", event.target.value)}
+              placeholder="e.g. CSC275"
               required
-              value={form.courseId}
+              value={form.courseCode}
             />
+            <FormField
+              error={errors.courseName ?? backendError("courseName")}
+              hint="Optional; helps students recognize the course."
+              label="Course name"
+              maxLength={160}
+              onChange={(event) => update("courseName", event.target.value)}
+              placeholder="e.g. Computer Networking"
+              value={form.courseName}
+            />
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
             <FormField
               error={errors.teacherName ?? backendError("teacherName")}
               label="Teacher name"
