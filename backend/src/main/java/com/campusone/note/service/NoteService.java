@@ -2,6 +2,7 @@ package com.campusone.note.service;
 
 import com.campusone.academic.entity.Course;
 import com.campusone.academic.repository.CourseRepository;
+import com.campusone.academic.repository.DepartmentRepository;
 import com.campusone.common.exception.InvalidNoteStateException;
 import com.campusone.common.exception.ResourceNotFoundException;
 import com.campusone.common.service.CommunityIntegrationService;
@@ -75,10 +76,12 @@ public class NoteService {
     private final NoteDownloadEventRepository noteDownloadEventRepository;
     private final NoteModerationActionRepository noteModerationActionRepository;
     private final CourseRepository courseRepository;
+    private final DepartmentRepository departmentRepository;
     private final UserRepository userRepository;
     private final NoteMapper noteMapper;
     private final CommunityIntegrationService integrationService;
     private final StorageService storageService;
+    private final NoteAdminAuthorizationService adminAuthorizationService;
     private final Clock clock;
 
     public NoteService(
@@ -91,10 +94,12 @@ public class NoteService {
             NoteDownloadEventRepository noteDownloadEventRepository,
             NoteModerationActionRepository noteModerationActionRepository,
             CourseRepository courseRepository,
+            DepartmentRepository departmentRepository,
             UserRepository userRepository,
             NoteMapper noteMapper,
             CommunityIntegrationService integrationService,
             StorageService storageService,
+            NoteAdminAuthorizationService adminAuthorizationService,
             Clock clock) {
         this.noteRepository = noteRepository;
         this.fileAssetRepository = fileAssetRepository;
@@ -105,10 +110,12 @@ public class NoteService {
         this.noteDownloadEventRepository = noteDownloadEventRepository;
         this.noteModerationActionRepository = noteModerationActionRepository;
         this.courseRepository = courseRepository;
+        this.departmentRepository = departmentRepository;
         this.userRepository = userRepository;
         this.noteMapper = noteMapper;
         this.integrationService = integrationService;
         this.storageService = storageService;
+        this.adminAuthorizationService = adminAuthorizationService;
         this.clock = clock;
     }
 
@@ -117,7 +124,11 @@ public class NoteService {
             UUID userId,
             CreateNoteRequest request) {
         User uploader = requireUser(userId);
-        Course course = requireActiveCourse(request.courseId());
+        Course course = resolveCourse(
+                request.courseId(),
+                request.courseCode(),
+                request.courseName(),
+                request.semester());
         validateFileExpiry(request.file());
 
         FileAsset fileAsset = fileAssetRepository.save(toFileAsset(
@@ -143,7 +154,11 @@ public class NoteService {
             CreateUploadedNoteRequest request,
             StoredObject storedObject) {
         User uploader = requireUser(userId);
-        Course course = requireActiveCourse(request.courseId());
+        Course course = resolveCourse(
+                request.courseId(),
+                request.courseCode(),
+                request.courseName(),
+                request.semester());
         FileAsset fileAsset = fileAssetRepository.save(FileAsset.uploaded(
                 uploader,
                 storedObject.storageProvider(),
@@ -231,8 +246,14 @@ public class NoteService {
 
         boolean hasChanges = hasChanges(request);
         Course course = request.courseId() == null
+                && (request.courseCode() == null || request.courseCode().isBlank())
+                && (request.courseName() == null || request.courseName().isBlank())
                 ? null
-                : requireActiveCourse(request.courseId());
+                : resolveCourse(
+                        request.courseId(),
+                        request.courseCode(),
+                        request.courseName(),
+                        request.semester());
         note.updateMetadata(
                 course,
                 request.title(),
@@ -291,13 +312,26 @@ public class NoteService {
             int page,
             int size,
             NoteSort sort) {
+        return listPublicNotes(courseId, null, tag, page, size, sort);
+    }
+
+    @Transactional(readOnly = true)
+    public NotePageResponse listPublicNotes(
+            UUID courseId,
+            String courseQuery,
+            String tag,
+            int page,
+            int size,
+            NoteSort sort) {
         String normalizedTag = tag == null || tag.isBlank()
                 ? null
                 : Tag.normalize(tag);
+        String normalizedCourseQuery = toSearchPattern(courseQuery);
         Page<Note> notes = noteRepository.findPublicNotes(
                 NoteModerationStatus.APPROVED,
                 NoteVisibility.PUBLIC,
                 courseId,
+                normalizedCourseQuery,
                 normalizedTag,
                 PageRequest.of(page, size, sort(sort)));
         return toPageResponse(notes);
@@ -472,6 +506,8 @@ public class NoteService {
 
     private boolean hasChanges(UpdateNoteRequest request) {
         return request.courseId() != null
+                || request.courseCode() != null
+                || request.courseName() != null
                 || request.title() != null
                 || request.description() != null
                 || request.teacherName() != null
@@ -491,6 +527,78 @@ public class NoteService {
     private User requireUser(UUID userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User"));
+    }
+
+    private Course resolveCourse(
+            UUID courseId,
+            String courseCode,
+            String courseName,
+            Integer recommendedSemester) {
+        if (courseId != null) {
+            return requireActiveCourse(courseId);
+        }
+        String normalizedCode = normalizeCourseCode(courseCode);
+        if (normalizedCode == null) {
+            throw new InvalidNoteStateException("Course code is required.");
+        }
+        String normalizedName = normalizeCourseName(courseName);
+        return courseRepository
+                .findFirstByCourseCodeIgnoreCaseAndActiveTrueOrderByCourseCodeAsc(
+                        normalizedCode)
+                .or(() -> normalizedName == null
+                        ? java.util.Optional.empty()
+                        : courseRepository
+                                .findFirstByTitleIgnoreCaseAndActiveTrueOrderByCourseCodeAsc(
+                                        normalizedName))
+                .orElseGet(() -> createLightweightCourse(
+                        normalizedCode,
+                        normalizedName,
+                        recommendedSemester));
+    }
+
+    private Course createLightweightCourse(
+            String courseCode,
+            String courseName,
+            Integer recommendedSemester) {
+        var department = departmentRepository
+                .findFirstByActiveTrueOrderByNameAsc()
+                .orElseThrow(() -> new ResourceNotFoundException("Department"));
+        Course course = new Course(
+                department,
+                courseCode,
+                courseName == null ? courseCode : courseName);
+        if (recommendedSemester != null) {
+            course.setRecommendedSemester(recommendedSemester);
+        }
+        return courseRepository.save(course);
+    }
+
+    private String normalizeCourseCode(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim()
+                .replaceAll("\\s+", " ")
+                .toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private String normalizeCourseName(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim().replaceAll("\\s+", " ");
+    }
+
+    private String toSearchPattern(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String escaped = value.trim()
+                .toLowerCase(java.util.Locale.ROOT)
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return "%" + escaped + "%";
     }
 
     private Course requireActiveCourse(UUID courseId) {
@@ -516,9 +624,21 @@ public class NoteService {
 
     private void requireViewable(Note note, UUID viewerUserId) {
         boolean owner = viewerUserId != null && note.isOwnedBy(viewerUserId);
-        if (!owner && !note.isPubliclyVisible()) {
-            throw new ResourceNotFoundException("Note");
+        if (owner || note.isPubliclyVisible()) {
+            return;
         }
+        if (viewerUserId != null && isAdmin(viewerUserId)) {
+            return;
+        }
+        throw new ResourceNotFoundException("Note");
+    }
+
+    private boolean isAdmin(UUID userId) {
+        return userRepository.findById(userId)
+                .map(user -> adminAuthorizationService.canManage(
+                        user.getId(),
+                        user.getEmail()))
+                .orElse(false);
     }
 
     private Sort sort(NoteSort noteSort) {
