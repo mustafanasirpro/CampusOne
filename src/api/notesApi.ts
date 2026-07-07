@@ -24,6 +24,7 @@ function queryString(parameters: Record<string, string | number | undefined>) {
 }
 
 export function listNotes({
+  course,
   courseId,
   page = 0,
   signal,
@@ -32,7 +33,7 @@ export function listNotes({
   tag,
 }: NoteListParameters = {}) {
   return apiRequest<NotePage>(
-    `/notes${queryString({ courseId, page, size, sort, tag })}`,
+    `/notes${queryString({ course, courseId, page, size, sort, tag })}`,
     { signal },
   );
 }
