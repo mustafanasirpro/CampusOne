@@ -5,6 +5,7 @@ import com.campusone.event.entity.EventStatus;
 import com.campusone.event.entity.EventVisibility;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +28,7 @@ public interface CampusEventRepository
             from CampusEvent campusEvent
             where campusEvent.deleted = false
               and campusEvent.visibility = :visibility
+              and campusEvent.status not in :hiddenStatuses
               and (:status is null or campusEvent.status = :status)
               and (
                     :searchPattern is null
@@ -36,8 +38,18 @@ public interface CampusEventRepository
             """)
     Page<CampusEvent> findPublicEvents(
             @Param("visibility") EventVisibility visibility,
+            @Param("hiddenStatuses") Set<EventStatus> hiddenStatuses,
             @Param("status") EventStatus status,
             @Param("searchPattern") String searchPattern,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+        "organizer",
+        "organizer.studentProfile",
+        "organizer.studentProfile.university"
+    })
+    Page<CampusEvent> findAllByStatusAndDeletedFalse(
+            EventStatus status,
             Pageable pageable);
 
     @EntityGraph(attributePaths = {
