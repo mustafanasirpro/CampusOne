@@ -22,6 +22,7 @@ import com.campusone.event.exception.EventConflictException;
 import com.campusone.event.mapper.EventMapper;
 import com.campusone.event.repository.CampusEventRepository;
 import com.campusone.event.repository.EventParticipantRepository;
+import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.time.Instant;
@@ -66,6 +67,9 @@ class EventServiceTest {
     @Mock
     private CommunityIntegrationService integrationService;
 
+    @Mock
+    private NoteAdminAuthorizationService adminAuthorizationService;
+
     private EventService eventService;
     private User organizer;
     private User attendee;
@@ -81,11 +85,16 @@ class EventServiceTest {
                 participantRepository,
                 userRepository,
                 new EventMapper(),
-                integrationService);
+                integrationService,
+                adminAuthorizationService);
         lenient().when(participantRepository.findJoinedEventIds(
                         any(UUID.class),
                         any()))
                 .thenReturn(List.of());
+        lenient().when(adminAuthorizationService.canManage(
+                        any(UUID.class),
+                        any()))
+                .thenReturn(true);
     }
 
     @Test
@@ -113,6 +122,7 @@ class EventServiceTest {
     void listPublicEvents_returnsPublicPage() {
         when(eventRepository.findPublicEvents(
                 eq(EventVisibility.PUBLIC),
+                any(),
                 eq(EventStatus.UPCOMING),
                 eq("%islamabad%"),
                 any(Pageable.class)))
