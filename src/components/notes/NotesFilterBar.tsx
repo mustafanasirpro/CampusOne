@@ -6,11 +6,11 @@ import { FormField } from "@/components/forms";
 import type { NoteSort } from "@/types/notes";
 
 interface NotesFilterBarProps {
-  courseId: string;
+  course: string;
   disabled?: boolean;
   onApply: () => void;
   onClear: () => void;
-  onCourseIdChange: (value: string) => void;
+  onCourseChange: (value: string) => void;
   onSortChange: (value: NoteSort) => void;
   onTagChange: (value: string) => void;
   sort: NoteSort;
@@ -18,11 +18,11 @@ interface NotesFilterBarProps {
 }
 
 export function NotesFilterBar({
-  courseId,
+  course,
   disabled = false,
   onApply,
   onClear,
-  onCourseIdChange,
+  onCourseChange,
   onSortChange,
   onTagChange,
   sort,
@@ -35,12 +35,12 @@ export function NotesFilterBar({
         hint={
           disabled
             ? "Course filtering is unavailable in My Notes."
-            : "The backend currently accepts a course UUID."
+            : "Search by course code or course name."
         }
-        label="Course ID"
-        onChange={(event) => onCourseIdChange(event.target.value)}
-        placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-        value={courseId}
+        label="Course"
+        onChange={(event) => onCourseChange(event.target.value)}
+        placeholder="CSC275, OOP, DBMS..."
+        value={course}
       />
 
       <div className="grid gap-1.5">
