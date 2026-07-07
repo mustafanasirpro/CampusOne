@@ -30,6 +30,7 @@ import com.campusone.moderation.entity.ReportStatus;
 import com.campusone.moderation.exception.ModeratorAccessDeniedException;
 import com.campusone.moderation.service.ModerationAdminService;
 import com.campusone.moderation.service.ModerationReportService;
+import com.campusone.moderation.service.ContentApprovalService;
 import com.campusone.moderation.service.ModeratorAuthorizationService;
 import com.campusone.security.CampusOneUserDetailsService;
 import com.campusone.security.CampusOneUserPrincipal;
@@ -89,6 +90,9 @@ class ModerationControllerTest {
 
     @MockitoBean
     private ModerationAdminService adminService;
+
+    @MockitoBean
+    private ContentApprovalService contentApprovalService;
 
     @MockitoBean
     private ModeratorAuthorizationService authorizationService;
