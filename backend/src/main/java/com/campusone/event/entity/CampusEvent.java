@@ -172,6 +172,18 @@ public class CampusEvent {
         deleted = true;
     }
 
+    public void submitForReview() {
+        status = EventStatus.PENDING_REVIEW;
+    }
+
+    public void approve() {
+        status = EventStatus.UPCOMING;
+    }
+
+    public void reject() {
+        status = EventStatus.REJECTED;
+    }
+
     public boolean isOwnedBy(UUID userId) {
         return organizer.getId().equals(userId);
     }
