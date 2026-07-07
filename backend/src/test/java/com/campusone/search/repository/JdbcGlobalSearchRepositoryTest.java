@@ -72,9 +72,11 @@ class JdbcGlobalSearchRepositoryTest {
                         "listing.deleted_at IS NULL",
                         "listing.status = 'ACTIVE'",
                         "question.deleted = FALSE",
-                        "question.status <> 'HIDDEN'",
+                        "question.status IN ('OPEN', 'RESOLVED', 'CLOSED')",
                         "event.deleted = FALSE",
                         "event.visibility = 'PUBLIC'",
+                        "event.status IN ('UPCOMING', 'CANCELLED', 'COMPLETED')",
+                        "internship.status IN ('OPEN', 'CLOSED', 'EXPIRED')",
                         "internship.deleted = FALSE");
     }
 
@@ -142,6 +144,7 @@ class JdbcGlobalSearchRepositoryTest {
                 .contains(
                         "DISTINCT ON (LOWER(suggestion))",
                         "internship.company_name AS suggestion",
-                        "internship.deleted = FALSE");
+                        "internship.deleted = FALSE",
+                        "internship.status IN ('OPEN', 'CLOSED', 'EXPIRED')");
     }
 }
