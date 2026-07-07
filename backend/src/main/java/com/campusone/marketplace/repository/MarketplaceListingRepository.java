@@ -58,6 +58,16 @@ public interface MarketplaceListingRepository
         "seller.studentProfile.university",
         "images"
     })
+    Page<MarketplaceListing> findAllByStatusAndDeletedAtIsNull(
+            MarketplaceListingStatus status,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+        "seller",
+        "seller.studentProfile",
+        "seller.studentProfile.university",
+        "images"
+    })
     @Query("""
             select listing
             from MarketplaceListing listing
