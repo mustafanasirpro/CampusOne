@@ -203,6 +203,18 @@ public class Internship {
         deleted = true;
     }
 
+    public void submitForReview() {
+        status = InternshipStatus.PENDING_REVIEW;
+    }
+
+    public void approve() {
+        status = InternshipStatus.OPEN;
+    }
+
+    public void reject() {
+        status = InternshipStatus.REJECTED;
+    }
+
     public boolean isOwnedBy(UUID userId) {
         return poster.getId().equals(userId);
     }
