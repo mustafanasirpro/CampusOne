@@ -9,6 +9,9 @@ import type {
   ModerationActionPage,
   ModeratorStatus,
   MyReportListParameters,
+  PendingApprovalItem,
+  PendingApprovalListParameters,
+  PendingApprovalPage,
 } from "@/types/moderation";
 
 function queryString(
@@ -64,6 +67,46 @@ export function getMyReportById(
 
 export function getModeratorStatus(signal?: AbortSignal) {
   return apiRequest<ModeratorStatus>(`${adminPath}/me`, { signal });
+}
+
+export function listPendingApprovals({
+  page = 0,
+  signal,
+  size = 12,
+  targetType,
+}: PendingApprovalListParameters = {}) {
+  return apiRequest<PendingApprovalPage>(
+    `${adminPath}/pending${queryString({
+      page,
+      size,
+      targetType,
+    })}`,
+    { signal },
+  );
+}
+
+export function approvePendingContent(
+  targetType: string,
+  targetId: string,
+) {
+  return apiRequest<PendingApprovalItem>(
+    `${adminPath}/${targetType}/${targetId}/approve`,
+    { method: "PATCH" },
+  );
+}
+
+export function rejectPendingContent(
+  targetType: string,
+  targetId: string,
+  reason: string,
+) {
+  return apiRequest<PendingApprovalItem>(
+    `${adminPath}/${targetType}/${targetId}/reject`,
+    {
+      body: JSON.stringify({ reason }),
+      method: "PATCH",
+    },
+  );
 }
 
 export function listAdminReports({
