@@ -5,6 +5,7 @@ import com.campusone.discussion.entity.DiscussionQuestion;
 import com.campusone.discussion.entity.DiscussionQuestionStatus;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,7 +28,7 @@ public interface DiscussionQuestionRepository
             select question
             from DiscussionQuestion question
             where question.deleted = false
-              and question.status <> :hiddenStatus
+              and question.status not in :hiddenStatuses
               and (:category is null or question.category = :category)
               and (
                     :searchPattern is null
@@ -36,9 +37,19 @@ public interface DiscussionQuestionRepository
               )
             """)
     Page<DiscussionQuestion> findVisibleQuestions(
-            @Param("hiddenStatus") DiscussionQuestionStatus hiddenStatus,
+            @Param("hiddenStatuses") Set<DiscussionQuestionStatus> hiddenStatuses,
             @Param("category") DiscussionCategory category,
             @Param("searchPattern") String searchPattern,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+        "author",
+        "author.studentProfile",
+        "author.studentProfile.university",
+        "acceptedAnswer"
+    })
+    Page<DiscussionQuestion> findAllByStatusAndDeletedFalse(
+            DiscussionQuestionStatus status,
             Pageable pageable);
 
     @EntityGraph(attributePaths = {
