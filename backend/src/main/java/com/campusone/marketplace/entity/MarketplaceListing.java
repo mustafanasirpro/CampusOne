@@ -1,6 +1,7 @@
 package com.campusone.marketplace.entity;
 
 import com.campusone.user.entity.User;
+import com.campusone.note.storage.StoredObject;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -178,9 +179,34 @@ public class MarketplaceListing {
                 displayOrder));
     }
 
+    public void addUploadedImage(
+            StoredObject storedObject,
+            String imageUrl,
+            String altText,
+            int displayOrder) {
+        images.add(new MarketplaceListingImage(
+                this,
+                storedObject,
+                imageUrl,
+                altText,
+                displayOrder));
+    }
+
     public void softDelete(Instant deletedAt) {
         status = MarketplaceListingStatus.DELETED;
         this.deletedAt = deletedAt;
+    }
+
+    public void submitForReview() {
+        status = MarketplaceListingStatus.PENDING_REVIEW;
+    }
+
+    public void approve() {
+        status = MarketplaceListingStatus.ACTIVE;
+    }
+
+    public void reject() {
+        status = MarketplaceListingStatus.REJECTED;
     }
 
     public boolean isOwnedBy(UUID userId) {
