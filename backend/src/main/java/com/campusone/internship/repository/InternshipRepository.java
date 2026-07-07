@@ -6,6 +6,7 @@ import com.campusone.internship.entity.InternshipType;
 import com.campusone.internship.entity.WorkMode;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,6 +28,7 @@ public interface InternshipRepository
             select internship
             from Internship internship
             where internship.deleted = false
+              and internship.status not in :hiddenStatuses
               and (:status is null or internship.status = :status)
               and (:internshipType is null
                     or internship.internshipType = :internshipType)
@@ -40,11 +42,21 @@ public interface InternshipRepository
               )
             """)
     Page<Internship> findVisibleInternships(
+            @Param("hiddenStatuses") Set<InternshipStatus> hiddenStatuses,
             @Param("status") InternshipStatus status,
             @Param("internshipType") InternshipType internshipType,
             @Param("workMode") WorkMode workMode,
             @Param("paid") Boolean paid,
             @Param("searchPattern") String searchPattern,
+            Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+        "poster",
+        "poster.studentProfile",
+        "poster.studentProfile.university"
+    })
+    Page<Internship> findAllByStatusAndDeletedFalse(
+            InternshipStatus status,
             Pageable pageable);
 
     @EntityGraph(attributePaths = {
@@ -87,6 +99,7 @@ public interface InternshipRepository
             select internship
             from Internship internship
             where internship.deleted = false
+              and internship.status not in :hiddenStatuses
               and exists (
                     select saved.id
                     from SavedInternship saved
@@ -96,6 +109,7 @@ public interface InternshipRepository
             """)
     Page<Internship> findSavedByUser(
             @Param("userId") UUID userId,
+            @Param("hiddenStatuses") Set<InternshipStatus> hiddenStatuses,
             Pageable pageable);
 
     @EntityGraph(attributePaths = {
