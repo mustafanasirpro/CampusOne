@@ -3,12 +3,20 @@ package com.campusone.common.service;
 import com.campusone.gamification.entity.GamificationActionType;
 import com.campusone.gamification.entity.GamificationSourceType;
 import com.campusone.gamification.service.GamificationService;
+import com.campusone.moderation.entity.ModerationTargetType;
+import com.campusone.moderation.repository.ModeratorRepository;
 import com.campusone.notification.entity.NotificationTargetType;
 import com.campusone.notification.entity.NotificationType;
 import com.campusone.notification.service.NotificationService;
+import com.campusone.user.repository.UserRepository;
 import java.util.Collection;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,12 +25,22 @@ public class CommunityIntegrationService {
 
     private final GamificationService gamificationService;
     private final NotificationService notificationService;
+    private final ModeratorRepository moderatorRepository;
+    private final UserRepository userRepository;
+    private final Set<String> fallbackAdminEmails;
 
     public CommunityIntegrationService(
             GamificationService gamificationService,
-            NotificationService notificationService) {
+            NotificationService notificationService,
+            ModeratorRepository moderatorRepository,
+            UserRepository userRepository,
+            @Value("${app.notes.admin-upload-emails:}")
+            String fallbackAdminEmails) {
         this.gamificationService = gamificationService;
         this.notificationService = notificationService;
+        this.moderatorRepository = moderatorRepository;
+        this.userRepository = userRepository;
+        this.fallbackAdminEmails = parseEmails(fallbackAdminEmails);
     }
 
     @Transactional
@@ -34,6 +52,20 @@ public class CommunityIntegrationService {
                 GamificationSourceType.NOTE,
                 noteId,
                 "Created a study note");
+    }
+
+    @Transactional
+    public void noteSubmittedForApproval(
+            UUID submitterUserId,
+            UUID noteId,
+            String noteTitle) {
+        notifyApprovalRecipients(
+                submitterUserId,
+                "New note pending approval",
+                "A student submitted \"%s\" for admin review."
+                        .formatted(safeTitle(noteTitle, "a note")),
+                NotificationTargetType.NOTE,
+                noteId);
     }
 
     @Transactional
@@ -84,6 +116,20 @@ public class CommunityIntegrationService {
     }
 
     @Transactional
+    public void marketplaceListingSubmittedForApproval(
+            UUID submitterUserId,
+            UUID listingId,
+            String listingTitle) {
+        notifyApprovalRecipients(
+                submitterUserId,
+                "New marketplace listing pending approval",
+                "A student submitted \"%s\" for admin review."
+                        .formatted(safeTitle(listingTitle, "a marketplace listing")),
+                NotificationTargetType.MARKETPLACE_LISTING,
+                listingId);
+    }
+
+    @Transactional
     public void discussionQuestionCreated(
             UUID authorUserId,
             UUID questionId) {
@@ -94,6 +140,20 @@ public class CommunityIntegrationService {
                 GamificationSourceType.DISCUSSION_QUESTION,
                 questionId,
                 "Asked a discussion question");
+    }
+
+    @Transactional
+    public void discussionQuestionSubmittedForApproval(
+            UUID submitterUserId,
+            UUID questionId,
+            String questionTitle) {
+        notifyApprovalRecipients(
+                submitterUserId,
+                "New discussion pending approval",
+                "A student submitted \"%s\" for admin review."
+                        .formatted(safeTitle(questionTitle, "a discussion")),
+                NotificationTargetType.DISCUSSION_QUESTION,
+                questionId);
     }
 
     @Transactional
@@ -158,6 +218,20 @@ public class CommunityIntegrationService {
     }
 
     @Transactional
+    public void eventSubmittedForApproval(
+            UUID submitterUserId,
+            UUID eventId,
+            String eventTitle) {
+        notifyApprovalRecipients(
+                submitterUserId,
+                "New event pending approval",
+                "A student submitted \"%s\" for admin review."
+                        .formatted(safeTitle(eventTitle, "an event")),
+                NotificationTargetType.EVENT,
+                eventId);
+    }
+
+    @Transactional
     public void eventJoined(
             UUID joiningUserId,
             UUID organizerUserId,
@@ -209,6 +283,54 @@ public class CommunityIntegrationService {
                 GamificationSourceType.INTERNSHIP,
                 internshipId,
                 "Shared an internship opportunity");
+    }
+
+    @Transactional
+    public void internshipSubmittedForApproval(
+            UUID submitterUserId,
+            UUID internshipId,
+            String internshipTitle) {
+        notifyApprovalRecipients(
+                submitterUserId,
+                "New internship pending approval",
+                "A student submitted \"%s\" for admin review."
+                        .formatted(safeTitle(internshipTitle, "an internship")),
+                NotificationTargetType.INTERNSHIP,
+                internshipId);
+    }
+
+    @Transactional
+    public void contentApprovalReviewed(
+            UUID submitterUserId,
+            UUID moderatorUserId,
+            ModerationTargetType targetType,
+            UUID targetId,
+            String title,
+            boolean approved) {
+        NotificationTargetType notificationTargetType =
+                toNotificationTargetType(targetType);
+        notificationService.markUnreadTargetNotificationsRead(
+                NotificationType.ADMIN_MESSAGE,
+                notificationTargetType,
+                targetId);
+        if (submitterUserId == null || submitterUserId.equals(moderatorUserId)) {
+            return;
+        }
+        String safeTitle = safeTitle(title, "your submission");
+        notificationService.createNotification(
+                submitterUserId,
+                NotificationType.ADMIN_MESSAGE,
+                approved
+                        ? "Your submission was approved"
+                        : "Your submission was rejected",
+                approved
+                        ? "\"%s\" is now visible on CampusOne."
+                                .formatted(safeTitle)
+                        : "\"%s\" was reviewed and will remain hidden."
+                                .formatted(safeTitle),
+                notificationTargetType,
+                targetId,
+                detailUrl(targetType, targetId));
     }
 
     @Transactional
@@ -264,5 +386,82 @@ public class CommunityIntegrationService {
                 sourceType,
                 sourceId,
                 description);
+    }
+
+    private void notifyApprovalRecipients(
+            UUID submitterUserId,
+            String title,
+            String message,
+            NotificationTargetType targetType,
+            UUID targetId) {
+        LinkedHashSet<UUID> recipients = approvalRecipientUserIds();
+        recipients.remove(submitterUserId);
+        notificationService.createBulkNotifications(
+                recipients,
+                NotificationType.ADMIN_MESSAGE,
+                title,
+                message,
+                targetType,
+                targetId,
+                "/admin");
+    }
+
+    private LinkedHashSet<UUID> approvalRecipientUserIds() {
+        LinkedHashSet<UUID> recipients =
+                new LinkedHashSet<>(moderatorRepository.findActiveModeratorUserIds());
+        fallbackAdminEmails.forEach(email ->
+                userRepository.findByEmailIgnoreCase(email)
+                        .ifPresent(user -> recipients.add(user.getId())));
+        return recipients;
+    }
+
+    private Set<String> parseEmails(String configuredEmails) {
+        if (configuredEmails == null || configuredEmails.isBlank()) {
+            return Set.of();
+        }
+        return Arrays.stream(configuredEmails.split(","))
+                .map(this::normalizeEmail)
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null
+                ? ""
+                : email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String safeTitle(String value, String fallback) {
+        return value == null || value.isBlank()
+                ? fallback
+                : value.trim();
+    }
+
+    private NotificationTargetType toNotificationTargetType(
+            ModerationTargetType targetType) {
+        return switch (targetType) {
+            case NOTE -> NotificationTargetType.NOTE;
+            case MARKETPLACE_LISTING -> NotificationTargetType.MARKETPLACE_LISTING;
+            case EVENT -> NotificationTargetType.EVENT;
+            case DISCUSSION_QUESTION -> NotificationTargetType.DISCUSSION_QUESTION;
+            case DISCUSSION_ANSWER -> NotificationTargetType.DISCUSSION_ANSWER;
+            case INTERNSHIP -> NotificationTargetType.INTERNSHIP;
+            case USER_PROFILE -> NotificationTargetType.USER;
+            case AI_GENERATED_ITEM, SYSTEM -> NotificationTargetType.SYSTEM;
+        };
+    }
+
+    private String detailUrl(
+            ModerationTargetType targetType,
+            UUID targetId) {
+        return switch (targetType) {
+            case NOTE -> "/notes/" + targetId;
+            case MARKETPLACE_LISTING -> "/marketplace/" + targetId;
+            case EVENT -> "/events/" + targetId;
+            case DISCUSSION_QUESTION -> "/discussions/questions/" + targetId;
+            case INTERNSHIP -> "/internships/" + targetId;
+            case DISCUSSION_ANSWER, AI_GENERATED_ITEM, USER_PROFILE, SYSTEM ->
+                    "/admin";
+        };
     }
 }
