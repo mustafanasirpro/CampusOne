@@ -43,13 +43,41 @@ class NoteManagementAuthorizationFilterTest {
     }
 
     @Test
-    void uploadRejectsAuthenticatedNormalUserBeforeRequestBodyHandling()
+    void uploadSubmissionIsNotTreatedAsNoteManagement()
             throws Exception {
+        authenticate();
+        MockHttpServletRequest request =
+                request("POST", "/api/v1/notes/upload");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(chain.getRequest()).isSameAs(request);
+        verifyNoInteractions(authorizationService);
+    }
+
+    @Test
+    void createSubmissionIsNotTreatedAsNoteManagement() throws Exception {
+        authenticate();
+        MockHttpServletRequest request =
+                request("POST", "/api/v1/notes");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(chain.getRequest()).isSameAs(request);
+        verifyNoInteractions(authorizationService);
+    }
+
+    @Test
+    void metadataUpdateRejectsAuthenticatedNormalUser() throws Exception {
         authenticate();
         when(authorizationService.canManage(USER_ID, EMAIL))
                 .thenReturn(false);
         MockHttpServletRequest request =
-                request("POST", "/api/v1/notes/upload");
+                request("PATCH", "/api/v1/notes/77cc499d-aa60-4a5e-941d-e0b69fd1a9ac");
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
@@ -60,23 +88,8 @@ class NoteManagementAuthorizationFilterTest {
                 .startsWith("application/problem+json");
         assertThat(response.getContentAsString())
                 .contains("NOTE_ADMIN_REQUIRED")
-                .contains("Only admins can upload or manage notes.");
+                .contains("Only admins can edit or delete notes after submission.");
         assertThat(chain.getRequest()).isNull();
-    }
-
-    @Test
-    void uploadAllowsAuthenticatedAdmin() throws Exception {
-        authenticate();
-        when(authorizationService.canManage(USER_ID, EMAIL))
-                .thenReturn(true);
-        MockHttpServletRequest request =
-                request("POST", "/api/v1/notes/upload");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-        MockFilterChain chain = new MockFilterChain();
-
-        filter.doFilter(request, response, chain);
-
-        assertThat(chain.getRequest()).isSameAs(request);
     }
 
     @Test
