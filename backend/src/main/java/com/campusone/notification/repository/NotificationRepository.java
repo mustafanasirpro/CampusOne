@@ -76,4 +76,22 @@ public interface NotificationRepository
     int markAllRead(
             @Param("recipientUserId") UUID recipientUserId,
             @Param("readAt") Instant readAt);
+
+    @Modifying
+    @Query("""
+            update Notification notification
+            set notification.readAt = :readAt,
+                notification.updatedAt = :readAt,
+                notification.version = notification.version + 1
+            where notification.type = :type
+              and notification.targetType = :targetType
+              and notification.targetId = :targetId
+              and notification.deleted = false
+              and notification.readAt is null
+            """)
+    int markUnreadTargetNotificationsRead(
+            @Param("type") NotificationType type,
+            @Param("targetType") NotificationTargetType targetType,
+            @Param("targetId") UUID targetId,
+            @Param("readAt") Instant readAt);
 }
