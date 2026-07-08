@@ -1,6 +1,6 @@
 import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 import { useState, type ChangeEvent, type FormEvent } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/auth/useAuth";
 import { Button, ErrorMessage } from "@/components/common";
@@ -127,6 +127,15 @@ export function LoginPage() {
           required
           value={form.password}
         />
+
+        <div className="-mt-2 flex justify-end">
+          <Link
+            className="text-sm font-semibold text-brand-700 hover:text-brand-800"
+            to={paths.forgotPassword}
+          >
+            Forgot password?
+          </Link>
+        </div>
 
         <Button className="w-full" loading={isLoading} size="lg" type="submit">
           {isLoading ? "Logging in" : "Log in"}
