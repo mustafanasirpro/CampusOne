@@ -43,7 +43,6 @@ The backend is a modular Spring Boot API for CampusOne:
 
 - Multi-session management
 - Email Verification
-- Password Reset
 
 ## Requirements
 
@@ -89,8 +88,12 @@ JWT signing uses:
   defaults to `false` so missing mail credentials never prevent startup
 - `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`:
   SMTP delivery settings for password reset email
-- `MAIL_SMTP_AUTH`, `MAIL_SMTP_STARTTLS_ENABLE`: optional SMTP transport
-  switches; both default to `false`
+- `MAIL_SMTP_AUTH`, `MAIL_SMTP_STARTTLS_ENABLE`,
+  `MAIL_SMTP_STARTTLS_REQUIRED`: optional SMTP transport switches; when
+  `MAIL_ENABLED=true`, auth and STARTTLS default to enabled
+- `MAIL_SMTP_CONNECTION_TIMEOUT_MS`, `MAIL_SMTP_TIMEOUT_MS`,
+  `MAIL_SMTP_WRITE_TIMEOUT_MS`: SMTP connection, read, and write timeouts;
+  each defaults to `10000` ms so password reset requests cannot hang forever
 - `APP_CORS_ALLOWED_ORIGINS`: comma-separated exact frontend origins for
   Render. Use
   `https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app,http://localhost:5173,http://127.0.0.1:5173`
@@ -231,14 +234,27 @@ ADMIN_UPLOAD_EMAILS=
 PASSWORD_RESET_TOKEN_TTL_MINUTES=30
 APP_FRONTEND_URL=https://campusone.dev
 MAIL_ENABLED=true
-MAIL_HOST=<smtp-host>
+MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
-MAIL_USERNAME=<secret>
-MAIL_PASSWORD=<secret>
-MAIL_FROM=CampusOne <no-reply@campusone.dev>
+MAIL_USERNAME=<sender-gmail-address>
+MAIL_PASSWORD=<gmail-app-password-without-spaces>
+MAIL_FROM=<sender-gmail-address>
 MAIL_SMTP_AUTH=true
 MAIL_SMTP_STARTTLS_ENABLE=true
+MAIL_SMTP_STARTTLS_REQUIRED=true
+MAIL_SMTP_CONNECTION_TIMEOUT_MS=10000
+MAIL_SMTP_TIMEOUT_MS=10000
+MAIL_SMTP_WRITE_TIMEOUT_MS=10000
 ```
+
+For Gmail, use an App Password, not the normal Gmail account password. Google
+shows app passwords with spaces for readability, such as
+`abcd efgh ijkl mnop`; store it in Render as `abcdefghijklmnop` with no
+spaces. Never commit or paste the real password into source files.
+
+Admins can verify production SMTP without exposing secrets by calling
+`POST /api/v1/admin/diagnostics/test-email` with a bearer token for an active
+admin or an email listed in `ADMIN_UPLOAD_EMAILS`.
 
 Use an R2 API token restricted to Object Read & Write for the selected bucket.
 Leave `R2_PUBLIC_BASE_URL` blank for private storage; CampusOne then returns
