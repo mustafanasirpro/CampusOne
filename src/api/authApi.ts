@@ -46,21 +46,29 @@ export function register(request: RegisterRequest) {
   });
 }
 
-export function forgotPassword(request: ForgotPasswordRequest) {
+export function forgotPassword(
+  request: ForgotPasswordRequest,
+  signal?: AbortSignal,
+) {
   return apiRequest<PasswordResetResponse>("/auth/forgot-password", {
     attachAccessToken: false,
     body: JSON.stringify(request),
     method: "POST",
     retryOnUnauthorized: false,
+    signal,
   });
 }
 
-export function resetPassword(request: ResetPasswordRequest) {
+export function resetPassword(
+  request: ResetPasswordRequest,
+  signal?: AbortSignal,
+) {
   return apiRequest<PasswordResetResponse>("/auth/reset-password", {
     attachAccessToken: false,
     body: JSON.stringify(request),
     method: "POST",
     retryOnUnauthorized: false,
+    signal,
   });
 }
 
