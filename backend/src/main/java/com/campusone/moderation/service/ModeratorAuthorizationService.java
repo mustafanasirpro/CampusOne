@@ -54,15 +54,23 @@ public class ModeratorAuthorizationService {
 
     @Transactional(readOnly = true)
     public Moderator requireActiveModerator(UUID userId) {
-        Moderator moderator =
-                moderatorRepository.findDetailedByUserId(userId)
-                        .orElseThrow(
-                                ModeratorAccessDeniedException::new);
-        if (!moderator.isActive()
-                || !isAuthorizedRole(moderator.getRole())) {
-            throw new ModeratorAccessDeniedException();
+        Moderator moderator = moderatorRepository.findDetailedByUserId(userId)
+                .orElse(null);
+        if (moderator != null
+                && moderator.isActive()
+                && isAuthorizedRole(moderator.getRole())) {
+            return moderator;
         }
-        return moderator;
+
+        return userRepository.findById(userId)
+                .filter(user -> adminAuthorizationService.canManage(
+                        user.getId(),
+                        user.getEmail()))
+                .map(user -> new Moderator(
+                        user,
+                        ModeratorRole.ADMIN,
+                        null))
+                .orElseThrow(ModeratorAccessDeniedException::new);
     }
 
     private boolean isAuthorizedRole(ModeratorRole role) {
