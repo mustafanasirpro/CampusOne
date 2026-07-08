@@ -44,6 +44,7 @@ interface NoteFormState {
 interface CommonNoteFormProps {
   backendFieldErrors?: Record<string, string[]>;
   isSubmitting: boolean;
+  reviewNotice?: string;
   submitLabel: string;
 }
 
@@ -315,8 +316,8 @@ export function NoteForm(props: NoteFormProps) {
               Note information
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Admin uploads are published directly to the approved notes
-              library.
+              {props.reviewNotice ??
+                "Submissions are reviewed before they appear publicly."}
             </p>
           </div>
 
