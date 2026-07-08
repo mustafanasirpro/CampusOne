@@ -367,7 +367,7 @@ token.
 - [x] Add password recovery with one-time reset tokens
 - [x] Add marketplace image uploads through private object storage
 - [x] Implement administration and moderation workflows
-- [ ] Connect notification and XP triggers across domain modules
+- [x] Connect notification and XP triggers across domain modules
 - [ ] Add production deployment and release automation
 
 ## 🔭 Future Improvements
