@@ -80,8 +80,7 @@ export function EditNotePage() {
       const updated = await updateNote(noteId, request);
       showToast({
         title: "Note updated",
-        message:
-          "Your changes were saved and may require moderation review.",
+        message: "Your changes were saved and the note remains approved.",
         variant: "success",
       });
       navigate(paths.noteDetail(updated.id), { replace: true });
