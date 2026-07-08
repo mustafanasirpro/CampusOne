@@ -12,9 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.campusone.auth.dto.response.AuthResponse;
+import com.campusone.auth.dto.response.PasswordResetResponse;
 import com.campusone.auth.dto.response.UserSummaryResponse;
 import com.campusone.auth.service.AuthenticationResult;
 import com.campusone.auth.service.AuthService;
+import com.campusone.auth.service.PasswordResetService;
 import com.campusone.common.exception.InvalidRefreshTokenException;
 import com.campusone.security.CampusOneUserDetailsService;
 import com.campusone.security.JwtAuthenticationFilter;
@@ -56,6 +58,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private PasswordResetService passwordResetService;
 
     @MockitoBean
     private RefreshTokenCookieFactory refreshTokenCookieFactory;
@@ -125,6 +130,43 @@ class AuthControllerTest {
                 .andExpect(header().string("Set-Cookie", refreshCookie.toString()));
 
         verify(authService).refresh(RAW_REFRESH_TOKEN);
+    }
+
+    @Test
+    void forgotPassword_returnsGenericMessage() throws Exception {
+        when(passwordResetService.requestReset(any()))
+                .thenReturn(new PasswordResetResponse(
+                        PasswordResetService.GENERIC_FORGOT_PASSWORD_MESSAGE));
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "student@example.com"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message")
+                        .value(PasswordResetService.GENERIC_FORGOT_PASSWORD_MESSAGE));
+    }
+
+    @Test
+    void resetPassword_validRequest_returnsSuccessMessage() throws Exception {
+        when(passwordResetService.resetPassword(any()))
+                .thenReturn(new PasswordResetResponse(
+                        PasswordResetService.RESET_SUCCESS_MESSAGE));
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "token": "reset-token-with-enough-entropy-for-tests",
+                                  "newPassword": "SecurePass2"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message")
+                        .value(PasswordResetService.RESET_SUCCESS_MESSAGE));
     }
 
     @Test
