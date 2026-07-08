@@ -83,6 +83,10 @@ function toApiError(response: Response, body: unknown) {
   );
 }
 
+function isBrowserOffline() {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
 async function refreshSession() {
   if (refreshRequest) return refreshRequest;
 
@@ -138,6 +142,14 @@ export async function apiRequest<T>(
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
+  if (isBrowserOffline()) {
+    throw new ApiError(
+      "You appear to be offline. Check your internet connection and try again.",
+      0,
+      "OFFLINE",
+    );
+  }
+
   let response: Response;
   try {
     response = await fetch(endpoint(path), {
@@ -149,8 +161,15 @@ export async function apiRequest<T>(
     if (error instanceof DOMException && error.name === "AbortError") {
       throw error;
     }
+    if (isBrowserOffline()) {
+      throw new ApiError(
+        "You appear to be offline. Check your internet connection and try again.",
+        0,
+        "OFFLINE",
+      );
+    }
     throw new ApiError(
-      "Unable to reach CampusOne. Check that the backend is running and allows this frontend domain.",
+      "CampusOne is temporarily unreachable. Please try again.",
       0,
       "NETWORK_ERROR",
     );
