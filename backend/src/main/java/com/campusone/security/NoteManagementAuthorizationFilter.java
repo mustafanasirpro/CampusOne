@@ -16,8 +16,6 @@ public class NoteManagementAuthorizationFilter
         extends OncePerRequestFilter {
 
     private static final String NOTES_PATH = "/api/v1/notes";
-    private static final String UPLOAD_PATH = "/api/v1/notes/upload";
-
     private final NoteAdminAuthorizationService authorizationService;
     private final SecurityErrorResponseWriter errorResponseWriter;
 
@@ -32,9 +30,6 @@ public class NoteManagementAuthorizationFilter
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String method = request.getMethod();
         String path = request.getServletPath();
-        if (HttpMethod.POST.matches(method)) {
-            return !NOTES_PATH.equals(path) && !UPLOAD_PATH.equals(path);
-        }
         if (HttpMethod.PATCH.matches(method)
                 || HttpMethod.DELETE.matches(method)) {
             return !isNoteDetailPath(path);
@@ -69,7 +64,7 @@ public class NoteManagementAuthorizationFilter
                 HttpStatus.FORBIDDEN.value(),
                 HttpStatus.FORBIDDEN.getReasonPhrase(),
                 "NOTE_ADMIN_REQUIRED",
-                "Only admins can upload or manage notes.");
+                "Only admins can edit or delete notes after submission.");
     }
 
     private boolean isNoteDetailPath(String path) {
