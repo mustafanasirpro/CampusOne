@@ -87,6 +87,19 @@ public class NoteModerationAction {
                 null);
     }
 
+    public static NoteModerationAction approved(
+            Note note,
+            User moderator,
+            NoteModerationStatus previousStatus) {
+        return new NoteModerationAction(
+                note,
+                moderator,
+                NoteModerationActionType.APPROVED,
+                previousStatus,
+                NoteModerationStatus.APPROVED,
+                null);
+    }
+
     @PrePersist
     void onCreate() {
         createdAt = Instant.now();
