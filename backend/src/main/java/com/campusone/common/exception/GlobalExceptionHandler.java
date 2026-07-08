@@ -275,6 +275,18 @@ public class GlobalExceptionHandler {
                 Map.of());
     }
 
+    @ExceptionHandler(InvalidPasswordResetTokenException.class)
+    ResponseEntity<ErrorResponse> handleInvalidPasswordResetToken(
+            InvalidPasswordResetTokenException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.BAD_REQUEST,
+                "PASSWORD_RESET_TOKEN_INVALID",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ErrorResponse> handleAccessDenied(
             AccessDeniedException exception,
