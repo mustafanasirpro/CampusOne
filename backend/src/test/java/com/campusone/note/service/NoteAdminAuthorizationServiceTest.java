@@ -83,6 +83,6 @@ class NoteAdminAuthorizationServiceTest {
                 USER_ID,
                 "student@example.com"))
                 .isInstanceOf(NoteManagementAccessDeniedException.class)
-                .hasMessage("Only admins can upload or manage notes.");
+                .hasMessage("Only admins can edit or delete notes after submission.");
     }
 }
