@@ -21,10 +21,17 @@ import {
   type AuthContextValue,
 } from "@/auth/authContextValue";
 
-function errorMessage(error: unknown) {
-  return error instanceof ApiError
-    ? error.message
-    : "Something went wrong. Please try again.";
+function errorMessage(error: unknown, invalidCredentials = false) {
+  if (error instanceof ApiError) {
+    if (
+      invalidCredentials &&
+      (error.status === 401 || error.status === 403)
+    ) {
+      return "Invalid email or password.";
+    }
+    return error.message;
+  }
+  return "Something went wrong. Please try again.";
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -59,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccessToken(session.accessToken);
       setCurrentUser(session.user);
     } catch (error) {
-      const message = errorMessage(error);
+      const message = errorMessage(error, true);
       setAuthError(message);
       throw error;
     } finally {
