@@ -25,11 +25,12 @@ export function ModeratorStatusCard({
           </span>
           <div>
             <h2 className="font-semibold text-amber-950">
-              You do not have moderator access.
+              You do not have admin access.
             </h2>
             <p className="mt-1 text-sm leading-6 text-amber-800">
-              Admin report queues and audit history are hidden. You can still
-              submit content reports and track your own reports below.
+              Approval queues, report review, and audit history are hidden.
+              You can still submit content reports and track your own reports
+              below.
             </p>
           </div>
         </CardContent>
@@ -45,12 +46,12 @@ export function ModeratorStatusCard({
         </span>
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold">Moderator access verified</h2>
+            <h2 className="text-lg font-semibold">Admin access verified</h2>
             <Badge variant="success">{status.role}</Badge>
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Review reports and audit moderation decisions. Content references
-            remain unchanged by this moderation phase.
+            Review pending submissions, manage reports, and audit moderation
+            decisions from one trusted workspace.
           </p>
           {status.assignedAt ? (
             <p className="mt-2 text-xs text-slate-400">
