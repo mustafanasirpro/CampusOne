@@ -206,7 +206,10 @@ User-submitted notes, marketplace listings, events, discussion questions, and
 internships are created as pending review and are hidden from public lists and
 global search until an admin approves them from
 `/api/v1/admin/moderation/pending`. Admin-created content is approved
-immediately.
+immediately. Pending user submissions also create unread in-app approval
+notifications for active moderators and for existing users listed in
+`ADMIN_UPLOAD_EMAILS`; approval/rejection marks those approval notifications as
+handled and notifies the submitter when possible.
 
 Configure these Render environment variables:
 
