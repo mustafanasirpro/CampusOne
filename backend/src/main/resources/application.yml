@@ -34,6 +34,17 @@ spring:
           time_zone: UTC
   jackson:
     time-zone: UTC
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:false}
 
 server:
   port: ${SERVER_PORT:${PORT:8080}}
@@ -69,6 +80,11 @@ app:
     refresh-token-cleanup-interval: ${REFRESH_TOKEN_CLEANUP_INTERVAL:24h}
     max-login-attempts: ${MAX_LOGIN_ATTEMPTS:5}
     account-lock-duration: ${ACCOUNT_LOCK_MINUTES:15}m
+  password-reset:
+    token-ttl: ${PASSWORD_RESET_TOKEN_TTL_MINUTES:30}m
+    frontend-url: ${APP_FRONTEND_URL:http://localhost:5173}
+    mail-enabled: ${MAIL_ENABLED:false}
+    mail-from: ${MAIL_FROM:CampusOne <no-reply@campusone.dev>}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}}
   storage:
