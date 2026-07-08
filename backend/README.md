@@ -81,6 +81,16 @@ JWT signing uses:
 - `REFRESH_TOKEN_CLEANUP_INTERVAL`: optional; defaults to `24h`
 - `MAX_LOGIN_ATTEMPTS`: optional; defaults to `5`
 - `ACCOUNT_LOCK_MINUTES`: optional; defaults to `15`
+- `PASSWORD_RESET_TOKEN_TTL_MINUTES`: optional reset-link lifetime; defaults
+  to `30`
+- `APP_FRONTEND_URL`: frontend base URL used in password reset links; use
+  `https://campusone.dev` in production
+- `MAIL_ENABLED`: set to `true` with real SMTP settings to send reset emails;
+  defaults to `false` so missing mail credentials never prevent startup
+- `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`:
+  SMTP delivery settings for password reset email
+- `MAIL_SMTP_AUTH`, `MAIL_SMTP_STARTTLS_ENABLE`: optional SMTP transport
+  switches; both default to `false`
 - `APP_CORS_ALLOWED_ORIGINS`: comma-separated exact frontend origins for
   Render. Use
   `https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app,http://localhost:5173,http://127.0.0.1:5173`
@@ -99,19 +109,20 @@ JWT signing uses:
 - `R2_REGION`: optional; defaults to `auto`
 - `R2_PUBLIC_BASE_URL`: optional public bucket/custom-domain URL; when omitted,
   the backend creates short-lived private presigned GET URLs
-- `MAX_UPLOAD_SIZE_MB`: optional maximum admin PDF size; defaults to `25`
+- `MAX_UPLOAD_SIZE_MB`: optional maximum PDF upload size; defaults to `25`
 - `MARKETPLACE_MAX_IMAGES_PER_LISTING`: optional maximum marketplace images
   per listing; defaults to `5`
 - `MARKETPLACE_MAX_IMAGE_SIZE_MB`: optional maximum marketplace image size;
   defaults to `5`
-- `ADMIN_MAX_UPLOADS_PER_DAY`: optional per-admin daily upload count;
+- `ADMIN_MAX_UPLOADS_PER_DAY`: optional per-uploader daily upload count;
   defaults to `200`
-- `ADMIN_MAX_STORAGE_MB_PER_MONTH`: optional per-admin monthly uploaded
+- `ADMIN_MAX_STORAGE_MB_PER_MONTH`: optional per-uploader monthly uploaded
   bytes; defaults to `5000`
 - `GLOBAL_UPLOAD_STORAGE_CAP_MB`: optional global monthly uploaded bytes;
   defaults to `8192` (8 GB)
-- `ADMIN_UPLOAD_EMAILS`: optional comma-separated fallback note-admin emails;
-  active `ADMIN` assignments in the moderators table are preferred
+- `ADMIN_UPLOAD_EMAILS`: optional comma-separated fallback admin emails for
+  approval and immediate-publish permissions; active `ADMIN` assignments in
+  the moderators table are preferred
 - `STORAGE_DOWNLOAD_URL_TTL`: optional presigned URL lifetime; defaults to `10m`
 
 Generate a different JWT secret for every environment. PowerShell:
@@ -176,10 +187,11 @@ The note upload endpoint accepts multipart form data at
 `POST /api/v1/notes/upload`, with a JSON `note` part and an
 `application/pdf` `file` part. The backend validates the PDF, generates an
 owner-scoped object key, uploads it to R2, and stores only its metadata in
-PostgreSQL. Uploads and note create/edit/delete operations require an active
-`ADMIN` assignment (or an email explicitly listed in `ADMIN_UPLOAD_EMAILS`).
-Normal users retain view, download, bookmark, and rating access. Uploads are
-limited to PDF files.
+PostgreSQL. Authenticated students can submit note PDFs; their notes are saved
+as `PENDING` and remain hidden from public lists/search until an admin approves
+them. Admin uploads are approved immediately. Note edit/delete operations still
+require an active `ADMIN` assignment (or an email explicitly listed in
+`ADMIN_UPLOAD_EMAILS`). Uploads are limited to PDF files.
 Quota checks use UTC calendar days/months and PostgreSQL transaction locks so
 concurrent requests and multiple backend instances cannot bypass the limits.
 
@@ -190,12 +202,11 @@ the same R2 bucket under `marketplace/`; PostgreSQL stores image metadata and
 the generated object URL only. The frontend no longer asks students to paste
 image URLs. Supported image types are JPG, PNG, and WebP.
 
-User-submitted marketplace listings, events, discussion questions, and
+User-submitted notes, marketplace listings, events, discussion questions, and
 internships are created as pending review and are hidden from public lists and
 global search until an admin approves them from
 `/api/v1/admin/moderation/pending`. Admin-created content is approved
-immediately. Notes remain admin-managed; normal users can view, download,
-bookmark, and rate approved notes but cannot upload or manage notes.
+immediately.
 
 Configure these Render environment variables:
 
@@ -214,6 +225,16 @@ ADMIN_MAX_UPLOADS_PER_DAY=200
 ADMIN_MAX_STORAGE_MB_PER_MONTH=5000
 GLOBAL_UPLOAD_STORAGE_CAP_MB=8192
 ADMIN_UPLOAD_EMAILS=
+PASSWORD_RESET_TOKEN_TTL_MINUTES=30
+APP_FRONTEND_URL=https://campusone.dev
+MAIL_ENABLED=true
+MAIL_HOST=<smtp-host>
+MAIL_PORT=587
+MAIL_USERNAME=<secret>
+MAIL_PASSWORD=<secret>
+MAIL_FROM=CampusOne <no-reply@campusone.dev>
+MAIL_SMTP_AUTH=true
+MAIL_SMTP_STARTTLS_ENABLE=true
 ```
 
 Use an R2 API token restricted to Object Read & Write for the selected bucket.
