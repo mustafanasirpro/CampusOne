@@ -256,7 +256,8 @@ configuration import. Operating-system environment variables take precedence.
 | `APP_FRONTEND_URL` | Production | Frontend base URL used in reset links, e.g. `https://campusone.dev` |
 | `MAIL_ENABLED` | Production | Set to `true` when SMTP is configured for reset emails |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Production | SMTP settings for password reset delivery |
-| `MAIL_SMTP_AUTH`, `MAIL_SMTP_STARTTLS_ENABLE` | No | SMTP transport switches; defaults are safe for disabled/local mail |
+| `MAIL_SMTP_AUTH`, `MAIL_SMTP_STARTTLS_ENABLE`, `MAIL_SMTP_STARTTLS_REQUIRED` | No | SMTP transport switches; auth and STARTTLS default on when `MAIL_ENABLED=true` |
+| `MAIL_SMTP_CONNECTION_TIMEOUT_MS`, `MAIL_SMTP_TIMEOUT_MS`, `MAIL_SMTP_WRITE_TIMEOUT_MS` | No | SMTP connection/read/write timeouts; each defaults to `10000` ms |
 | `APP_CORS_ALLOWED_ORIGINS` | Production | Comma-separated exact frontend origins for Render, for example `https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app` |
 | `CORS_ALLOWED_ORIGINS` | No | Legacy alias for the same exact-origin CORS setting |
 | `OPENAPI_ENABLED` | No | Enabled by default; set to `false` to disable API documentation |
@@ -297,7 +298,26 @@ For the deployed backend, Render should include:
 APP_CORS_ALLOWED_ORIGINS=https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app,http://localhost:5173,http://127.0.0.1:5173
 AUTH_COOKIE_SECURE=true
 AUTH_COOKIE_SAME_SITE=None
+PASSWORD_RESET_TOKEN_TTL_MINUTES=30
+APP_FRONTEND_URL=https://campusone.dev
+MAIL_ENABLED=true
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=<sender-gmail-address>
+MAIL_PASSWORD=<gmail-app-password-without-spaces>
+MAIL_FROM=<sender-gmail-address>
+MAIL_SMTP_AUTH=true
+MAIL_SMTP_STARTTLS_ENABLE=true
+MAIL_SMTP_STARTTLS_REQUIRED=true
+MAIL_SMTP_CONNECTION_TIMEOUT_MS=10000
+MAIL_SMTP_TIMEOUT_MS=10000
+MAIL_SMTP_WRITE_TIMEOUT_MS=10000
 ```
+
+For Gmail SMTP, create a Gmail App Password and store it in Render without
+spaces. If Google displays `abcd efgh ijkl mnop`, the Render value must be
+`abcdefghijklmnop`. Do not use the normal Gmail password and do not commit any
+mail credentials.
 
 ## 💻 Running Locally
 
