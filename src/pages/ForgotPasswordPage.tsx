@@ -11,6 +11,7 @@ import { paths } from "@/routes/paths";
 import { useDocumentTitle } from "@/utils/useDocumentTitle";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const requestTimeoutMs = 15_000;
 const successMessage =
   "If an account exists, password reset instructions have been sent.";
 
@@ -49,16 +50,28 @@ export function ForgotPasswordPage() {
     setIsSubmitting(true);
     setError(null);
     setSuccess(null);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      requestTimeoutMs,
+    );
     try {
-      const response = await forgotPassword({ email: email.trim() });
+      const response = await forgotPassword(
+        { email: email.trim() },
+        controller.signal,
+      );
       setSuccess(response.message || successMessage);
     } catch (requestError) {
       setError(
-        requestError instanceof ApiError
-          ? requestError.message
-          : "Password reset instructions could not be requested. Please try again.",
+        requestError instanceof DOMException &&
+          requestError.name === "AbortError"
+          ? "CampusOne is temporarily unreachable. Please try again."
+          : requestError instanceof ApiError
+            ? requestError.message
+            : "Password reset instructions could not be requested. Please try again.",
       );
     } finally {
+      window.clearTimeout(timeoutId);
       setIsSubmitting(false);
     }
   };
