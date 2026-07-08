@@ -220,6 +220,10 @@ public class NoteService {
         } else {
             noteModerationActionRepository.save(
                     NoteModerationAction.submitted(savedNote, null));
+            integrationService.noteSubmittedForApproval(
+                    userId,
+                    savedNote.getId(),
+                    savedNote.getTitle());
         }
         integrationService.noteCreated(userId, savedNote.getId());
         return noteMapper.toDetail(savedNote, false, null);
