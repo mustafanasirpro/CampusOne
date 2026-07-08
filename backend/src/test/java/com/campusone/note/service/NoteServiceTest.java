@@ -198,7 +198,7 @@ class NoteServiceTest {
     }
 
     @Test
-    void createNote_validMetadata_createsPendingNoteAndInitialAuditRecords() {
+    void createNote_validMetadata_createsApprovedNoteAndInitialAuditRecords() {
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
         when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.of(course));
         when(fileAssetRepository.save(any(FileAsset.class)))
@@ -227,7 +227,7 @@ class NoteServiceTest {
 
         assertThat(response.id()).isEqualTo(NOTE_ID);
         assertThat(response.moderationStatus())
-                .isEqualTo(NoteModerationStatus.PENDING);
+                .isEqualTo(NoteModerationStatus.APPROVED);
         assertThat(response.tags())
                 .extracting(tag -> tag.name())
                 .containsExactlyInAnyOrder("Java", "OOP");
@@ -303,6 +303,8 @@ class NoteServiceTest {
                 .isEqualTo(StorageProvider.S3_COMPATIBLE);
         assertThat(response.file().originalFilename())
                 .isEqualTo("oop-notes.pdf");
+        assertThat(response.moderationStatus())
+                .isEqualTo(NoteModerationStatus.APPROVED);
     }
 
     @Test
@@ -409,6 +411,8 @@ class NoteServiceTest {
     void updateNoteAsAdmin_nonOwnerUpdate_isAllowed() {
         when(noteRepository.findDetailedById(NOTE_ID))
                 .thenReturn(Optional.of(note));
+        when(userRepository.findById(OTHER_USER_ID))
+                .thenReturn(Optional.of(otherUser));
         when(noteBookmarkRepository.existsById(any())).thenReturn(false);
         when(noteRatingRepository.findById(any())).thenReturn(Optional.empty());
 
@@ -426,6 +430,8 @@ class NoteServiceTest {
                         null));
 
         assertThat(response.title()).isEqualTo("Admin Updated OOP Notes");
+        assertThat(response.moderationStatus())
+                .isEqualTo(NoteModerationStatus.APPROVED);
     }
 
     @Test
