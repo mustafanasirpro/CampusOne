@@ -73,7 +73,7 @@ export function CreateNotePage() {
         showToast({
           title: "Submitted for review",
           message:
-            "Submitted for review. Your note will appear after admin approval.",
+            "Submitted for review. It will appear after admin approval.",
           variant: "success",
         });
         navigate(paths.notes, { replace: true });
