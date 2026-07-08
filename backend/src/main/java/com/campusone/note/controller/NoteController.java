@@ -63,15 +63,16 @@ public class NoteController {
 
     @PostMapping
     @Operation(
-            summary = "Create a note from existing file metadata (admin only)",
-            description = "Admin-only deprecated compatibility endpoint. "
-                    + "Use /api/v1/notes/upload for real PDF uploads.",
+            summary = "Submit a note from existing file metadata",
+            description = "Deprecated compatibility endpoint for trusted clients. "
+                    + "Authenticated student submissions enter pending review; "
+                    + "admin submissions are approved immediately. Use "
+                    + "/api/v1/notes/upload for real PDF uploads.",
             deprecated = true)
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<NoteDetailResponse> createNote(
             @AuthenticationPrincipal CampusOneUserPrincipal principal,
             @Valid @RequestBody CreateNoteRequest request) {
-        requireAdmin(principal);
         NoteDetailResponse response =
                 noteService.createNote(principal.getUserId(), request);
         return ResponseEntity.created(
@@ -83,17 +84,17 @@ public class NoteController {
             path = "/upload",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
-            summary = "Create a note and upload its PDF (admin only)",
-            description = "Admin-only multipart endpoint. Accepts a JSON "
-                    + "`note` part and an application/pdf "
-                    + "`file` part. CampusOne validates and stores the PDF in "
-                    + "configured S3-compatible storage.")
+            summary = "Submit a note and upload its PDF",
+            description = "Authenticated multipart endpoint. Accepts a JSON "
+                    + "`note` part and an application/pdf `file` part. Student "
+                    + "submissions enter pending review; admin uploads are "
+                    + "approved immediately. CampusOne validates and stores the "
+                    + "PDF in configured S3-compatible storage.")
     @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<NoteDetailResponse> uploadNote(
             @AuthenticationPrincipal CampusOneUserPrincipal principal,
             @Valid @RequestPart("note") CreateUploadedNoteRequest request,
             @RequestPart("file") MultipartFile file) {
-        requireAdmin(principal);
         NoteDetailResponse response = noteUploadService.uploadAndCreate(
                 principal.getUserId(),
                 request,
