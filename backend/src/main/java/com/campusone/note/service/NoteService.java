@@ -206,10 +206,14 @@ public class NoteService {
                 visibility);
         note.replaceTags(resolveTags(tags));
         Note savedNote = noteRepository.save(note);
+        savedNote.approve(uploader, clock.instant());
 
         noteVersionRepository.save(NoteVersion.initial(savedNote));
         noteModerationActionRepository.save(
-                NoteModerationAction.submitted(savedNote, null));
+                NoteModerationAction.approved(
+                        savedNote,
+                        uploader,
+                        NoteModerationStatus.PENDING));
         integrationService.noteCreated(userId, savedNote.getId());
         return noteMapper.toDetail(savedNote, false, null);
     }
@@ -267,10 +271,26 @@ public class NoteService {
         }
 
         if (hasChanges) {
-            NoteModerationStatus previousStatus = note.resubmitForReview();
-            if (previousStatus != NoteModerationStatus.PENDING) {
-                noteModerationActionRepository.save(
-                        NoteModerationAction.submitted(note, previousStatus));
+            if (requireOwnership) {
+                NoteModerationStatus previousStatus = note.resubmitForReview();
+                if (previousStatus != NoteModerationStatus.PENDING) {
+                    noteModerationActionRepository.save(
+                            NoteModerationAction.submitted(
+                                    note,
+                                    previousStatus));
+                }
+            } else {
+                User admin = requireUser(userId);
+                NoteModerationStatus previousStatus =
+                        note.getModerationStatus();
+                note.approve(admin, clock.instant());
+                if (previousStatus != NoteModerationStatus.APPROVED) {
+                    noteModerationActionRepository.save(
+                            NoteModerationAction.approved(
+                                    note,
+                                    admin,
+                                    previousStatus));
+                }
             }
         }
         return toDetail(note, userId);
