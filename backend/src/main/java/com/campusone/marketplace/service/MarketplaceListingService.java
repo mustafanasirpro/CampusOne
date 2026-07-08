@@ -84,6 +84,7 @@ public class MarketplaceListingService {
         integrationService.marketplaceListingCreated(
                 userId,
                 savedListing.getId());
+        notifyIfPendingReview(savedListing, userId);
         return listingMapper.toDetail(savedListing);
     }
 
@@ -108,6 +109,7 @@ public class MarketplaceListingService {
         integrationService.marketplaceListingCreated(
                 userId,
                 savedListing.getId());
+        notifyIfPendingReview(savedListing, userId);
         return listingMapper.toDetail(savedListing);
     }
 
@@ -181,6 +183,7 @@ public class MarketplaceListingService {
             replaceImages(listing, request.images());
         }
         requeueForReviewIfNeeded(listing);
+        notifyIfPendingReview(listing, userId);
         return listingMapper.toDetail(listing);
     }
 
@@ -208,6 +211,7 @@ public class MarketplaceListingService {
                 storedImages,
                 request.title() == null ? listing.getTitle() : request.title());
         requeueForReviewIfNeeded(listing);
+        notifyIfPendingReview(listing, userId);
         return listingMapper.toDetail(listing);
     }
 
@@ -282,6 +286,17 @@ public class MarketplaceListingService {
                 seller.getId(),
                 seller.getEmail())) {
             listing.submitForReview();
+        }
+    }
+
+    private void notifyIfPendingReview(
+            MarketplaceListing listing,
+            UUID userId) {
+        if (listing.getStatus() == MarketplaceListingStatus.PENDING_REVIEW) {
+            integrationService.marketplaceListingSubmittedForApproval(
+                    userId,
+                    listing.getId(),
+                    listing.getTitle());
         }
     }
 
