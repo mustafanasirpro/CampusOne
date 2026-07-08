@@ -6,6 +6,6 @@ public class NoteManagementAccessDeniedException
         extends AccessDeniedException {
 
     public NoteManagementAccessDeniedException() {
-        super("Only admins can upload or manage notes.");
+        super("Only admins can edit or delete notes after submission.");
     }
 }
