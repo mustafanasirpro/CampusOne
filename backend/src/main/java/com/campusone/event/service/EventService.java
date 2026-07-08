@@ -80,6 +80,7 @@ public class EventService {
         }
         event = eventRepository.save(event);
         integrationService.eventCreated(userId, event.getId());
+        notifyIfPendingReview(event, userId);
         return eventMapper.toDetail(event, false, true);
     }
 
@@ -169,6 +170,7 @@ public class EventService {
                     previousStatus != EventStatus.CANCELLED
                             && event.getStatus() == EventStatus.CANCELLED);
         }
+        notifyIfPendingReview(event, userId);
         return toDetail(event, userId);
     }
 
@@ -397,6 +399,17 @@ public class EventService {
                         user.getId(),
                         user.getEmail()))
                 .orElse(false);
+    }
+
+    private void notifyIfPendingReview(
+            CampusEvent event,
+            UUID userId) {
+        if (event.getStatus() == EventStatus.PENDING_REVIEW) {
+            integrationService.eventSubmittedForApproval(
+                    userId,
+                    event.getId(),
+                    event.getTitle());
+        }
     }
 
     private void requireOrganizer(CampusEvent event, UUID userId) {
