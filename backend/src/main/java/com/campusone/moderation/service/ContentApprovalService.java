@@ -10,6 +10,7 @@ import com.campusone.event.repository.CampusEventRepository;
 import com.campusone.internship.entity.Internship;
 import com.campusone.internship.entity.InternshipStatus;
 import com.campusone.internship.repository.InternshipRepository;
+import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.marketplace.entity.MarketplaceListing;
 import com.campusone.marketplace.entity.MarketplaceListingStatus;
 import com.campusone.marketplace.repository.MarketplaceListingRepository;
@@ -53,6 +54,7 @@ public class ContentApprovalService {
     private final ModerationActionRepository actionRepository;
     private final UserRepository userRepository;
     private final NoteAdminAuthorizationService adminAuthorizationService;
+    private final CommunityIntegrationService integrationService;
     private final Clock clock;
 
     public ContentApprovalService(
@@ -64,6 +66,7 @@ public class ContentApprovalService {
             ModerationActionRepository actionRepository,
             UserRepository userRepository,
             NoteAdminAuthorizationService adminAuthorizationService,
+            CommunityIntegrationService integrationService,
             Clock clock) {
         this.noteRepository = noteRepository;
         this.listingRepository = listingRepository;
@@ -73,6 +76,7 @@ public class ContentApprovalService {
         this.actionRepository = actionRepository;
         this.userRepository = userRepository;
         this.adminAuthorizationService = adminAuthorizationService;
+        this.integrationService = integrationService;
         this.clock = clock;
     }
 
@@ -118,6 +122,13 @@ public class ContentApprovalService {
                 targetType,
                 targetId,
                 null);
+        integrationService.contentApprovalReviewed(
+                response.submittedBy().userId(),
+                admin.getId(),
+                targetType,
+                targetId,
+                response.title(),
+                true);
         return response;
     }
 
@@ -143,6 +154,13 @@ public class ContentApprovalService {
                 targetType,
                 targetId,
                 normalizedReason);
+        integrationService.contentApprovalReviewed(
+                response.submittedBy().userId(),
+                admin.getId(),
+                targetType,
+                targetId,
+                response.title(),
+                false);
         return response;
     }
 
