@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mail.MailSendException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -111,6 +113,25 @@ class PasswordResetServiceTest {
                 PasswordResetService.GENERIC_FORGOT_PASSWORD_MESSAGE);
         verify(tokenRepository, never()).save(any());
         verify(mailer, never()).sendResetLink(any(), any());
+    }
+
+    @Test
+    void requestReset_smtpFailureStillReturnsGenericMessageAndStoresToken() {
+        when(userRepository.findByEmailIgnoreCase("student@example.com"))
+                .thenReturn(Optional.of(user));
+        when(tokenRepository.save(any(PasswordResetToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new MailSendException("smtp down"))
+                .when(mailer)
+                .sendResetLink(eq(user), any(String.class));
+
+        var response = service.requestReset(
+                new ForgotPasswordRequest("student@example.com"));
+
+        assertThat(response.message()).isEqualTo(
+                PasswordResetService.GENERIC_FORGOT_PASSWORD_MESSAGE);
+        verify(tokenRepository).save(any(PasswordResetToken.class));
+        verify(mailer).sendResetLink(eq(user), any(String.class));
     }
 
     @Test
