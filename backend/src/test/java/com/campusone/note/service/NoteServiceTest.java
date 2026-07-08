@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 import com.campusone.academic.entity.Course;
@@ -234,6 +235,10 @@ class NoteServiceTest {
         verify(noteVersionRepository).save(any());
         verify(noteModerationActionRepository)
                 .save(any(NoteModerationAction.class));
+        verify(integrationService).noteSubmittedForApproval(
+                OWNER_ID,
+                NOTE_ID,
+                "Complete OOP Notes");
     }
 
     @Test
@@ -272,6 +277,10 @@ class NoteServiceTest {
         verify(noteVersionRepository).save(any());
         verify(noteModerationActionRepository)
                 .save(any(NoteModerationAction.class));
+        verify(integrationService, never()).noteSubmittedForApproval(
+                any(),
+                any(),
+                any());
     }
 
     @Test
@@ -387,6 +396,10 @@ class NoteServiceTest {
 
         assertThat(response.moderationStatus())
                 .isEqualTo(NoteModerationStatus.PENDING);
+        verify(integrationService).noteSubmittedForApproval(
+                OWNER_ID,
+                NOTE_ID,
+                "Complete OOP Notes");
     }
 
     @Test
