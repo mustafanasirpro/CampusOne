@@ -173,7 +173,7 @@ class NoteControllerTest {
     }
 
     @Test
-    void createNote_adminValidRequest_returnsCreated() throws Exception {
+    void createNote_authenticatedUserValidRequest_returnsCreated() throws Exception {
         when(noteService.createNote(eq(USER_ID), any(CreateNoteRequest.class)))
                 .thenReturn(detailResponse);
 
@@ -189,20 +189,16 @@ class NoteControllerTest {
     }
 
     @Test
-    void createNote_normalUser_isForbidden() throws Exception {
-        rejectNoteManagement();
+    void createNote_normalUserSubmitsForReview_returnsCreated() throws Exception {
+        when(noteService.createNote(eq(USER_ID), any(CreateNoteRequest.class)))
+                .thenReturn(detailResponse);
 
         mockMvc.perform(post("/api/v1/notes")
                         .with(authentication(authentication))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validCreateJson()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("NOTE_ADMIN_REQUIRED"))
-                .andExpect(jsonPath("$.message")
-                        .value("Only admins can upload or manage notes."));
-
-        verify(noteService, never())
-                .createNote(eq(USER_ID), any(CreateNoteRequest.class));
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.moderationStatus").value("PENDING"));
     }
 
     @Test
@@ -253,7 +249,7 @@ class NoteControllerTest {
     }
 
     @Test
-    void uploadNote_adminMultipartRequest_returnsCreated()
+    void uploadNote_authenticatedUserMultipartRequest_returnsCreated()
             throws Exception {
         when(noteUploadService.uploadAndCreate(
                 eq(USER_ID),
@@ -274,22 +270,19 @@ class NoteControllerTest {
     }
 
     @Test
-    void uploadNote_normalUser_isForbidden() throws Exception {
-        rejectNoteManagement();
+    void uploadNote_normalUserSubmitsForReview_returnsCreated() throws Exception {
+        when(noteUploadService.uploadAndCreate(
+                eq(USER_ID),
+                any(CreateUploadedNoteRequest.class),
+                any()))
+                .thenReturn(detailResponse);
 
         mockMvc.perform(multipart("/api/v1/notes/upload")
                         .file(validUploadRequestPart())
                         .file(validPdfPart())
                         .with(authentication(authentication)))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("NOTE_ADMIN_REQUIRED"))
-                .andExpect(jsonPath("$.message")
-                        .value("Only admins can upload or manage notes."));
-
-        verify(noteUploadService, never()).uploadAndCreate(
-                eq(USER_ID),
-                any(CreateUploadedNoteRequest.class),
-                any());
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.moderationStatus").value("PENDING"));
     }
 
     @Test
@@ -351,7 +344,7 @@ class NoteControllerTest {
                         .content("{\"title\":\"Updated OOP Notes\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message")
-                        .value("Only admins can upload or manage notes."));
+                        .value("Only admins can edit or delete notes after submission."));
 
         verify(noteService, never()).updateNoteAsAdmin(
                 eq(USER_ID),
@@ -383,7 +376,7 @@ class NoteControllerTest {
                         .with(authentication(authentication)))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.message")
-                        .value("Only admins can upload or manage notes."));
+                        .value("Only admins can edit or delete notes after submission."));
 
         verify(noteService, never()).deleteNoteAsAdmin(NOTE_ID);
     }
