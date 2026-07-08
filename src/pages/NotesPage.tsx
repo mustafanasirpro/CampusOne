@@ -154,17 +154,15 @@ export function NotesPage() {
     <div className="grid gap-6 pb-8">
       <PageHeader
         actions={
-          canManage ? (
-            <Link
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
-              to={paths.noteNew}
-            >
-              <FilePlus2 className="size-4" />
-              Upload note
-            </Link>
-          ) : null
+          <Link
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+            to={paths.noteNew}
+          >
+            <FilePlus2 className="size-4" />
+            {canManage ? "Upload note" : "Submit note"}
+          </Link>
         }
-        description="Discover approved notes and past papers. Upload and management tools are available to admins."
+        description="Share study notes and past papers. Submissions are reviewed before they appear publicly."
         eyebrow="Study resources"
         title="Notes"
       />
@@ -173,30 +171,21 @@ export function NotesPage() {
         activeTab={view}
         onChange={changeView}
         tabs={
-          canManage
-            ? [
-                {
-                  count:
-                    view === "library"
-                      ? result?.totalElements
-                      : undefined,
-                  label: "Notes library",
-                  value: "library",
-                },
-                {
-                  count:
-                    view === "mine" ? result?.totalElements : undefined,
-                  label: "Admin uploads",
-                  value: "mine",
-                },
-              ]
-            : [
-                {
-                  count: result?.totalElements,
-                  label: "Notes library",
-                  value: "library",
-                },
-              ]
+          [
+            {
+              count:
+                view === "library"
+                  ? result?.totalElements
+                  : undefined,
+              label: "Notes library",
+              value: "library",
+            },
+            {
+              count: view === "mine" ? result?.totalElements : undefined,
+              label: canManage ? "Admin uploads" : "My submissions",
+              value: "mine",
+            },
+          ]
         }
       />
 
@@ -250,18 +239,20 @@ export function NotesPage() {
               <Button onClick={clearFilters} variant="outline">
                 Clear filters
               </Button>
-            ) : canManage ? (
+            ) : (
               <Link
                 className="inline-flex h-10 items-center justify-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white hover:bg-brand-700"
                 to={paths.noteNew}
               >
-                Upload a note
+                {canManage ? "Upload a note" : "Submit a note"}
               </Link>
-            ) : undefined
+            )
           }
           description={
             view === "mine"
-              ? "No notes have been uploaded by this admin account."
+              ? canManage
+                ? "No notes have been uploaded by this admin account."
+                : "No notes have been submitted by your account yet."
               : "No approved public notes match the selected course and tag."
           }
           icon={<FileSearch className="size-6" />}
