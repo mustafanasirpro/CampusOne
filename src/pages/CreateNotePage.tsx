@@ -1,4 +1,4 @@
-import { ArrowLeft, LockKeyhole } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -8,7 +8,6 @@ import {
   getNoteManagementStatus,
 } from "@/api/notesApi";
 import {
-  EmptyState,
   ErrorMessage,
   LoadingSpinner,
   PageHeader,
@@ -57,18 +56,28 @@ export function CreateNotePage() {
   }, []);
 
   const handleSubmit = async (request: CreateNoteRequest, file: File) => {
-    if (!canManage || isSubmitting) return;
+    if (isSubmitting) return;
     setIsSubmitting(true);
     setError(null);
     setFieldErrors({});
     try {
       const note = await createNote(request, file);
-      showToast({
-        title: "Note uploaded",
-        message: "Your note is now available in the approved library.",
-        variant: "success",
-      });
-      navigate(paths.noteDetail(note.id), { replace: true });
+      if (canManage) {
+        showToast({
+          title: "Note uploaded",
+          message: "Note uploaded successfully.",
+          variant: "success",
+        });
+        navigate(paths.noteDetail(note.id), { replace: true });
+      } else {
+        showToast({
+          title: "Submitted for review",
+          message:
+            "Submitted for review. Your note will appear after admin approval.",
+          variant: "success",
+        });
+        navigate(paths.notes, { replace: true });
+      }
     } catch (requestError) {
       if (requestError instanceof ApiError) {
         setError(requestError.message);
@@ -89,27 +98,6 @@ export function CreateNotePage() {
     );
   }
 
-  if (!canManage) {
-    return (
-      <div className="grid gap-4">
-        {accessError ? <ErrorMessage message={accessError} /> : null}
-        <EmptyState
-          action={
-            <Link
-              className="inline-flex h-10 items-center rounded-xl bg-brand-600 px-4 text-sm font-semibold text-white hover:bg-brand-700"
-              to={paths.notes}
-            >
-              Back to notes
-            </Link>
-          }
-          description="Only admins can upload notes and past papers."
-          icon={<LockKeyhole className="size-6" />}
-          title="Admin access required"
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="grid gap-6 pb-8">
       <Link
@@ -121,19 +109,31 @@ export function CreateNotePage() {
       </Link>
 
       <PageHeader
-        description="Upload an approved PDF study resource with clear academic details."
+        description={
+          canManage
+            ? "Upload an approved PDF study resource with clear academic details."
+            : "Submit a PDF study resource for review. Approved notes become visible in the public library."
+        }
         eyebrow="Notes"
-        title="Create a note"
+        title={canManage ? "Upload a note" : "Submit a note"}
       />
 
       {error ? <ErrorMessage message={error} /> : null}
+      {!canManage && accessError ? (
+        <ErrorMessage message={accessError} />
+      ) : null}
 
       <NoteForm
         backendFieldErrors={fieldErrors}
         isSubmitting={isSubmitting}
         mode="create"
         onSubmit={handleSubmit}
-        submitLabel="Upload note"
+        reviewNotice={
+          canManage
+            ? "Admin uploads are published directly to the approved notes library."
+            : "Student submissions are reviewed before they appear publicly."
+        }
+        submitLabel={canManage ? "Upload note" : "Submit note"}
       />
     </div>
   );
