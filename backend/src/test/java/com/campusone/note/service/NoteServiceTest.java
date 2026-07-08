@@ -198,7 +198,7 @@ class NoteServiceTest {
     }
 
     @Test
-    void createNote_validMetadata_createsApprovedNoteAndInitialAuditRecords() {
+    void createNote_normalUserCreatesPendingNoteAndInitialAuditRecords() {
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
         when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.of(course));
         when(fileAssetRepository.save(any(FileAsset.class)))
@@ -227,10 +227,48 @@ class NoteServiceTest {
 
         assertThat(response.id()).isEqualTo(NOTE_ID);
         assertThat(response.moderationStatus())
-                .isEqualTo(NoteModerationStatus.APPROVED);
+                .isEqualTo(NoteModerationStatus.PENDING);
         assertThat(response.tags())
                 .extracting(tag -> tag.name())
                 .containsExactlyInAnyOrder("Java", "OOP");
+        verify(noteVersionRepository).save(any());
+        verify(noteModerationActionRepository)
+                .save(any(NoteModerationAction.class));
+    }
+
+    @Test
+    void createNote_adminCreatesApprovedNoteAndInitialAuditRecords() {
+        when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+        when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.of(course));
+        when(adminAuthorizationService.canManage(OWNER_ID, "owner@example.com"))
+                .thenReturn(true);
+        when(fileAssetRepository.save(any(FileAsset.class)))
+                .thenAnswer(invocation -> {
+                    FileAsset saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", FILE_ID);
+                    ReflectionTestUtils.setField(saved, "createdAt", NOW);
+                    ReflectionTestUtils.setField(saved, "updatedAt", NOW);
+                    return saved;
+                });
+        when(tagRepository.findAllByNormalizedNameIn(anyCollection()))
+                .thenReturn(List.of());
+        when(tagRepository.saveAll(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(noteRepository.save(any(Note.class)))
+                .thenAnswer(invocation -> {
+                    Note saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", NOTE_ID);
+                    ReflectionTestUtils.setField(saved, "createdAt", NOW);
+                    ReflectionTestUtils.setField(saved, "updatedAt", NOW);
+                    return saved;
+                });
+
+        NoteDetailResponse response =
+                noteService.createNote(OWNER_ID, createRequest());
+
+        assertThat(response.id()).isEqualTo(NOTE_ID);
+        assertThat(response.moderationStatus())
+                .isEqualTo(NoteModerationStatus.APPROVED);
         verify(noteVersionRepository).save(any());
         verify(noteModerationActionRepository)
                 .save(any(NoteModerationAction.class));
@@ -251,6 +289,8 @@ class NoteServiceTest {
     void createUploadedNote_storesReadyR2Metadata() {
         when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
         when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.of(course));
+        when(adminAuthorizationService.canManage(OWNER_ID, "owner@example.com"))
+                .thenReturn(true);
         when(fileAssetRepository.save(any(FileAsset.class)))
                 .thenAnswer(invocation -> {
                     FileAsset saved = invocation.getArgument(0);
@@ -305,6 +345,48 @@ class NoteServiceTest {
                 .isEqualTo("oop-notes.pdf");
         assertThat(response.moderationStatus())
                 .isEqualTo(NoteModerationStatus.APPROVED);
+    }
+
+    @Test
+    void createUploadedNote_normalUserSubmissionStaysPending() {
+        when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+        when(courseRepository.findById(COURSE_ID)).thenReturn(Optional.of(course));
+        when(fileAssetRepository.save(any(FileAsset.class)))
+                .thenAnswer(invocation -> {
+                    FileAsset saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", FILE_ID);
+                    ReflectionTestUtils.setField(saved, "createdAt", NOW);
+                    ReflectionTestUtils.setField(saved, "updatedAt", NOW);
+                    return saved;
+                });
+        when(tagRepository.findAllByNormalizedNameIn(anyCollection()))
+                .thenReturn(List.of());
+        when(tagRepository.saveAll(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(noteRepository.save(any(Note.class)))
+                .thenAnswer(invocation -> {
+                    Note saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", NOTE_ID);
+                    ReflectionTestUtils.setField(saved, "createdAt", NOW);
+                    ReflectionTestUtils.setField(saved, "updatedAt", NOW);
+                    return saved;
+                });
+        StoredObject storedObject = new StoredObject(
+                StorageProvider.S3_COMPATIBLE,
+                "campusone-notes",
+                "notes/" + OWNER_ID + "/2026/oop.pdf",
+                "oop-notes.pdf",
+                "application/pdf",
+                4096,
+                "a".repeat(64));
+
+        NoteDetailResponse response = noteService.createUploadedNote(
+                OWNER_ID,
+                createUploadedRequest(),
+                storedObject);
+
+        assertThat(response.moderationStatus())
+                .isEqualTo(NoteModerationStatus.PENDING);
     }
 
     @Test
@@ -536,6 +618,18 @@ class NoteServiceTest {
                         4096L,
                         "a".repeat(64),
                         null));
+    }
+
+    private CreateUploadedNoteRequest createUploadedRequest() {
+        return new CreateUploadedNoteRequest(
+                COURSE_ID,
+                "Complete OOP Notes",
+                "Detailed object oriented programming lecture notes.",
+                "Dr. Ahmed Khan",
+                4,
+                NoteFileType.PDF,
+                NoteVisibility.PUBLIC,
+                List.of("OOP", "Java"));
     }
 
     private User user(
