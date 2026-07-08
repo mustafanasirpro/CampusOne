@@ -74,6 +74,36 @@ export function NotificationMenu() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const refreshUnreadCount = () => {
+      void getUnreadCount()
+        .then((response) => {
+          if (active) setUnreadCount(response.unreadCount);
+        })
+        .catch(() => {
+          if (active) {
+            setError("The unread notification count could not be refreshed.");
+          }
+        });
+    };
+    window.addEventListener(
+      "campusone:notifications-refresh",
+      refreshUnreadCount,
+    );
+    window.addEventListener("focus", refreshUnreadCount);
+    const intervalId = window.setInterval(refreshUnreadCount, 60_000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener(
+        "campusone:notifications-refresh",
+        refreshUnreadCount,
+      );
+      window.removeEventListener("focus", refreshUnreadCount);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isOpen) return;
 
     const controller = new AbortController();
