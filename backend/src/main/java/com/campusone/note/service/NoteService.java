@@ -206,14 +206,21 @@ public class NoteService {
                 visibility);
         note.replaceTags(resolveTags(tags));
         Note savedNote = noteRepository.save(note);
-        savedNote.approve(uploader, clock.instant());
 
         noteVersionRepository.save(NoteVersion.initial(savedNote));
-        noteModerationActionRepository.save(
-                NoteModerationAction.approved(
-                        savedNote,
-                        uploader,
-                        NoteModerationStatus.PENDING));
+        if (adminAuthorizationService.canManage(
+                uploader.getId(),
+                uploader.getEmail())) {
+            savedNote.approve(uploader, clock.instant());
+            noteModerationActionRepository.save(
+                    NoteModerationAction.approved(
+                            savedNote,
+                            uploader,
+                            NoteModerationStatus.PENDING));
+        } else {
+            noteModerationActionRepository.save(
+                    NoteModerationAction.submitted(savedNote, null));
+        }
         integrationService.noteCreated(userId, savedNote.getId());
         return noteMapper.toDetail(savedNote, false, null);
     }
