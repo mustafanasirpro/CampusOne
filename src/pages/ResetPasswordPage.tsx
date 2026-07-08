@@ -18,6 +18,7 @@ interface ResetPasswordForm {
 type ResetPasswordErrors = Partial<Record<keyof ResetPasswordForm, string>>;
 
 const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/;
+const requestTimeoutMs = 15_000;
 const successMessage = "Password reset successfully. You can now log in.";
 
 export function ResetPasswordPage() {
@@ -78,20 +79,31 @@ export function ResetPasswordPage() {
     setIsSubmitting(true);
     setRequestError(null);
     setSuccess(null);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      requestTimeoutMs,
+    );
     try {
-      const response = await resetPassword({
-        newPassword: form.newPassword,
-        token,
-      });
+      const response = await resetPassword(
+        {
+          newPassword: form.newPassword,
+          token,
+        },
+        controller.signal,
+      );
       setSuccess(response.message || successMessage);
       setForm({ confirmPassword: "", newPassword: "" });
     } catch (error) {
       setRequestError(
-        error instanceof ApiError
+        error instanceof DOMException && error.name === "AbortError"
+          ? "CampusOne is temporarily unreachable. Please try again."
+          : error instanceof ApiError
           ? error.message
           : "This reset link is invalid or expired.",
       );
     } finally {
+      window.clearTimeout(timeoutId);
       setIsSubmitting(false);
     }
   };
