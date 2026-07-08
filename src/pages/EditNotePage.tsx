@@ -132,7 +132,7 @@ export function EditNotePage() {
             View note
           </Link>
         }
-        description="Only admins can upload notes and past papers."
+        description="Only admins can edit or delete notes after submission."
         icon={<LockKeyhole className="size-6" />}
         title="Admin access required"
       />
