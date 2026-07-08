@@ -119,6 +119,32 @@ class EventServiceTest {
     }
 
     @Test
+    void createEvent_normalUserCreatesPendingEventAndNotifiesAdmins() {
+        when(userRepository.findById(ORGANIZER_ID))
+                .thenReturn(Optional.of(organizer));
+        when(adminAuthorizationService.canManage(
+                ORGANIZER_ID,
+                "organizer@example.com"))
+                .thenReturn(false);
+        when(eventRepository.save(any(CampusEvent.class)))
+                .thenAnswer(invocation -> {
+                    CampusEvent saved = invocation.getArgument(0);
+                    setPersistenceFields(saved);
+                    return saved;
+                });
+
+        var response = eventService.createEvent(
+                ORGANIZER_ID,
+                createRequest());
+
+        assertThat(response.status()).isEqualTo(EventStatus.PENDING_REVIEW);
+        verify(integrationService).eventSubmittedForApproval(
+                ORGANIZER_ID,
+                EVENT_ID,
+                "Campus AI Workshop");
+    }
+
+    @Test
     void listPublicEvents_returnsPublicPage() {
         when(eventRepository.findPublicEvents(
                 eq(EventVisibility.PUBLIC),
