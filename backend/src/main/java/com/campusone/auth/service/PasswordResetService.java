@@ -120,9 +120,10 @@ public class PasswordResetService {
             mailer.sendResetLink(user, rawToken);
         } catch (RuntimeException exception) {
             LOGGER.error(
-                    "Password reset mail delivery failed for user {}",
+                    "Failed to send password reset email for user {}: {}: {}",
                     user.getId(),
-                    exception);
+                    exception.getClass().getSimpleName(),
+                    exception.getMessage());
         }
     }
 
