@@ -26,12 +26,14 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.campusone.config.AuthSessionProperties;
 import com.campusone.config.CorsProperties;
+import com.campusone.config.PasswordResetProperties;
 
 @Configuration
 @EnableConfigurationProperties({
     JwtProperties.class,
     AuthSessionProperties.class,
-    CorsProperties.class
+    CorsProperties.class,
+    PasswordResetProperties.class
 })
 public class SecurityConfig {
 
@@ -59,6 +61,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/login",
+                                "/api/v1/auth/forgot-password",
+                                "/api/v1/auth/reset-password",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout")
                         .permitAll()
