@@ -64,8 +64,8 @@ export function CreateNotePage() {
     try {
       const note = await createNote(request, file);
       showToast({
-        title: "Note submitted",
-        message: "Your note is pending moderation review.",
+        title: "Note uploaded",
+        message: "Your note is now available in the approved library.",
         variant: "success",
       });
       navigate(paths.noteDetail(note.id), { replace: true });
@@ -121,7 +121,7 @@ export function CreateNotePage() {
       </Link>
 
       <PageHeader
-        description="Upload a PDF study resource and submit its academic details for moderation."
+        description="Upload an approved PDF study resource with clear academic details."
         eyebrow="Notes"
         title="Create a note"
       />
@@ -133,7 +133,7 @@ export function CreateNotePage() {
         isSubmitting={isSubmitting}
         mode="create"
         onSubmit={handleSubmit}
-        submitLabel="Submit note"
+        submitLabel="Upload note"
       />
     </div>
   );
