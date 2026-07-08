@@ -92,6 +92,7 @@ public class DiscussionService {
         }
         question = questionRepository.save(question);
         integrationService.discussionQuestionCreated(userId, question.getId());
+        notifyQuestionIfPendingReview(question, userId);
         return discussionMapper.toQuestionDetail(
                 question,
                 null,
@@ -168,6 +169,7 @@ public class DiscussionService {
                 question.getAuthor().getEmail())) {
             question.submitForReview();
         }
+        notifyQuestionIfPendingReview(question, userId);
         return toQuestionDetail(question, userId);
     }
 
@@ -565,6 +567,17 @@ public class DiscussionService {
                         user.getId(),
                         user.getEmail()))
                 .orElse(false);
+    }
+
+    private void notifyQuestionIfPendingReview(
+            DiscussionQuestion question,
+            UUID userId) {
+        if (question.getStatus() == DiscussionQuestionStatus.PENDING_REVIEW) {
+            integrationService.discussionQuestionSubmittedForApproval(
+                    userId,
+                    question.getId(),
+                    question.getTitle());
+        }
     }
 
     private void requireOwner(
