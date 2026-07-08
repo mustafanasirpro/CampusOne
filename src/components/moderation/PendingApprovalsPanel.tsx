@@ -90,6 +90,7 @@ export function PendingApprovalsPanel() {
         message: `${item.title} is now visible publicly.`,
         variant: "success",
       });
+      window.dispatchEvent(new Event("campusone:notifications-refresh"));
       setRefreshKey((value) => value + 1);
     } catch (requestError) {
       setError(toActionError(requestError, "This item could not be approved."));
@@ -115,6 +116,7 @@ export function PendingApprovalsPanel() {
         message: `${item.title} will remain hidden from public pages.`,
         variant: "success",
       });
+      window.dispatchEvent(new Event("campusone:notifications-refresh"));
       setRefreshKey((value) => value + 1);
     } catch (requestError) {
       setError(toActionError(requestError, "This item could not be rejected."));
