@@ -1,0 +1,38 @@
+[35mbackend/src/main/java/com/campusone/note/controller/NoteController.java[m[36m:[m[32m109[m[36m:[m            @RequestParam(required = false) UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/controller/NoteController.java[m[36m:[m[32m118[m[36m:[m                        [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/dto/request/CreateNoteRequest.java[m[36m:[m[32m17[m[36m:[m        UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/dto/request/CreateNoteRequest.java[m[36m:[m[32m69[m[36m:[m            UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/dto/request/CreateNoteRequest.java[m[36m:[m[32m79[m[36m:[m                [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/dto/request/CreateNoteRequest.java[m[36m:[m[32m94[m[36m:[m        return [1;31mcourseId[m != null || (courseCode != null && !courseCode.isBlank());
+[35mbackend/src/main/java/com/campusone/note/dto/request/CreateUploadedNoteRequest.java[m[36m:[m[32m16[m[36m:[m        UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/dto/request/CreateUploadedNoteRequest.java[m[36m:[m[32m64[m[36m:[m            UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/dto/request/CreateUploadedNoteRequest.java[m[36m:[m[32m73[m[36m:[m                [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/dto/request/CreateUploadedNoteRequest.java[m[36m:[m[32m87[m[36m:[m        return [1;31mcourseId[m != null || (courseCode != null && !courseCode.isBlank());
+[35mbackend/src/main/java/com/campusone/note/dto/request/UpdateNoteRequest.java[m[36m:[m[32m14[m[36m:[m        UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/dto/request/UpdateNoteRequest.java[m[36m:[m[32m57[m[36m:[m            UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/dto/request/UpdateNoteRequest.java[m[36m:[m[32m66[m[36m:[m                [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/repository/NoteRepository.java[m[36m:[m[32m33[m[36m:[m              and (:[1;31mcourseId[m is null or note.course.id = :[1;31mcourseId[m)
+[35mbackend/src/main/java/com/campusone/note/repository/NoteRepository.java[m[36m:[m[32m51[m[36m:[m            @Param("[1;31mcourseId[m") UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/repository/NoteRepository.java[m[36m:[m[32m59[m[36m:[m            UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/repository/NoteRepository.java[m[36m:[m[32m65[m[36m:[m                [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m128[m[36m:[m                request.[1;31mcourseId[m(),
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m158[m[36m:[m                request.[1;31mcourseId[m(),
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m248[m[36m:[m        Course course = request.[1;31mcourseId[m() == null
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m253[m[36m:[m                        request.[1;31mcourseId[m(),
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m310[m[36m:[m            UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m315[m[36m:[m        return listPublicNotes([1;31mcourseId[m, null, tag, page, size, sort);
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m320[m[36m:[m            UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m333[m[36m:[m                [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m508[m[36m:[m        return request.[1;31mcourseId[m() != null
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m533[m[36m:[m            UUID [1;31mcourseId[m,
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m537[m[36m:[m        if ([1;31mcourseId[m != null) {
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m538[m[36m:[m            return requireActiveCourse([1;31mcourseId[m);
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m604[m[36m:[m    private Course requireActiveCourse(UUID [1;31mcourseId[m) {
+[35mbackend/src/main/java/com/campusone/note/service/NoteService.java[m[36m:[m[32m605[m[36m:[m        Course course = courseRepository.findById([1;31mcourseId[m)
+[35mbackend/src/test/java/com/campusone/note/controller/NoteControllerTest.java[m[36m:[m[32m215[m[36m:[m                                  "[1;31mcourseId[m": "%s",
+[35mbackend/src/test/java/com/campusone/note/controller/NoteControllerTest.java[m[36m:[m[32m433[m[36m:[m                  "[1;31mcourseId[m": "%s",
+[35mbackend/src/test/java/com/campusone/note/controller/NoteControllerTest.java[m[36m:[m[32m457[m[36m:[m                  "[1;31mcourseId[m": "%s",
+[35msrc/api/notesApi.ts[m[36m:[m[32m28[m[36m:[m  [1;31mcourseId[m,
+[35msrc/api/notesApi.ts[m[36m:[m[32m36[m[36m:[m    `/notes${queryString({ course, [1;31mcourseId[m, page, size, sort, tag })}`,
+[35msrc/api/notesApi.ts[m[36m:[m[32m46[m[36m:[m}: Omit<NoteListParameters, "[1;31mcourseId[m" | "tag"> = {}) {
+[35msrc/types/notes.ts[m[36m:[m[32m124[m[36m:[m  [1;31mcourseId[m?: string;
