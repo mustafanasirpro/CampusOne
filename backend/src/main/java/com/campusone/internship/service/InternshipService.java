@@ -89,6 +89,7 @@ public class InternshipService {
         }
         internship = internshipRepository.save(internship);
         integrationService.internshipCreated(userId, internship.getId());
+        notifyIfPendingReview(internship, userId);
         return internshipMapper.toDetail(internship, false, true);
     }
 
@@ -176,6 +177,7 @@ public class InternshipService {
                 internship.getPoster().getEmail())) {
             internship.submitForReview();
         }
+        notifyIfPendingReview(internship, userId);
         return toDetail(internship, userId);
     }
 
@@ -363,6 +365,17 @@ public class InternshipService {
                         user.getId(),
                         user.getEmail()))
                 .orElse(false);
+    }
+
+    private void notifyIfPendingReview(
+            Internship internship,
+            UUID userId) {
+        if (internship.getStatus() == InternshipStatus.PENDING_REVIEW) {
+            integrationService.internshipSubmittedForApproval(
+                    userId,
+                    internship.getId(),
+                    internship.getTitle());
+        }
     }
 
     private InternshipConflictException conflict(
