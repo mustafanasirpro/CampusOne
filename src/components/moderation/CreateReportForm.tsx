@@ -30,7 +30,7 @@ export function CreateReportForm({
   const { showToast } = useToast();
   const [targetType, setTargetType] =
     useState<ModerationTargetType>("NOTE");
-  const [targetId, setTargetId] = useState("");
+  const [targetReference, setTargetReference] = useState("");
   const [reason, setReason] = useState<ReportReason>("SPAM");
   const [details, setDetails] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +38,9 @@ export function CreateReportForm({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const normalizedTargetId = targetId.trim();
+    const normalizedTargetId = extractContentId(targetReference);
     if (!isUuid(normalizedTargetId)) {
-      setError("Enter a valid target UUID.");
+      setError("Enter a valid CampusOne content link or content ID.");
       return;
     }
     setIsSubmitting(true);
@@ -52,7 +52,7 @@ export function CreateReportForm({
         targetId: normalizedTargetId,
         targetType,
       });
-      setTargetId("");
+      setTargetReference("");
       setDetails("");
       onCreated(report);
       showToast({
@@ -81,8 +81,8 @@ export function CreateReportForm({
               Report content
             </h2>
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              Submit a content reference for review. You can find the UUID in
-              the relevant CampusOne URL or API response.
+              Submit a CampusOne content link for review. You can paste a
+              note, listing, event, discussion, or internship URL here.
             </p>
           </div>
           <div className="grid gap-5 md:grid-cols-2">
@@ -96,11 +96,11 @@ export function CreateReportForm({
               value={targetType}
             />
             <FormField
-              label="Target UUID"
-              onChange={(event) => setTargetId(event.target.value)}
-              placeholder="00000000-0000-0000-0000-000000000000"
+              label="Content link or ID"
+              onChange={(event) => setTargetReference(event.target.value)}
+              placeholder="https://campusone.dev/notes/..."
               required
-              value={targetId}
+              value={targetReference}
             />
           </div>
           <SelectField
@@ -137,4 +137,13 @@ export function CreateReportForm({
       </CardContent>
     </Card>
   );
+}
+
+function extractContentId(value: string) {
+  const trimmed = value.trim();
+  if (isUuid(trimmed)) return trimmed;
+  const match = trimmed.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+  );
+  return match?.[0] ?? trimmed;
 }
