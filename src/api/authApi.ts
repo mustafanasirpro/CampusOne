@@ -15,6 +15,19 @@ export interface RegisterRequest {
   universityId: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  newPassword: string;
+  token: string;
+}
+
+export interface PasswordResetResponse {
+  message: string;
+}
+
 export function login(request: LoginRequest) {
   return apiRequest<AuthSession>("/auth/login", {
     attachAccessToken: false,
@@ -26,6 +39,24 @@ export function login(request: LoginRequest) {
 
 export function register(request: RegisterRequest) {
   return apiRequest<AuthUser>("/auth/register", {
+    attachAccessToken: false,
+    body: JSON.stringify(request),
+    method: "POST",
+    retryOnUnauthorized: false,
+  });
+}
+
+export function forgotPassword(request: ForgotPasswordRequest) {
+  return apiRequest<PasswordResetResponse>("/auth/forgot-password", {
+    attachAccessToken: false,
+    body: JSON.stringify(request),
+    method: "POST",
+    retryOnUnauthorized: false,
+  });
+}
+
+export function resetPassword(request: ResetPasswordRequest) {
+  return apiRequest<PasswordResetResponse>("/auth/reset-password", {
     attachAccessToken: false,
     body: JSON.stringify(request),
     method: "POST",
