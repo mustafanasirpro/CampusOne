@@ -1,11 +1,15 @@
 package com.campusone.auth.controller;
 
+import com.campusone.auth.dto.request.ForgotPasswordRequest;
 import com.campusone.auth.dto.request.LoginRequest;
 import com.campusone.auth.dto.request.RegisterRequest;
+import com.campusone.auth.dto.request.ResetPasswordRequest;
 import com.campusone.auth.dto.response.AuthResponse;
+import com.campusone.auth.dto.response.PasswordResetResponse;
 import com.campusone.auth.dto.response.UserSummaryResponse;
 import com.campusone.auth.service.AuthenticationResult;
 import com.campusone.auth.service.AuthService;
+import com.campusone.auth.service.PasswordResetService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,12 +30,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final PasswordResetService passwordResetService;
     private final RefreshTokenCookieFactory refreshTokenCookieFactory;
 
     public AuthController(
             AuthService authService,
+            PasswordResetService passwordResetService,
             RefreshTokenCookieFactory refreshTokenCookieFactory) {
         this.authService = authService;
+        this.passwordResetService = passwordResetService;
         this.refreshTokenCookieFactory = refreshTokenCookieFactory;
     }
 
@@ -47,6 +54,20 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(
             @Valid @RequestBody LoginRequest request) {
         return authenticatedResponse(authService.login(request));
+    }
+
+    @PostMapping(value = "/forgot-password", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Request a password reset link")
+    public ResponseEntity<PasswordResetResponse> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        return ResponseEntity.ok(passwordResetService.requestReset(request));
+    }
+
+    @PostMapping(value = "/reset-password", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Reset a password using a one-time reset token")
+    public ResponseEntity<PasswordResetResponse> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(passwordResetService.resetPassword(request));
     }
 
     @PostMapping("/refresh")
