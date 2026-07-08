@@ -220,6 +220,20 @@ public class NotificationService {
     }
 
     @Transactional
+    public NotificationBulkActionResponse markUnreadTargetNotificationsRead(
+            NotificationType type,
+            NotificationTargetType targetType,
+            UUID targetId) {
+        int updatedCount =
+                notificationRepository.markUnreadTargetNotificationsRead(
+                        type,
+                        targetType,
+                        targetId,
+                        clock.instant());
+        return new NotificationBulkActionResponse(updatedCount);
+    }
+
+    @Transactional
     public void deleteNotification(
             UUID userId,
             UUID notificationId) {
