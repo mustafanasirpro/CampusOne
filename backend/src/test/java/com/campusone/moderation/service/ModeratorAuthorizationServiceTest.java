@@ -88,9 +88,28 @@ class ModeratorAuthorizationServiceTest {
     }
 
     @Test
+    void getStatus_fallbackAdminEmail_returnsAdminAccess() {
+        User user = user("fallback-admin@example.com");
+        when(moderatorRepository.findDetailedByUserId(USER_ID))
+                .thenReturn(Optional.empty());
+        when(userRepository.findById(USER_ID))
+                .thenReturn(Optional.of(user));
+        when(adminAuthorizationService.canManage(
+                USER_ID,
+                "fallback-admin@example.com"))
+                .thenReturn(true);
+
+        var response = service.getStatus(USER_ID);
+
+        assertThat(response.activeModerator()).isTrue();
+        assertThat(response.role()).isEqualTo(ModeratorRole.ADMIN);
+    }
+
+    @Test
     void requireActiveModerator_normalUser_rejectsAccess() {
         when(moderatorRepository.findDetailedByUserId(USER_ID))
                 .thenReturn(Optional.empty());
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
                 service.requireActiveModerator(USER_ID))
@@ -103,10 +122,39 @@ class ModeratorAuthorizationServiceTest {
         ReflectionTestUtils.setField(moderator, "active", false);
         when(moderatorRepository.findDetailedByUserId(USER_ID))
                 .thenReturn(Optional.of(moderator));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
                 service.requireActiveModerator(USER_ID))
                 .isInstanceOf(
                         ModeratorAccessDeniedException.class);
+    }
+
+    @Test
+    void requireActiveModerator_fallbackAdminEmail_returnsAdminModerator() {
+        User user = user("fallback-admin@example.com");
+        when(moderatorRepository.findDetailedByUserId(USER_ID))
+                .thenReturn(Optional.empty());
+        when(userRepository.findById(USER_ID))
+                .thenReturn(Optional.of(user));
+        when(adminAuthorizationService.canManage(
+                USER_ID,
+                "fallback-admin@example.com"))
+                .thenReturn(true);
+
+        Moderator fallbackModerator = service.requireActiveModerator(USER_ID);
+
+        assertThat(fallbackModerator.getUser()).isSameAs(user);
+        assertThat(fallbackModerator.getRole())
+                .isEqualTo(ModeratorRole.ADMIN);
+        assertThat(fallbackModerator.isActive()).isTrue();
+    }
+
+    private User user(String email) {
+        User user = new User(
+                email,
+                "$2a$12$abcdefghijklmnopqrstuvabcdefghijklmnopqrstuvabcd");
+        ReflectionTestUtils.setField(user, "id", USER_ID);
+        return user;
     }
 }
