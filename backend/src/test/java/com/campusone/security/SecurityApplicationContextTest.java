@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.campusone.academic.repository.DepartmentRepository;
 import com.campusone.academic.repository.CourseRepository;
 import com.campusone.academic.repository.UniversityRepository;
+import com.campusone.auth.repository.PasswordResetTokenRepository;
 import com.campusone.auth.repository.RefreshTokenRepository;
 import com.campusone.note.repository.FileAssetRepository;
 import com.campusone.note.repository.NoteBookmarkRepository;
@@ -47,6 +48,9 @@ class SecurityApplicationContextTest {
 
     @MockitoBean
     private RefreshTokenRepository refreshTokenRepository;
+
+    @MockitoBean
+    private PasswordResetTokenRepository passwordResetTokenRepository;
 
     @MockitoBean
     private SkillRepository skillRepository;
