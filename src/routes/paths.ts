@@ -2,6 +2,8 @@ export const paths = {
   landing: "/",
   login: "/login",
   signup: "/signup",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
   dashboard: "/dashboard",
   profile: "/profile",
   notes: "/notes",
