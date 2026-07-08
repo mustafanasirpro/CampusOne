@@ -116,6 +116,32 @@ class MarketplaceListingServiceTest {
     }
 
     @Test
+    void createListing_normalUserCreatesPendingListingAndNotifiesAdmins() {
+        when(userRepository.findById(OWNER_ID)).thenReturn(Optional.of(owner));
+        when(adminAuthorizationService.canManage(OWNER_ID, "owner@example.com"))
+                .thenReturn(false);
+        when(listingRepository.save(any(MarketplaceListing.class)))
+                .thenAnswer(invocation -> {
+                    MarketplaceListing saved = invocation.getArgument(0);
+                    ReflectionTestUtils.setField(saved, "id", LISTING_ID);
+                    ReflectionTestUtils.setField(saved, "createdAt", NOW);
+                    ReflectionTestUtils.setField(saved, "updatedAt", NOW);
+                    return saved;
+                });
+
+        var response = listingService.createListing(
+                OWNER_ID,
+                createRequest());
+
+        assertThat(response.status())
+                .isEqualTo(MarketplaceListingStatus.PENDING_REVIEW);
+        verify(integrationService).marketplaceListingSubmittedForApproval(
+                OWNER_ID,
+                LISTING_ID,
+                "Java Programming Textbook");
+    }
+
+    @Test
     void listActiveListings_filtersCategoryAndNormalizedTitle() {
         PageImpl<MarketplaceListing> result = new PageImpl<>(List.of(listing));
         when(listingRepository.findActiveListings(
