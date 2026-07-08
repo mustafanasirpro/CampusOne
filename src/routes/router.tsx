@@ -150,6 +150,16 @@ const AdminPage = lazy(async () => {
   return { default: module.AdminPage };
 });
 
+const ForgotPasswordPage = lazy(async () => {
+  const module = await import("@/pages/ForgotPasswordPage");
+  return { default: module.ForgotPasswordPage };
+});
+
+const ResetPasswordPage = lazy(async () => {
+  const module = await import("@/pages/ResetPasswordPage");
+  return { default: module.ResetPasswordPage };
+});
+
 function lazyRoute(element: ReactNode, path: string) {
   return (
     <Suspense fallback={<PageLoadingState routePath={path} />}>
@@ -168,6 +178,17 @@ export const router = createBrowserRouter([
         children: [
           { path: paths.login, element: <LoginPage /> },
           { path: paths.signup, element: <SignupPage /> },
+          {
+            path: paths.forgotPassword,
+            element: lazyRoute(
+              <ForgotPasswordPage />,
+              paths.forgotPassword,
+            ),
+          },
+          {
+            path: paths.resetPassword,
+            element: lazyRoute(<ResetPasswordPage />, paths.resetPassword),
+          },
         ],
       },
     ],
