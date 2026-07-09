@@ -19,7 +19,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
-import org.springframework.mail.MailSendException;
 
 @ExtendWith(MockitoExtension.class)
 class AdminDiagnosticsControllerTest {
@@ -87,7 +86,7 @@ class AdminDiagnosticsControllerTest {
 
     @Test
     void sendTestEmailMailFailureReturnsSafeMessage() {
-        doThrow(new MailSendException("SMTP authentication failed"))
+        doThrow(new IllegalStateException("Resend request failed"))
                 .when(mailer)
                 .sendTestEmail("admin@example.com");
 
@@ -97,6 +96,6 @@ class AdminDiagnosticsControllerTest {
                 .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody()).isNotNull();
         assertThat(response.getBody().message())
-                .isEqualTo("Test email failed. Check Render MAIL_* environment variables and SMTP credentials.");
+                .isEqualTo("Test email failed. Check Render email provider environment variables.");
     }
 }
