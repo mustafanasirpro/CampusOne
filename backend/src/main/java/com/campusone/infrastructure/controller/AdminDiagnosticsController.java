@@ -33,7 +33,7 @@ public class AdminDiagnosticsController {
     private static final String SUCCESS_MESSAGE =
             "Test email sent successfully.";
     private static final String FAILURE_MESSAGE =
-            "Test email failed. Check Render MAIL_* environment variables and SMTP credentials.";
+            "Test email failed. Check Render email provider environment variables.";
 
     private final NoteAdminAuthorizationService authorizationService;
     private final PasswordResetMailer mailer;
@@ -48,7 +48,7 @@ public class AdminDiagnosticsController {
     @PostMapping(
             value = "/test-email",
             produces = MediaType.APPLICATION_JSON_VALUE)
-    @Operation(summary = "Send an admin-only SMTP diagnostic email")
+    @Operation(summary = "Send an admin-only email delivery diagnostic")
     public ResponseEntity<TestEmailResponse> sendTestEmail(
             @AuthenticationPrincipal CampusOneUserPrincipal principal,
             @Valid @RequestBody(required = false) TestEmailRequest request) {
