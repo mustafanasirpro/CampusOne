@@ -2,8 +2,6 @@ package com.campusone.auth.service;
 
 import com.campusone.config.PasswordResetProperties;
 import com.campusone.user.entity.User;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,9 +9,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.env.Environment;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.stereotype.Service;
 
-@Service
 public class SmtpPasswordResetMailer implements PasswordResetMailer {
 
     private static final Logger LOGGER =
@@ -34,21 +30,8 @@ public class SmtpPasswordResetMailer implements PasswordResetMailer {
 
     @Override
     public void sendResetLink(User user, String rawToken) {
-        String link = resetLink(rawToken);
-        String body = """
-                Hi,
-
-                We received a request to reset your CampusOne password.
-
-                Reset your password here:
-                %s
-
-                This link expires in %d minutes and can be used only once.
-
-                If you did not request this, you can safely ignore this email.
-                """.formatted(
-                link,
-                Math.max(1, properties.getTokenTtl().toMinutes()));
+        String link = PasswordResetEmailContent.resetLink(properties, rawToken);
+        String body = PasswordResetEmailContent.textBody(properties, link);
 
         JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
         if (properties.isMailEnabled()) {
@@ -123,13 +106,6 @@ public class SmtpPasswordResetMailer implements PasswordResetMailer {
         message.setSubject(subject);
         message.setText(body);
         mailSender.send(message);
-    }
-
-    private String resetLink(String rawToken) {
-        String frontendUrl = properties.getFrontendUrl().replaceAll("/+$", "");
-        return frontendUrl
-                + "/reset-password?token="
-                + URLEncoder.encode(rawToken, StandardCharsets.UTF_8);
     }
 
     private boolean isLocalProfile() {
