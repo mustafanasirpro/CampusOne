@@ -1,6 +1,8 @@
 package com.campusone.config;
 
+import java.net.URI;
 import java.time.Duration;
+import java.util.Locale;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app.password-reset")
@@ -8,8 +10,13 @@ public class PasswordResetProperties {
 
     private Duration tokenTtl = Duration.ofMinutes(30);
     private String frontendUrl = "http://localhost:5173";
+    private String mailProvider = "disabled";
     private boolean mailEnabled;
     private String mailFrom = "CampusOne <no-reply@campusone.dev>";
+    private String resendApiKey = "";
+    private String resendFrom = "CampusOne <onboarding@resend.dev>";
+    private URI resendApiUrl = URI.create("https://api.resend.com/emails");
+    private Duration resendTimeout = Duration.ofSeconds(10);
 
     public Duration getTokenTtl() {
         return tokenTtl;
@@ -29,6 +36,16 @@ public class PasswordResetProperties {
         }
     }
 
+    public String getMailProvider() {
+        return mailProvider;
+    }
+
+    public void setMailProvider(String mailProvider) {
+        if (mailProvider != null && !mailProvider.isBlank()) {
+            this.mailProvider = mailProvider.trim().toLowerCase(Locale.ROOT);
+        }
+    }
+
     public boolean isMailEnabled() {
         return mailEnabled;
     }
@@ -45,5 +62,47 @@ public class PasswordResetProperties {
         if (mailFrom != null && !mailFrom.isBlank()) {
             this.mailFrom = mailFrom.trim();
         }
+    }
+
+    public String getResendApiKey() {
+        return resendApiKey;
+    }
+
+    public void setResendApiKey(String resendApiKey) {
+        this.resendApiKey = resendApiKey == null ? "" : resendApiKey.trim();
+    }
+
+    public String getResendFrom() {
+        return resendFrom;
+    }
+
+    public void setResendFrom(String resendFrom) {
+        if (resendFrom != null && !resendFrom.isBlank()) {
+            this.resendFrom = resendFrom.trim();
+        }
+    }
+
+    public URI getResendApiUrl() {
+        return resendApiUrl;
+    }
+
+    public void setResendApiUrl(URI resendApiUrl) {
+        if (resendApiUrl != null) {
+            this.resendApiUrl = resendApiUrl;
+        }
+    }
+
+    public Duration getResendTimeout() {
+        return resendTimeout;
+    }
+
+    public void setResendTimeout(Duration resendTimeout) {
+        this.resendTimeout = resendTimeout == null
+                ? Duration.ofSeconds(10)
+                : resendTimeout;
+    }
+
+    public boolean isProvider(String provider) {
+        return mailProvider.equalsIgnoreCase(provider);
     }
 }
