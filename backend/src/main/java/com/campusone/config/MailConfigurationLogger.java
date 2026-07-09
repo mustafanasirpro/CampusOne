@@ -25,6 +25,7 @@ public class MailConfigurationLogger implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        String provider = passwordResetProperties.getMailProvider();
         String host = property("spring.mail.host");
         String port = property("spring.mail.port");
         String username = property("spring.mail.username");
@@ -32,7 +33,25 @@ public class MailConfigurationLogger implements ApplicationRunner {
         String from = passwordResetProperties.getMailFrom();
 
         LOGGER.info(
-                "CampusOne mail config: enabled={}, host={}, port={}, usernamePresent={}, from={}",
+                "CampusOne email config: provider={}, resendApiKeyPresent={}, resendFrom={}, frontendUrl={}, tokenTtl={}",
+                provider,
+                hasText(passwordResetProperties.getResendApiKey()),
+                display(passwordResetProperties.getResendFrom()),
+                display(passwordResetProperties.getFrontendUrl()),
+                passwordResetProperties.getTokenTtl());
+
+        if (passwordResetProperties.isProvider("resend")
+                && !hasText(passwordResetProperties.getResendApiKey())) {
+            LOGGER.warn(
+                    "Resend email provider is selected but RESEND_API_KEY is missing.");
+        }
+
+        if (!passwordResetProperties.isProvider("smtp")) {
+            return;
+        }
+
+        LOGGER.info(
+                "CampusOne SMTP config: mailEnabled={}, host={}, port={}, usernamePresent={}, from={}",
                 passwordResetProperties.isMailEnabled(),
                 display(host),
                 display(port),
