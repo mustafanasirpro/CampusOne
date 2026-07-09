@@ -254,10 +254,14 @@ configuration import. Operating-system environment variables take precedence.
 | `ACCOUNT_LOCK_MINUTES` | No | Defaults to `15` |
 | `PASSWORD_RESET_TOKEN_TTL_MINUTES` | No | Password reset links expire after this many minutes; defaults to `30` |
 | `APP_FRONTEND_URL` | Production | Frontend base URL used in reset links, e.g. `https://campusone.dev` |
-| `MAIL_ENABLED` | Production | Set to `true` when SMTP is configured for reset emails |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | Production | SMTP settings for password reset delivery |
-| `MAIL_SMTP_AUTH`, `MAIL_SMTP_STARTTLS_ENABLE`, `MAIL_SMTP_STARTTLS_REQUIRED` | No | SMTP transport switches; auth and STARTTLS default on when `MAIL_ENABLED=true` |
-| `MAIL_SMTP_CONNECTION_TIMEOUT_MS`, `MAIL_SMTP_TIMEOUT_MS`, `MAIL_SMTP_WRITE_TIMEOUT_MS` | No | SMTP connection/read/write timeouts; each defaults to `10000` ms |
+| `MAIL_PROVIDER` | Production | Set to `resend` for Render production email delivery; defaults to `disabled` |
+| `RESEND_API_KEY` | Production | Resend HTTPS API key for password reset emails |
+| `RESEND_FROM` | Production | Sender identity, e.g. `CampusOne <onboarding@resend.dev>` |
+| `RESEND_TIMEOUT` | No | Resend HTTPS request timeout; defaults to `10s` |
+| `MAIL_ENABLED` | SMTP fallback | Set to `true` only when `MAIL_PROVIDER=smtp` |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | SMTP fallback | Optional SMTP settings; not required for Resend production mode |
+| `MAIL_SMTP_AUTH`, `MAIL_SMTP_STARTTLS_ENABLE`, `MAIL_SMTP_STARTTLS_REQUIRED` | SMTP fallback | SMTP transport switches; auth and STARTTLS default on when `MAIL_ENABLED=true` |
+| `MAIL_SMTP_CONNECTION_TIMEOUT_MS`, `MAIL_SMTP_TIMEOUT_MS`, `MAIL_SMTP_WRITE_TIMEOUT_MS` | SMTP fallback | SMTP connection/read/write timeouts; each defaults to `10000` ms |
 | `APP_CORS_ALLOWED_ORIGINS` | Production | Comma-separated exact frontend origins for Render, for example `https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app` |
 | `CORS_ALLOWED_ORIGINS` | No | Legacy alias for the same exact-origin CORS setting |
 | `OPENAPI_ENABLED` | No | Enabled by default; set to `false` to disable API documentation |
@@ -300,24 +304,17 @@ AUTH_COOKIE_SECURE=true
 AUTH_COOKIE_SAME_SITE=None
 PASSWORD_RESET_TOKEN_TTL_MINUTES=30
 APP_FRONTEND_URL=https://campusone.dev
-MAIL_ENABLED=true
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=<sender-gmail-address>
-MAIL_PASSWORD=<gmail-app-password-without-spaces>
-MAIL_FROM=<sender-gmail-address>
-MAIL_SMTP_AUTH=true
-MAIL_SMTP_STARTTLS_ENABLE=true
-MAIL_SMTP_STARTTLS_REQUIRED=true
-MAIL_SMTP_CONNECTION_TIMEOUT_MS=10000
-MAIL_SMTP_TIMEOUT_MS=10000
-MAIL_SMTP_WRITE_TIMEOUT_MS=10000
+MAIL_PROVIDER=resend
+RESEND_API_KEY=<your-resend-api-key>
+RESEND_FROM=CampusOne <onboarding@resend.dev>
+RESEND_TIMEOUT=10s
 ```
 
-For Gmail SMTP, create a Gmail App Password and store it in Render without
-spaces. If Google displays `abcd efgh ijkl mnop`, the Render value must be
-`abcdefghijklmnop`. Do not use the normal Gmail password and do not commit any
-mail credentials.
+Production password reset email uses Resend's HTTPS API because Render may not
+reliably connect to Gmail SMTP. Gmail SMTP variables are not required when
+`MAIL_PROVIDER=resend`. If you later verify a sending domain in Resend, change
+`RESEND_FROM` to something like `CampusOne <noreply@yourdomain.com>`. Do not
+commit `RESEND_API_KEY`.
 
 ## 💻 Running Locally
 
