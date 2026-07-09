@@ -84,10 +84,16 @@ JWT signing uses:
   to `30`
 - `APP_FRONTEND_URL`: frontend base URL used in password reset links; use
   `https://campusone.dev` in production
-- `MAIL_ENABLED`: set to `true` with real SMTP settings to send reset emails;
-  defaults to `false` so missing mail credentials never prevent startup
+- `MAIL_PROVIDER`: set to `resend` for Render production email delivery;
+  defaults to `disabled`
+- `RESEND_API_KEY`: Resend HTTPS API key for password reset emails
+- `RESEND_FROM`: sender identity, for example
+  `CampusOne <onboarding@resend.dev>`
+- `RESEND_TIMEOUT`: optional Resend HTTPS request timeout; defaults to `10s`
+- `MAIL_ENABLED`: set to `true` only when using the optional SMTP fallback
+  with `MAIL_PROVIDER=smtp`
 - `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM`:
-  SMTP delivery settings for password reset email
+  optional SMTP fallback settings; not required for Resend production mode
 - `MAIL_SMTP_AUTH`, `MAIL_SMTP_STARTTLS_ENABLE`,
   `MAIL_SMTP_STARTTLS_REQUIRED`: optional SMTP transport switches; when
   `MAIL_ENABLED=true`, auth and STARTTLS default to enabled
@@ -233,26 +239,19 @@ GLOBAL_UPLOAD_STORAGE_CAP_MB=8192
 ADMIN_UPLOAD_EMAILS=
 PASSWORD_RESET_TOKEN_TTL_MINUTES=30
 APP_FRONTEND_URL=https://campusone.dev
-MAIL_ENABLED=true
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=<sender-gmail-address>
-MAIL_PASSWORD=<gmail-app-password-without-spaces>
-MAIL_FROM=<sender-gmail-address>
-MAIL_SMTP_AUTH=true
-MAIL_SMTP_STARTTLS_ENABLE=true
-MAIL_SMTP_STARTTLS_REQUIRED=true
-MAIL_SMTP_CONNECTION_TIMEOUT_MS=10000
-MAIL_SMTP_TIMEOUT_MS=10000
-MAIL_SMTP_WRITE_TIMEOUT_MS=10000
+MAIL_PROVIDER=resend
+RESEND_API_KEY=<your-resend-api-key>
+RESEND_FROM=CampusOne <onboarding@resend.dev>
+RESEND_TIMEOUT=10s
 ```
 
-For Gmail, use an App Password, not the normal Gmail account password. Google
-shows app passwords with spaces for readability, such as
-`abcd efgh ijkl mnop`; store it in Render as `abcdefghijklmnop` with no
-spaces. Never commit or paste the real password into source files.
+Production password reset email uses Resend's HTTPS API because Render may not
+reliably connect to Gmail SMTP. Gmail SMTP variables are not required when
+`MAIL_PROVIDER=resend`. If you later verify a sending domain in Resend, change
+`RESEND_FROM` to something like `CampusOne <noreply@yourdomain.com>`. Never
+commit or paste the real Resend API key into source files.
 
-Admins can verify production SMTP without exposing secrets by calling
+Admins can verify production email delivery without exposing secrets by calling
 `POST /api/v1/admin/diagnostics/test-email` with a bearer token for an active
 admin or an email listed in `ADMIN_UPLOAD_EMAILS`.
 
