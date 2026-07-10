@@ -16,9 +16,42 @@ function displayMetadata(metadata: Record<string, unknown>) {
     .slice(0, 3);
 }
 
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function highlightedText(text: string, query?: string) {
+  const terms = Array.from(
+    new Set(
+      (query ?? "")
+        .split(/[^\p{L}\p{N}]+/u)
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 2),
+    ),
+  ).sort((left, right) => right.length - left.length);
+
+  if (terms.length === 0) return text;
+
+  const matcher = new RegExp(`(${terms.map(escapeRegex).join("|")})`, "giu");
+  return text.split(matcher).map((part, index) =>
+    terms.some((term) => term.toLocaleLowerCase() === part.toLocaleLowerCase())
+      ? (
+          <mark
+            className="rounded bg-amber-100 px-0.5 text-inherit"
+            key={`${part}-${index}`}
+          >
+            {part}
+          </mark>
+        )
+      : part,
+  );
+}
+
 export function SearchResultCard({
+  query,
   result,
 }: {
+  query?: string;
   result: GlobalSearchResult;
 }) {
   const isExternal = /^https?:\/\//i.test(result.targetUrl);
@@ -37,10 +70,10 @@ export function SearchResultCard({
         </div>
         <div>
           <h2 className="text-lg font-semibold text-slate-950">
-            {result.title}
+            {highlightedText(result.title, query)}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            {result.snippet}
+            {highlightedText(result.snippet, query)}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -78,4 +111,3 @@ export function SearchResultCard({
     </Card>
   );
 }
-
