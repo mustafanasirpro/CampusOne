@@ -63,8 +63,11 @@ public class SearchResultMapper {
             return compact;
         }
 
-        int matchIndex = compact.toLowerCase(Locale.ROOT)
-                .indexOf(normalizedQuery);
+        String lowerCompact = compact.toLowerCase(Locale.ROOT);
+        int matchIndex = lowerCompact.indexOf(normalizedQuery);
+        if (matchIndex < 0) {
+            matchIndex = firstTokenMatch(lowerCompact, normalizedQuery);
+        }
         int start = matchIndex < 0
                 ? 0
                 : Math.max(0, matchIndex - SNIPPET_CONTEXT);
@@ -78,6 +81,23 @@ public class SearchResultMapper {
         return (start > 0 ? "…" : "")
                 + result
                 + (end < compact.length() ? "…" : "");
+    }
+
+    private int firstTokenMatch(
+            String lowerCompact,
+            String normalizedQuery) {
+        int firstIndex = -1;
+        for (String token : normalizedQuery.split("\\s+")) {
+            if (token.isBlank()) {
+                continue;
+            }
+            int tokenIndex = lowerCompact.indexOf(token);
+            if (tokenIndex >= 0
+                    && (firstIndex < 0 || tokenIndex < firstIndex)) {
+                firstIndex = tokenIndex;
+            }
+        }
+        return firstIndex;
     }
 
     private void put(
