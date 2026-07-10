@@ -26,7 +26,7 @@ public class JdbcGlobalSearchRepository
                 note.title,
                 note.description AS snippet_source,
                 profile.full_name AS owner_name,
-                course.title AS category,
+                CONCAT_WS(' · ', course.course_code, course.title)::VARCHAR AS category,
                 NULL::VARCHAR AS location,
                 NULL::VARCHAR AS company_name,
                 NULL::NUMERIC AS price,
@@ -36,33 +36,140 @@ public class JdbcGlobalSearchRepository
                 note.created_at,
                 note.updated_at,
                 CASE
-                    WHEN LOWER(note.title) = :exactQuery THEN 100
-                    WHEN LOWER(note.title) LIKE :prefixPattern ESCAPE '\\'
-                        THEN 80
-                    WHEN LOWER(note.title) LIKE :searchPattern ESCAPE '\\'
-                        THEN 60
-                    WHEN LOWER(course.title) = :exactQuery THEN 50
-                    WHEN LOWER(course.title) LIKE :prefixPattern ESCAPE '\\'
-                        THEN 40
-                    ELSE 20
-                END AS relevance_score
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(note.title, ''), '[^[:alnum:]]+', ' ', 'g'))) = :exactQuery
+                        THEN 1000
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(note.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :prefixPattern ESCAPE '\\'
+                        THEN 900
+                    WHEN (' ' || BTRIM(LOWER(REGEXP_REPLACE(COALESCE(note.title, ''), '[^[:alnum:]]+', ' ', 'g'))) || ' ')
+                            LIKE :wholeWordPattern ESCAPE '\\'
+                        THEN 850
+                    WHEN NOT EXISTS (
+                            SELECT 1
+                            FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                            WHERE query_token.token <> ''
+                              AND BTRIM(LOWER(REGEXP_REPLACE(COALESCE(note.title, ''), '[^[:alnum:]]+', ' ', 'g')))
+                                    NOT LIKE '%' || query_token.token || '%'
+                        )
+                        THEN 820
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(note.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 800
+                    WHEN COALESCE((
+                            SELECT LOWER(STRING_AGG(LEFT(title_word.word, 1), ''))
+                            FROM REGEXP_SPLIT_TO_TABLE(COALESCE(note.title, ''), '[^[:alnum:]]+')
+                                AS title_word(word)
+                            WHERE title_word.word <> ''
+                        ), '') LIKE :initialPattern ESCAPE '\\'
+                        THEN 780
+                    WHEN LOWER(note.title) % :exactQuery
+                        THEN 770
+                    WHEN REPLACE(BTRIM(LOWER(REGEXP_REPLACE(COALESCE(course.course_code, ''), '[^[:alnum:]]+', ' ', 'g'))), ' ', '') = :compactExactQuery
+                        THEN 760
+                    WHEN REPLACE(BTRIM(LOWER(REGEXP_REPLACE(COALESCE(course.course_code, ''), '[^[:alnum:]]+', ' ', 'g'))), ' ', '') LIKE :compactPrefixPattern ESCAPE '\\'
+                        THEN 740
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(course.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                         OR NOT EXISTS (
+                            SELECT 1
+                            FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                            WHERE query_token.token <> ''
+                              AND BTRIM(LOWER(REGEXP_REPLACE(COALESCE(course.title, ''), '[^[:alnum:]]+', ' ', 'g')))
+                                    NOT LIKE '%' || query_token.token || '%'
+                         )
+                        THEN 720
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(note.teacher_name, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 700
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(note_tags.tags, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 660
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(file_asset.original_filename, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 640
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(profile.full_name, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 620
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ', department.name, department.code), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 600
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(note.description, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                         OR NOT EXISTS (
+                            SELECT 1
+                            FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                            WHERE query_token.token <> ''
+                              AND BTRIM(LOWER(REGEXP_REPLACE(COALESCE(note.description, ''), '[^[:alnum:]]+', ' ', 'g')))
+                                    NOT LIKE '%' || query_token.token || '%'
+                         )
+                        THEN 500
+                    ELSE 300
+                END
+                + LEAST(note.download_count, 50)
+                + LEAST(note.rating_count, 20) AS relevance_score
             FROM notes note
             JOIN courses course ON course.id = note.course_id
+            JOIN departments department ON department.id = course.department_id
+            JOIN file_assets file_asset ON file_asset.id = note.file_asset_id
             LEFT JOIN student_profiles profile
                 ON profile.user_id = note.uploader_id
+            LEFT JOIN LATERAL (
+                SELECT STRING_AGG(tag.name, ' ') AS tags
+                FROM note_tags note_tag
+                JOIN tags tag ON tag.id = note_tag.tag_id
+                WHERE note_tag.note_id = note.id
+            ) note_tags ON TRUE
             WHERE note.deleted_at IS NULL
               AND note.moderation_status = 'APPROVED'
               AND note.visibility = 'PUBLIC'
               AND (
-                    LOWER(note.title) LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(note.description)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(note.teacher_name)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(course.title)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(course.course_code)
-                        LIKE :searchPattern ESCAPE '\\'
+                    BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                        note.title,
+                        note.description,
+                        note.teacher_name,
+                        course.course_code,
+                        course.title,
+                        department.name,
+                        department.code,
+                        note_tags.tags,
+                        file_asset.original_filename,
+                        profile.full_name,
+                        note.file_type,
+                        note.semester::TEXT
+                    ), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                    OR REPLACE(BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                        note.title,
+                        note.description,
+                        note.teacher_name,
+                        course.course_code,
+                        course.title,
+                        department.name,
+                        department.code,
+                        note_tags.tags,
+                        file_asset.original_filename,
+                        profile.full_name,
+                        note.file_type,
+                        note.semester::TEXT
+                    ), '[^[:alnum:]]+', ' ', 'g'))), ' ', '') LIKE :compactSearchPattern ESCAPE '\\'
+                    OR COALESCE((
+                        SELECT LOWER(STRING_AGG(LEFT(title_word.word, 1), ''))
+                        FROM REGEXP_SPLIT_TO_TABLE(COALESCE(note.title, ''), '[^[:alnum:]]+')
+                            AS title_word(word)
+                        WHERE title_word.word <> ''
+                    ), '') LIKE :initialPattern ESCAPE '\\'
+                    OR LOWER(note.title) % :exactQuery
+                    OR LOWER(course.title) % :exactQuery
+                    OR NOT EXISTS (
+                        SELECT 1
+                        FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                        WHERE query_token.token <> ''
+                          AND BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                                note.title,
+                                note.description,
+                                note.teacher_name,
+                                course.course_code,
+                                course.title,
+                                department.name,
+                                department.code,
+                                note_tags.tags,
+                                file_asset.original_filename,
+                                profile.full_name,
+                                note.file_type,
+                                note.semester::TEXT
+                              ), '[^[:alnum:]]+', ' ', 'g')))
+                                NOT LIKE '%' || query_token.token || '%'
+                    )
               )
 
             UNION ALL
@@ -73,7 +180,7 @@ public class JdbcGlobalSearchRepository
                 listing.title,
                 listing.description AS snippet_source,
                 profile.full_name AS owner_name,
-                listing.category AS category,
+                REPLACE(listing.category, '_', ' ') AS category,
                 NULL::VARCHAR AS location,
                 NULL::VARCHAR AS company_name,
                 listing.price,
@@ -83,29 +190,76 @@ public class JdbcGlobalSearchRepository
                 listing.created_at,
                 listing.updated_at,
                 CASE
-                    WHEN LOWER(listing.title) = :exactQuery THEN 100
-                    WHEN LOWER(listing.title)
-                        LIKE :prefixPattern ESCAPE '\\'
-                        THEN 80
-                    WHEN LOWER(listing.title)
-                        LIKE :searchPattern ESCAPE '\\'
-                        THEN 60
-                    WHEN LOWER(REPLACE(listing.category, '_', ' '))
-                        = :exactQuery THEN 40
-                    ELSE 20
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(listing.title, ''), '[^[:alnum:]]+', ' ', 'g'))) = :exactQuery
+                        THEN 1000
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(listing.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :prefixPattern ESCAPE '\\'
+                        THEN 900
+                    WHEN (' ' || BTRIM(LOWER(REGEXP_REPLACE(COALESCE(listing.title, ''), '[^[:alnum:]]+', ' ', 'g'))) || ' ')
+                            LIKE :wholeWordPattern ESCAPE '\\'
+                        THEN 850
+                    WHEN NOT EXISTS (
+                            SELECT 1
+                            FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                            WHERE query_token.token <> ''
+                              AND BTRIM(LOWER(REGEXP_REPLACE(COALESCE(listing.title, ''), '[^[:alnum:]]+', ' ', 'g')))
+                                    NOT LIKE '%' || query_token.token || '%'
+                        )
+                        THEN 820
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(listing.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 800
+                    WHEN LOWER(listing.title) % :exactQuery
+                        THEN 770
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(listing.category, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 660
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(marketplace_images.image_terms, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 640
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(profile.full_name, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 620
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(listing.description, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                         OR NOT EXISTS (
+                            SELECT 1
+                            FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                            WHERE query_token.token <> ''
+                              AND BTRIM(LOWER(REGEXP_REPLACE(COALESCE(listing.description, ''), '[^[:alnum:]]+', ' ', 'g')))
+                                    NOT LIKE '%' || query_token.token || '%'
+                         )
+                        THEN 500
+                    ELSE 300
                 END AS relevance_score
             FROM marketplace_listings listing
             LEFT JOIN student_profiles profile
                 ON profile.user_id = listing.seller_id
+            LEFT JOIN LATERAL (
+                SELECT STRING_AGG(CONCAT_WS(' ', image.original_filename, image.alt_text), ' ') AS image_terms
+                FROM marketplace_listing_images image
+                WHERE image.listing_id = listing.id
+            ) marketplace_images ON TRUE
             WHERE listing.deleted_at IS NULL
               AND listing.status = 'ACTIVE'
               AND (
-                    LOWER(listing.title)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(listing.description)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(REPLACE(listing.category, '_', ' '))
-                        LIKE :searchPattern ESCAPE '\\'
+                    BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                        listing.title,
+                        listing.description,
+                        listing.category,
+                        listing.item_condition,
+                        marketplace_images.image_terms,
+                        profile.full_name
+                    ), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                    OR LOWER(listing.title) % :exactQuery
+                    OR NOT EXISTS (
+                        SELECT 1
+                        FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                        WHERE query_token.token <> ''
+                          AND BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                                listing.title,
+                                listing.description,
+                                listing.category,
+                                listing.item_condition,
+                                marketplace_images.image_terms,
+                                profile.full_name
+                              ), '[^[:alnum:]]+', ' ', 'g')))
+                                NOT LIKE '%' || query_token.token || '%'
+                    )
               )
 
             UNION ALL
@@ -116,7 +270,7 @@ public class JdbcGlobalSearchRepository
                 question.title,
                 question.body AS snippet_source,
                 profile.full_name AS owner_name,
-                question.category AS category,
+                REPLACE(question.category, '_', ' ') AS category,
                 NULL::VARCHAR AS location,
                 NULL::VARCHAR AS company_name,
                 NULL::NUMERIC AS price,
@@ -126,16 +280,32 @@ public class JdbcGlobalSearchRepository
                 question.created_at,
                 question.updated_at,
                 CASE
-                    WHEN LOWER(question.title) = :exactQuery THEN 100
-                    WHEN LOWER(question.title)
-                        LIKE :prefixPattern ESCAPE '\\'
-                        THEN 80
-                    WHEN LOWER(question.title)
-                        LIKE :searchPattern ESCAPE '\\'
-                        THEN 60
-                    WHEN LOWER(REPLACE(question.category, '_', ' '))
-                        = :exactQuery THEN 40
-                    ELSE 20
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(question.title, ''), '[^[:alnum:]]+', ' ', 'g'))) = :exactQuery
+                        THEN 1000
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(question.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :prefixPattern ESCAPE '\\'
+                        THEN 900
+                    WHEN (' ' || BTRIM(LOWER(REGEXP_REPLACE(COALESCE(question.title, ''), '[^[:alnum:]]+', ' ', 'g'))) || ' ')
+                            LIKE :wholeWordPattern ESCAPE '\\'
+                        THEN 850
+                    WHEN NOT EXISTS (
+                            SELECT 1
+                            FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                            WHERE query_token.token <> ''
+                              AND BTRIM(LOWER(REGEXP_REPLACE(COALESCE(question.title, ''), '[^[:alnum:]]+', ' ', 'g')))
+                                    NOT LIKE '%' || query_token.token || '%'
+                        )
+                        THEN 820
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(question.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 800
+                    WHEN LOWER(question.title) % :exactQuery
+                        THEN 770
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(question.category, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 660
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(profile.full_name, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 620
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(question.body, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 500
+                    ELSE 300
                 END AS relevance_score
             FROM discussion_questions question
             LEFT JOIN student_profiles profile
@@ -143,12 +313,25 @@ public class JdbcGlobalSearchRepository
             WHERE question.deleted = FALSE
               AND question.status IN ('OPEN', 'RESOLVED', 'CLOSED')
               AND (
-                    LOWER(question.title)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(question.body)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(REPLACE(question.category, '_', ' '))
-                        LIKE :searchPattern ESCAPE '\\'
+                    BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                        question.title,
+                        question.body,
+                        question.category,
+                        profile.full_name
+                    ), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                    OR LOWER(question.title) % :exactQuery
+                    OR NOT EXISTS (
+                        SELECT 1
+                        FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                        WHERE query_token.token <> ''
+                          AND BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                                question.title,
+                                question.body,
+                                question.category,
+                                profile.full_name
+                              ), '[^[:alnum:]]+', ' ', 'g')))
+                                NOT LIKE '%' || query_token.token || '%'
+                    )
               )
 
             UNION ALL
@@ -169,15 +352,32 @@ public class JdbcGlobalSearchRepository
                 event.created_at,
                 event.updated_at,
                 CASE
-                    WHEN LOWER(event.title) = :exactQuery THEN 100
-                    WHEN LOWER(event.title)
-                        LIKE :prefixPattern ESCAPE '\\'
-                        THEN 80
-                    WHEN LOWER(event.title)
-                        LIKE :searchPattern ESCAPE '\\'
-                        THEN 60
-                    WHEN LOWER(event.location) = :exactQuery THEN 40
-                    ELSE 20
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(event.title, ''), '[^[:alnum:]]+', ' ', 'g'))) = :exactQuery
+                        THEN 1000
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(event.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :prefixPattern ESCAPE '\\'
+                        THEN 900
+                    WHEN (' ' || BTRIM(LOWER(REGEXP_REPLACE(COALESCE(event.title, ''), '[^[:alnum:]]+', ' ', 'g'))) || ' ')
+                            LIKE :wholeWordPattern ESCAPE '\\'
+                        THEN 850
+                    WHEN NOT EXISTS (
+                            SELECT 1
+                            FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                            WHERE query_token.token <> ''
+                              AND BTRIM(LOWER(REGEXP_REPLACE(COALESCE(event.title, ''), '[^[:alnum:]]+', ' ', 'g')))
+                                    NOT LIKE '%' || query_token.token || '%'
+                        )
+                        THEN 820
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(event.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 800
+                    WHEN LOWER(event.title) % :exactQuery
+                        THEN 770
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(event.location, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 660
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(profile.full_name, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 620
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(event.description, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 500
+                    ELSE 300
                 END AS relevance_score
             FROM events event
             LEFT JOIN student_profiles profile
@@ -186,12 +386,25 @@ public class JdbcGlobalSearchRepository
               AND event.visibility = 'PUBLIC'
               AND event.status IN ('UPCOMING', 'CANCELLED', 'COMPLETED')
               AND (
-                    LOWER(event.title)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(event.description)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(event.location)
-                        LIKE :searchPattern ESCAPE '\\'
+                    BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                        event.title,
+                        event.description,
+                        event.location,
+                        profile.full_name
+                    ), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                    OR LOWER(event.title) % :exactQuery
+                    OR NOT EXISTS (
+                        SELECT 1
+                        FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                        WHERE query_token.token <> ''
+                          AND BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                                event.title,
+                                event.description,
+                                event.location,
+                                profile.full_name
+                              ), '[^[:alnum:]]+', ' ', 'g')))
+                                NOT LIKE '%' || query_token.token || '%'
+                    )
               )
 
             UNION ALL
@@ -202,7 +415,7 @@ public class JdbcGlobalSearchRepository
                 internship.title,
                 internship.description AS snippet_source,
                 profile.full_name AS owner_name,
-                internship.internship_type AS category,
+                REPLACE(internship.internship_type, '_', ' ') AS category,
                 internship.location,
                 internship.company_name,
                 NULL::NUMERIC AS price,
@@ -212,19 +425,37 @@ public class JdbcGlobalSearchRepository
                 internship.created_at,
                 internship.updated_at,
                 CASE
-                    WHEN LOWER(internship.title) = :exactQuery THEN 100
-                    WHEN LOWER(internship.title)
-                        LIKE :prefixPattern ESCAPE '\\'
-                        THEN 80
-                    WHEN LOWER(internship.title)
-                        LIKE :searchPattern ESCAPE '\\'
-                        THEN 60
-                    WHEN LOWER(internship.company_name) = :exactQuery
-                        THEN 50
-                    WHEN LOWER(internship.company_name)
-                        LIKE :prefixPattern ESCAPE '\\'
-                        THEN 40
-                    ELSE 20
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.title, ''), '[^[:alnum:]]+', ' ', 'g'))) = :exactQuery
+                        THEN 1000
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :prefixPattern ESCAPE '\\'
+                        THEN 900
+                    WHEN (' ' || BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.title, ''), '[^[:alnum:]]+', ' ', 'g'))) || ' ')
+                            LIKE :wholeWordPattern ESCAPE '\\'
+                        THEN 850
+                    WHEN NOT EXISTS (
+                            SELECT 1
+                            FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                            WHERE query_token.token <> ''
+                              AND BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.title, ''), '[^[:alnum:]]+', ' ', 'g')))
+                                    NOT LIKE '%' || query_token.token || '%'
+                        )
+                        THEN 820
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 800
+                    WHEN LOWER(internship.title) % :exactQuery
+                        THEN 770
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.company_name, ''), '[^[:alnum:]]+', ' ', 'g'))) = :exactQuery
+                        THEN 700
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.company_name, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :prefixPattern ESCAPE '\\'
+                        THEN 680
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.internship_type, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 660
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(profile.full_name, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 620
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.description, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                         OR BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.location, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 500
+                    ELSE 300
                 END AS relevance_score
             FROM internships internship
             LEFT JOIN student_profiles profile
@@ -232,14 +463,33 @@ public class JdbcGlobalSearchRepository
             WHERE internship.deleted = FALSE
               AND internship.status IN ('OPEN', 'CLOSED', 'EXPIRED')
               AND (
-                    LOWER(internship.title)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(internship.company_name)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(internship.description)
-                        LIKE :searchPattern ESCAPE '\\'
-                    OR LOWER(internship.location)
-                        LIKE :searchPattern ESCAPE '\\'
+                    BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                        internship.title,
+                        internship.company_name,
+                        internship.description,
+                        internship.location,
+                        internship.internship_type,
+                        internship.work_mode,
+                        internship.currency,
+                        profile.full_name
+                    ), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                    OR LOWER(internship.title) % :exactQuery
+                    OR NOT EXISTS (
+                        SELECT 1
+                        FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                        WHERE query_token.token <> ''
+                          AND BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                                internship.title,
+                                internship.company_name,
+                                internship.description,
+                                internship.location,
+                                internship.internship_type,
+                                internship.work_mode,
+                                internship.currency,
+                                profile.full_name
+                              ), '[^[:alnum:]]+', ' ', 'g')))
+                                NOT LIKE '%' || query_token.token || '%'
+                    )
               )
             """;
 
@@ -247,18 +497,18 @@ public class JdbcGlobalSearchRepository
             SELECT
                 internship.company_name AS suggestion,
                 CASE
-                    WHEN LOWER(internship.company_name) = :exactQuery
-                        THEN 100
-                    WHEN LOWER(internship.company_name)
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.company_name, ''), '[^[:alnum:]]+', ' ', 'g'))) = :exactQuery
+                        THEN 700
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.company_name, ''), '[^[:alnum:]]+', ' ', 'g')))
                         LIKE :prefixPattern ESCAPE '\\'
-                        THEN 80
-                    ELSE 60
+                        THEN 680
+                    ELSE 600
                 END AS relevance_score,
                 internship.created_at
             FROM internships internship
             WHERE internship.deleted = FALSE
               AND internship.status IN ('OPEN', 'CLOSED', 'EXPIRED')
-              AND LOWER(internship.company_name)
+              AND BTRIM(LOWER(REGEXP_REPLACE(COALESCE(internship.company_name, ''), '[^[:alnum:]]+', ' ', 'g')))
                     LIKE :searchPattern ESCAPE '\\'
             """;
 
@@ -332,6 +582,50 @@ public class JdbcGlobalSearchRepository
 
                     UNION ALL
 
+                    SELECT
+                        owner_name AS suggestion,
+                        relevance_score - 120 AS relevance_score,
+                        created_at
+                    FROM matching_documents
+                    WHERE owner_name IS NOT NULL
+                      AND BTRIM(LOWER(REGEXP_REPLACE(owner_name, '[^[:alnum:]]+', ' ', 'g')))
+                            LIKE :searchPattern ESCAPE '\\'
+
+                    UNION ALL
+
+                    SELECT
+                        category AS suggestion,
+                        relevance_score - 140 AS relevance_score,
+                        created_at
+                    FROM matching_documents
+                    WHERE category IS NOT NULL
+                      AND BTRIM(LOWER(REGEXP_REPLACE(category, '[^[:alnum:]]+', ' ', 'g')))
+                            LIKE :searchPattern ESCAPE '\\'
+
+                    UNION ALL
+
+                    SELECT
+                        location AS suggestion,
+                        relevance_score - 160 AS relevance_score,
+                        created_at
+                    FROM matching_documents
+                    WHERE location IS NOT NULL
+                      AND BTRIM(LOWER(REGEXP_REPLACE(location, '[^[:alnum:]]+', ' ', 'g')))
+                            LIKE :searchPattern ESCAPE '\\'
+
+                    UNION ALL
+
+                    SELECT
+                        company_name AS suggestion,
+                        relevance_score - 100 AS relevance_score,
+                        created_at
+                    FROM matching_documents
+                    WHERE company_name IS NOT NULL
+                      AND BTRIM(LOWER(REGEXP_REPLACE(company_name, '[^[:alnum:]]+', ' ', 'g')))
+                            LIKE :searchPattern ESCAPE '\\'
+
+                    UNION ALL
+
                 %s
                 ),
                 deduplicated AS (
@@ -340,6 +634,8 @@ public class JdbcGlobalSearchRepository
                         relevance_score,
                         created_at
                     FROM suggestion_candidates
+                    WHERE suggestion IS NOT NULL
+                      AND BTRIM(suggestion) <> ''
                     ORDER BY
                         LOWER(suggestion),
                         relevance_score DESC,
@@ -383,14 +679,26 @@ public class JdbcGlobalSearchRepository
     }
 
     private MapSqlParameterSource parameters(String normalizedQuery) {
-        String escapedQuery = normalizedQuery
+        String escapedQuery = escapeLike(normalizedQuery);
+        String compactQuery = normalizedQuery.replace(" ", "");
+        String escapedCompactQuery = escapeLike(compactQuery);
+        return new MapSqlParameterSource()
+                .addValue("exactQuery", normalizedQuery)
+                .addValue("compactExactQuery", compactQuery)
+                .addValue("tokensText", normalizedQuery)
+                .addValue("prefixPattern", escapedQuery + "%")
+                .addValue("compactPrefixPattern", escapedCompactQuery + "%")
+                .addValue("initialPattern", escapedCompactQuery + "%")
+                .addValue("wholeWordPattern", "% " + escapedQuery + " %")
+                .addValue("searchPattern", "%" + escapedQuery + "%")
+                .addValue("compactSearchPattern", "%" + escapedCompactQuery + "%");
+    }
+
+    private String escapeLike(String value) {
+        return value
                 .replace("\\", "\\\\")
                 .replace("%", "\\%")
                 .replace("_", "\\_");
-        return new MapSqlParameterSource()
-                .addValue("exactQuery", normalizedQuery)
-                .addValue("prefixPattern", escapedQuery + "%")
-                .addValue("searchPattern", "%" + escapedQuery + "%");
     }
 
     private String orderBy(SearchSort sort) {
