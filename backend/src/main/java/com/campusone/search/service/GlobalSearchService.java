@@ -66,7 +66,7 @@ public class GlobalSearchService {
                 calculatedPages);
         boolean hasNext = ((long) page + 1) * size < totalElements;
         return new GlobalSearchResponse(
-                query.trim(),
+                displayQuery(query),
                 page,
                 size,
                 totalElements,
@@ -85,7 +85,7 @@ public class GlobalSearchService {
                         normalizedQuery,
                         limit));
         return new SearchSuggestionResponse(
-                query.trim(),
+                displayQuery(query),
                 suggestions);
     }
 
@@ -120,14 +120,25 @@ public class GlobalSearchService {
                     "q",
                     "Query is required.");
         }
-        String trimmed = query.trim();
-        if (trimmed.length() < MINIMUM_QUERY_LENGTH
-                || trimmed.length() > MAXIMUM_QUERY_LENGTH) {
+        String normalized = searchableQuery(query);
+        if (normalized.length() < MINIMUM_QUERY_LENGTH
+                || normalized.length() > MAXIMUM_QUERY_LENGTH) {
             throw new SearchValidationException(
                     "q",
-                    "Query must contain 2 to 100 characters after trimming.");
+                    "Query must contain 2 to 100 searchable characters.");
         }
-        return trimmed.toLowerCase(Locale.ROOT);
+        return normalized.toLowerCase(Locale.ROOT);
+    }
+
+    private String displayQuery(String query) {
+        return searchableQuery(query);
+    }
+
+    private String searchableQuery(String query) {
+        return query.trim()
+                .replaceAll("[^\\p{L}\\p{N}]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
     }
 
     private Set<SearchType> normalizeTypes(
