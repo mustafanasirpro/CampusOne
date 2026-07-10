@@ -117,6 +117,32 @@ class GlobalSearchServiceTest {
         assertThat(response.hasNext()).isTrue();
     }
 
+    @Test
+    void search_normalizesCasePunctuationAndDuplicateSpaces() {
+        when(searchRepository.search(
+                "machine learning",
+                EnumSet.allOf(SearchType.class),
+                0,
+                10,
+                SearchSort.RELEVANCE))
+                .thenReturn(result(document(SearchType.NOTE), 1));
+
+        var response = searchService.search(
+                "  Machine---   Learning!!!  ",
+                null,
+                0,
+                10,
+                SearchSort.RELEVANCE);
+
+        assertThat(response.query()).isEqualTo("Machine Learning");
+        verify(searchRepository).search(
+                "machine learning",
+                EnumSet.allOf(SearchType.class),
+                0,
+                10,
+                SearchSort.RELEVANCE);
+    }
+
     @ParameterizedTest
     @EnumSource(
             value = SearchSort.class,
