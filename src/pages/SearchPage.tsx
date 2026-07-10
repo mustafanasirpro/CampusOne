@@ -277,7 +277,7 @@ export function SearchPage() {
               </Button>
             ) : undefined
           }
-          description="Try a broader phrase or search across every content type."
+          description="Try one word, a course code, teacher name, tag, filename, department, or search across every content type."
           icon={<SearchX className="size-6" />}
           title="No results found"
         />
@@ -289,7 +289,11 @@ export function SearchPage() {
           </p>
           <div className="grid gap-4">
             {result.results.map((item) => (
-              <SearchResultCard key={`${item.type}-${item.id}`} result={item} />
+              <SearchResultCard
+                key={`${item.type}-${item.id}`}
+                query={result.query}
+                result={item}
+              />
             ))}
           </div>
           <nav
