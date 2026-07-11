@@ -44,7 +44,7 @@ export function CreateNotePage() {
         setAccessError(
           requestError instanceof ApiError
             ? requestError.message
-            : "Admin access could not be checked. Please try again.",
+            : "We could not confirm your note permissions. Please try again.",
         );
         setCanManage(false);
       });
@@ -93,7 +93,7 @@ export function CreateNotePage() {
   if (canManage === null) {
     return (
       <div className="grid min-h-[60vh] place-items-center">
-        <LoadingSpinner label="Checking admin access" />
+        <LoadingSpinner label="Checking your note tools" />
       </div>
     );
   }
