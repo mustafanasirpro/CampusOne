@@ -128,6 +128,7 @@ class NoteControllerTest {
                 null,
                 null,
                 null,
+                null,
                 0,
                 20,
                 com.campusone.note.dto.request.NoteSort.NEWEST))
@@ -143,6 +144,43 @@ class NoteControllerTest {
         mockMvc.perform(get("/api/v1/notes"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray());
+    }
+
+    @Test
+    void listPublicNotes_withQueryPassesSearchFiltersToService()
+            throws Exception {
+        when(noteService.listPublicNotes(
+                null,
+                "CSC275",
+                "Machine Learning",
+                "midterm",
+                0,
+                20,
+                com.campusone.note.dto.request.NoteSort.RELEVANCE))
+                .thenReturn(new NotePageResponse(
+                        List.of(),
+                        0,
+                        20,
+                        0,
+                        0,
+                        true,
+                        true));
+
+        mockMvc.perform(get("/api/v1/notes")
+                        .param("q", "Machine Learning")
+                        .param("course", "CSC275")
+                        .param("tag", "midterm")
+                        .param("sort", "RELEVANCE"))
+                .andExpect(status().isOk());
+
+        verify(noteService).listPublicNotes(
+                null,
+                "CSC275",
+                "Machine Learning",
+                "midterm",
+                0,
+                20,
+                com.campusone.note.dto.request.NoteSort.RELEVANCE);
     }
 
     @Test
