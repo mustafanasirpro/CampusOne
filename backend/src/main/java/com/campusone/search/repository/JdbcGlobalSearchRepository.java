@@ -2,6 +2,7 @@ package com.campusone.search.repository;
 
 import com.campusone.search.dto.SearchSort;
 import com.campusone.search.dto.SearchType;
+import com.campusone.search.service.SearchQueryNormalizer;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -513,10 +514,13 @@ public class JdbcGlobalSearchRepository
             """;
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final SearchQueryNormalizer normalizer;
 
     public JdbcGlobalSearchRepository(
-            NamedParameterJdbcTemplate jdbcTemplate) {
+            NamedParameterJdbcTemplate jdbcTemplate,
+            SearchQueryNormalizer normalizer) {
         this.jdbcTemplate = jdbcTemplate;
+        this.normalizer = normalizer;
     }
 
     @Override
@@ -679,26 +683,17 @@ public class JdbcGlobalSearchRepository
     }
 
     private MapSqlParameterSource parameters(String normalizedQuery) {
-        String escapedQuery = escapeLike(normalizedQuery);
-        String compactQuery = normalizedQuery.replace(" ", "");
-        String escapedCompactQuery = escapeLike(compactQuery);
+        String compactQuery = normalizer.compact(normalizedQuery);
         return new MapSqlParameterSource()
                 .addValue("exactQuery", normalizedQuery)
                 .addValue("compactExactQuery", compactQuery)
                 .addValue("tokensText", normalizedQuery)
-                .addValue("prefixPattern", escapedQuery + "%")
-                .addValue("compactPrefixPattern", escapedCompactQuery + "%")
-                .addValue("initialPattern", escapedCompactQuery + "%")
-                .addValue("wholeWordPattern", "% " + escapedQuery + " %")
-                .addValue("searchPattern", "%" + escapedQuery + "%")
-                .addValue("compactSearchPattern", "%" + escapedCompactQuery + "%");
-    }
-
-    private String escapeLike(String value) {
-        return value
-                .replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_");
+                .addValue("prefixPattern", normalizer.prefixPattern(normalizedQuery))
+                .addValue("compactPrefixPattern", normalizer.prefixPattern(compactQuery))
+                .addValue("initialPattern", normalizer.prefixPattern(compactQuery))
+                .addValue("wholeWordPattern", normalizer.wholeWordPattern(normalizedQuery))
+                .addValue("searchPattern", normalizer.likePattern(normalizedQuery))
+                .addValue("compactSearchPattern", normalizer.likePattern(compactQuery));
     }
 
     private String orderBy(SearchSort sort) {
