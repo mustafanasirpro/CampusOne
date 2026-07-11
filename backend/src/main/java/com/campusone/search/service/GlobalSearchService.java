@@ -27,12 +27,15 @@ public class GlobalSearchService {
 
     private final GlobalSearchRepository searchRepository;
     private final SearchResultMapper searchResultMapper;
+    private final SearchQueryNormalizer queryNormalizer;
 
     public GlobalSearchService(
             GlobalSearchRepository searchRepository,
-            SearchResultMapper searchResultMapper) {
+            SearchResultMapper searchResultMapper,
+            SearchQueryNormalizer queryNormalizer) {
         this.searchRepository = searchRepository;
         this.searchResultMapper = searchResultMapper;
+        this.queryNormalizer = queryNormalizer;
     }
 
     @Transactional(readOnly = true)
@@ -120,25 +123,18 @@ public class GlobalSearchService {
                     "q",
                     "Query is required.");
         }
-        String normalized = searchableQuery(query);
+        String normalized = queryNormalizer.normalize(query);
         if (normalized.length() < MINIMUM_QUERY_LENGTH
                 || normalized.length() > MAXIMUM_QUERY_LENGTH) {
             throw new SearchValidationException(
                     "q",
                     "Query must contain 2 to 100 searchable characters.");
         }
-        return normalized.toLowerCase(Locale.ROOT);
+        return normalized;
     }
 
     private String displayQuery(String query) {
-        return searchableQuery(query);
-    }
-
-    private String searchableQuery(String query) {
-        return query.trim()
-                .replaceAll("[^\\p{L}\\p{N}]+", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
+        return queryNormalizer.display(query);
     }
 
     private Set<SearchType> normalizeTypes(
