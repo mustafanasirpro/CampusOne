@@ -98,16 +98,16 @@ public class JdbcNoteSearchRepository implements NoteSearchRepository {
             WHERE note.deleted_at IS NULL
               AND note.moderation_status = 'APPROVED'
               AND note.visibility = 'PUBLIC'
-              AND (:courseId IS NULL OR course.id = :courseId)
+              AND (:hasCourseIdFilter = FALSE OR course.id = :courseId)
               AND (
-                    :courseSearchPattern IS NULL
+                    :hasCourseTextFilter = FALSE
                     OR BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ', course.course_code, course.title), '[^[:alnum:]]+', ' ', 'g')))
                         LIKE :courseSearchPattern ESCAPE '\\'
                     OR REPLACE(BTRIM(LOWER(REGEXP_REPLACE(COALESCE(course.course_code, ''), '[^[:alnum:]]+', ' ', 'g'))), ' ', '')
                         LIKE :courseCompactPattern ESCAPE '\\'
               )
               AND (
-                    :normalizedTag IS NULL
+                    :hasTagFilter = FALSE
                     OR note_tags.normalized_tags LIKE :tagSearchPattern ESCAPE '\\'
               )
               AND (
@@ -249,14 +249,16 @@ public class JdbcNoteSearchRepository implements NoteSearchRepository {
                 .addValue("wholeWordPattern", normalizer.wholeWordPattern(normalizedQuery))
                 .addValue("searchPattern", normalizer.likePattern(normalizedQuery))
                 .addValue("compactSearchPattern", normalizer.likePattern(compactQuery))
+                .addValue("hasCourseIdFilter", courseId != null)
                 .addValue("courseId", courseId)
+                .addValue("hasCourseTextFilter", normalizedCourseFilter != null)
                 .addValue("courseSearchPattern", normalizedCourseFilter == null
                         ? null
                         : normalizer.likePattern(normalizedCourseFilter))
                 .addValue("courseCompactPattern", courseCompact == null
                         ? null
                         : normalizer.likePattern(courseCompact))
-                .addValue("normalizedTag", normalizedTagFilter)
+                .addValue("hasTagFilter", normalizedTagFilter != null)
                 .addValue("tagSearchPattern", normalizedTagFilter == null
                         ? null
                         : normalizer.likePattern(normalizedTagFilter));
