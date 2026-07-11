@@ -4,6 +4,8 @@ import com.campusone.note.entity.Note;
 import com.campusone.note.entity.NoteModerationStatus;
 import com.campusone.note.entity.NoteVisibility;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -22,7 +24,8 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
         "uploader.studentProfile.university",
         "course",
         "course.department",
-        "fileAsset"
+        "fileAsset",
+        "tags"
     })
     @Query("""
             select note
@@ -74,7 +77,8 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
         "uploader.studentProfile.university",
         "course",
         "course.department",
-        "fileAsset"
+        "fileAsset",
+        "tags"
     })
     @Query("""
             select note
@@ -85,6 +89,22 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
     Page<Note> findMyNotes(
             @Param("userId") UUID userId,
             Pageable pageable);
+
+    @EntityGraph(attributePaths = {
+        "uploader",
+        "uploader.studentProfile",
+        "uploader.studentProfile.university",
+        "course",
+        "course.department",
+        "fileAsset",
+        "tags"
+    })
+    @Query("""
+            select note
+            from Note note
+            where note.id in :noteIds
+            """)
+    List<Note> findSummariesByIdIn(@Param("noteIds") Collection<UUID> noteIds);
 
     @EntityGraph(attributePaths = {
         "uploader",
