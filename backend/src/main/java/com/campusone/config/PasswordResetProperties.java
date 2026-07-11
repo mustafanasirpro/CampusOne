@@ -12,9 +12,9 @@ public class PasswordResetProperties {
     private String frontendUrl = "http://localhost:5173";
     private String mailProvider = "disabled";
     private boolean mailEnabled;
-    private String mailFrom = "CampusOne <no-reply@campusone.dev>";
+    private String mailFrom = "";
     private String resendApiKey = "";
-    private String resendFrom = "CampusOne <onboarding@resend.dev>";
+    private String resendFrom = "";
     private URI resendApiUrl = URI.create("https://api.resend.com/emails");
     private Duration resendTimeout = Duration.ofSeconds(10);
 
@@ -59,9 +59,7 @@ public class PasswordResetProperties {
     }
 
     public void setMailFrom(String mailFrom) {
-        if (mailFrom != null && !mailFrom.isBlank()) {
-            this.mailFrom = mailFrom.trim();
-        }
+        this.mailFrom = mailFrom == null ? "" : mailFrom.trim();
     }
 
     public String getResendApiKey() {
@@ -77,9 +75,7 @@ public class PasswordResetProperties {
     }
 
     public void setResendFrom(String resendFrom) {
-        if (resendFrom != null && !resendFrom.isBlank()) {
-            this.resendFrom = resendFrom.trim();
-        }
+        this.resendFrom = resendFrom == null ? "" : resendFrom.trim();
     }
 
     public URI getResendApiUrl() {
