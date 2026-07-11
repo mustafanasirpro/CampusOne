@@ -256,7 +256,7 @@ configuration import. Operating-system environment variables take precedence.
 | `APP_FRONTEND_URL` | Production | Frontend base URL used in reset links, e.g. `https://campusone.dev` |
 | `MAIL_PROVIDER` | Production | Set to `resend` for Render production email delivery; defaults to `disabled` |
 | `RESEND_API_KEY` | Production | Resend HTTPS API key for password reset emails |
-| `RESEND_FROM` | Production | Sender identity, e.g. `CampusOne <onboarding@resend.dev>` |
+| `RESEND_FROM` | Production | Verified Resend sender, e.g. `CampusOne <support@mail.campusone.dev>` |
 | `RESEND_TIMEOUT` | No | Resend HTTPS request timeout; defaults to `10s` |
 | `MAIL_ENABLED` | SMTP fallback | Set to `true` only when `MAIL_PROVIDER=smtp` |
 | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | SMTP fallback | Optional SMTP settings; not required for Resend production mode |
@@ -306,15 +306,17 @@ PASSWORD_RESET_TOKEN_TTL_MINUTES=30
 APP_FRONTEND_URL=https://campusone.dev
 MAIL_PROVIDER=resend
 RESEND_API_KEY=<your-resend-api-key>
-RESEND_FROM=CampusOne <onboarding@resend.dev>
+RESEND_FROM=CampusOne <support@mail.campusone.dev>
 RESEND_TIMEOUT=10s
 ```
 
 Production password reset email uses Resend's HTTPS API because Render may not
 reliably connect to Gmail SMTP. Gmail SMTP variables are not required when
-`MAIL_PROVIDER=resend`. If you later verify a sending domain in Resend, change
-`RESEND_FROM` to something like `CampusOne <noreply@yourdomain.com>`. Do not
-commit `RESEND_API_KEY`.
+`MAIL_PROVIDER=resend`. The current verified sending domain is
+`mail.campusone.dev`, so `RESEND_FROM` must use an address on that domain such
+as `CampusOne <support@mail.campusone.dev>`. Do not use
+`onboarding@resend.dev` or `mail@campusone.dev` for production delivery, and do
+not commit `RESEND_API_KEY`.
 
 ## 💻 Running Locally
 
