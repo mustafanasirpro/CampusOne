@@ -10,7 +10,10 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +21,10 @@ public class ResendPasswordResetMailer implements PasswordResetMailer {
 
     private static final Logger LOGGER =
             LoggerFactory.getLogger(ResendPasswordResetMailer.class);
+    private static final String VERIFIED_RESEND_SENDER_DOMAIN =
+            "mail.campusone.dev";
+    private static final Pattern EMAIL_ADDRESS_PATTERN =
+            Pattern.compile("<([^<>\\s@]+@[^<>\\s@]+)>|\\b([^\\s<>@]+@[^\\s<>@]+)\\b");
 
     private final PasswordResetProperties properties;
     private final HttpClient httpClient;
@@ -144,6 +151,26 @@ public class ResendPasswordResetMailer implements PasswordResetMailer {
             throw new IllegalStateException(
                     "Resend email provider is selected but RESEND_FROM is missing.");
         }
+        if (!usesVerifiedSenderDomain(properties.getResendFrom())) {
+            throw new IllegalStateException(
+                    "RESEND_FROM must use a sender on the verified "
+                            + VERIFIED_RESEND_SENDER_DOMAIN
+                            + " domain.");
+        }
+    }
+
+    private boolean usesVerifiedSenderDomain(String resendFrom) {
+        Matcher matcher = EMAIL_ADDRESS_PATTERN.matcher(resendFrom.trim());
+        if (!matcher.find()) {
+            return false;
+        }
+        String email = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+        int atIndex = email.lastIndexOf('@');
+        if (atIndex < 0 || atIndex == email.length() - 1) {
+            return false;
+        }
+        String domain = email.substring(atIndex + 1).toLowerCase(Locale.ROOT);
+        return VERIFIED_RESEND_SENDER_DOMAIN.equals(domain);
     }
 
     private String safeSummary(String responseBody) {
