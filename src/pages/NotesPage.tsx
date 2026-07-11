@@ -31,6 +31,22 @@ type NotesView = "library" | "mine";
 
 const pageSize = 12;
 
+function notesErrorMessage(error: unknown) {
+  if (!(error instanceof ApiError)) {
+    return "Notes could not be loaded. Please try again.";
+  }
+  if (error.code === "OFFLINE" || error.code === "NETWORK_ERROR") {
+    return error.message;
+  }
+  if (
+    error.status >= 500 ||
+    error.message.toLowerCase().includes("unexpected error")
+  ) {
+    return "Notes search could not be completed. Please try again.";
+  }
+  return error.message;
+}
+
 export function NotesPage() {
   const [view, setView] = useState<NotesView>("library");
   const [page, setPage] = useState(0);
@@ -98,11 +114,7 @@ export function NotesPage() {
       })
       .catch((requestError: unknown) => {
         if (active) {
-          setError(
-            requestError instanceof ApiError
-              ? requestError.message
-              : "Notes could not be loaded. Please try again.",
-          );
+          setError(notesErrorMessage(requestError));
         }
       })
       .finally(() => {
