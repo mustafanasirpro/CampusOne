@@ -108,6 +108,7 @@ public class NoteController {
     @Operation(summary = "List approved public notes")
     public ResponseEntity<NotePageResponse> listPublicNotes(
             @RequestParam(required = false) UUID courseId,
+            @RequestParam(required = false) @Size(min = 2, max = 100) String q,
             @RequestParam(required = false) @Size(min = 2, max = 100) String course,
             @RequestParam(required = false) @Size(min = 2, max = 30) String courseCode,
             @RequestParam(required = false) @Size(min = 2, max = 40) String tag,
@@ -118,6 +119,7 @@ public class NoteController {
                 noteService.listPublicNotes(
                         courseId,
                         firstNonBlank(course, courseCode),
+                        q,
                         tag,
                         page,
                         size,
