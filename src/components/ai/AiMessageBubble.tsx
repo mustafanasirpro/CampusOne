@@ -38,10 +38,9 @@ export function AiMessageBubble({ message }: { message: AiMessage }) {
             user ? "text-brand-100" : "text-slate-400",
           )}
         >
-          {formatAiDate(message.createdAt)} · {message.tokenEstimate} estimated tokens
+          {formatAiDate(message.createdAt)}
         </p>
       </div>
     </article>
   );
 }
-
