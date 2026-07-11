@@ -97,7 +97,7 @@ export function ResetPasswordPage() {
     } catch (error) {
       setRequestError(
         error instanceof DOMException && error.name === "AbortError"
-          ? "CampusOne is temporarily unreachable. Please try again."
+          ? "We could not connect right now. Please try again."
           : error instanceof ApiError
           ? error.message
           : "This reset link is invalid or expired.",
