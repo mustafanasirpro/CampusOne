@@ -60,9 +60,9 @@ class JdbcNoteSearchRepositoryTest {
                         "note.deleted_at IS NULL",
                         "note.moderation_status = 'APPROVED'",
                         "note.visibility = 'PUBLIC'",
-                        "(:courseId IS NULL OR course.id = :courseId)",
-                        ":courseSearchPattern IS NULL",
-                        ":normalizedTag IS NULL");
+                        "(:hasCourseIdFilter = FALSE OR course.id = :courseId)",
+                        ":hasCourseTextFilter = FALSE",
+                        ":hasTagFilter = FALSE");
     }
 
     @Test
@@ -133,10 +133,49 @@ class JdbcNoteSearchRepositoryTest {
                 .isEqualTo("%csc 275%");
         assertThat(parameters.getValue().getValue("courseCompactPattern"))
                 .isEqualTo("%csc275%");
+        assertThat(parameters.getValue().getValue("hasCourseIdFilter"))
+                .isEqualTo(true);
+        assertThat(parameters.getValue().getValue("hasCourseTextFilter"))
+                .isEqualTo(true);
+        assertThat(parameters.getValue().getValue("hasTagFilter"))
+                .isEqualTo(true);
         assertThat(parameters.getValue().getValue("tagSearchPattern"))
                 .isEqualTo("%machine\\_learning%");
         assertThat(parameters.getValue().getValue("offset")).isEqualTo(12L);
         assertThat(parameters.getValue().getValue("limit")).isEqualTo(6);
+    }
+
+    @Test
+    void searchPublicNotes_usesBooleanFlagsWhenOptionalFiltersAreMissing() {
+        stubEmptySearch();
+
+        searchRepository.searchPublicNotes(
+                "data",
+                null,
+                null,
+                null,
+                0,
+                10);
+
+        ArgumentCaptor<SqlParameterSource> parameters =
+                ArgumentCaptor.forClass(SqlParameterSource.class);
+        verify(jdbcTemplate).queryForList(
+                anyString(),
+                parameters.capture(),
+                eq(UUID.class));
+
+        assertThat(parameters.getValue().getValue("hasCourseIdFilter"))
+                .isEqualTo(false);
+        assertThat(parameters.getValue().getValue("hasCourseTextFilter"))
+                .isEqualTo(false);
+        assertThat(parameters.getValue().getValue("hasTagFilter"))
+                .isEqualTo(false);
+        assertThat(parameters.getValue().getValue("courseSearchPattern"))
+                .isNull();
+        assertThat(parameters.getValue().getValue("courseCompactPattern"))
+                .isNull();
+        assertThat(parameters.getValue().getValue("tagSearchPattern"))
+                .isNull();
     }
 
     @Test
