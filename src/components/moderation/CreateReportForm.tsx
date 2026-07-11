@@ -40,7 +40,7 @@ export function CreateReportForm({
     event.preventDefault();
     const normalizedTargetId = extractContentId(targetReference);
     if (!isUuid(normalizedTargetId)) {
-      setError("Enter a valid CampusOne content link or content ID.");
+      setError("Enter a valid CampusOne content link.");
       return;
     }
     setIsSubmitting(true);
@@ -87,7 +87,7 @@ export function CreateReportForm({
           </div>
           <div className="grid gap-5 md:grid-cols-2">
             <SelectField
-              label="Target type"
+              label="Content type"
               onChange={(event) =>
                 setTargetType(event.target.value as ModerationTargetType)
               }
@@ -96,7 +96,7 @@ export function CreateReportForm({
               value={targetType}
             />
             <FormField
-              label="Content link or ID"
+              label="Content link"
               onChange={(event) => setTargetReference(event.target.value)}
               placeholder="https://campusone.dev/notes/..."
               required
