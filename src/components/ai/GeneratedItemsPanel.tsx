@@ -128,7 +128,7 @@ export function GeneratedItemsPanel() {
         <div>
           <h2 className="text-xl font-bold text-slate-950">Generated items</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Reopen summaries, flashcards, quizzes, and study plans saved by the backend.
+            Reopen your saved summaries, flashcards, quizzes, and study plans.
           </p>
         </div>
         <Dropdown
