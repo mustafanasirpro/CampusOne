@@ -112,11 +112,11 @@ export function ModerationActionsPanel() {
     const moderator = moderatorInput.trim();
     const report = reportInput.trim();
     if (moderator && !isUuid(moderator)) {
-      setFilterError("Moderator user ID must be a valid UUID.");
+      setFilterError("Reviewer ID looks invalid.");
       return;
     }
     if (report && !isUuid(report)) {
-      setFilterError("Report ID must be a valid UUID.");
+      setFilterError("Report ID looks invalid.");
       return;
     }
     setFilterError(null);
@@ -214,17 +214,17 @@ export function ModerationActionsPanel() {
           value={sort}
         />
         <FormField
-          error={filterError?.startsWith("Moderator") ? filterError : undefined}
-          label="Moderator user UUID"
+          error={filterError?.startsWith("Reviewer") ? filterError : undefined}
+          label="Reviewer ID"
           onChange={(event) => setModeratorInput(event.target.value)}
-          placeholder="Optional exact UUID"
+          placeholder="Paste an ID if needed"
           value={moderatorInput}
         />
         <FormField
           error={filterError?.startsWith("Report") ? filterError : undefined}
-          label="Report UUID"
+          label="Report ID"
           onChange={(event) => setReportInput(event.target.value)}
-          placeholder="Optional exact UUID"
+          placeholder="Paste an ID if needed"
           value={reportInput}
         />
         <div className="flex items-end gap-2">
