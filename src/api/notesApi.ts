@@ -27,13 +27,14 @@ export function listNotes({
   course,
   courseId,
   page = 0,
+  q,
   signal,
   size = 12,
-  sort = "NEWEST",
+  sort = "RELEVANCE",
   tag,
 }: NoteListParameters = {}) {
   return apiRequest<NotePage>(
-    `/notes${queryString({ course, courseId, page, size, sort, tag })}`,
+    `/notes${queryString({ course, courseId, page, q, size, sort, tag })}`,
     { signal },
   );
 }
@@ -43,7 +44,7 @@ export function getMyNotes({
   signal,
   size = 12,
   sort = "NEWEST",
-}: Omit<NoteListParameters, "courseId" | "tag"> = {}) {
+}: Omit<NoteListParameters, "course" | "courseId" | "q" | "tag"> = {}) {
   return apiRequest<NotePage>(
     `/notes/my${queryString({ page, size, sort })}`,
     { signal },
@@ -112,6 +113,7 @@ export function recordNoteDownload(noteId: string) {
 }
 
 export const noteSortOptions: Array<{ label: string; value: NoteSort }> = [
+  { label: "Best match", value: "RELEVANCE" },
   { label: "Newest first", value: "NEWEST" },
   { label: "Highest rated", value: "RATING" },
   { label: "Most downloaded", value: "DOWNLOADS" },
