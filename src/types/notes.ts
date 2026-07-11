@@ -13,7 +13,7 @@ export type NoteModerationStatus =
   | "APPROVED"
   | "REJECTED"
   | "HIDDEN";
-export type NoteSort = "NEWEST" | "RATING" | "DOWNLOADS";
+export type NoteSort = "RELEVANCE" | "NEWEST" | "RATING" | "DOWNLOADS";
 export type StorageProvider = "LOCAL" | "MINIO" | "S3" | "S3_COMPATIBLE";
 export type FileAssetStatus =
   | "PENDING"
@@ -123,6 +123,7 @@ export interface NoteListParameters {
   course?: string;
   courseId?: string;
   page?: number;
+  q?: string;
   signal?: AbortSignal;
   size?: number;
   sort?: NoteSort;
