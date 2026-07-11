@@ -65,7 +65,7 @@ export function ForgotPasswordPage() {
       setError(
         requestError instanceof DOMException &&
           requestError.name === "AbortError"
-          ? "CampusOne is temporarily unreachable. Please try again."
+          ? "We could not connect right now. Please try again."
           : requestError instanceof ApiError
             ? requestError.message
             : "Password reset instructions could not be requested. Please try again.",
