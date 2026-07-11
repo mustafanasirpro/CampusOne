@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.campusone.search.dto.SearchSort;
 import com.campusone.search.dto.SearchType;
+import com.campusone.search.service.SearchQueryNormalizer;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -33,7 +34,9 @@ class JdbcGlobalSearchRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        searchRepository = new JdbcGlobalSearchRepository(jdbcTemplate);
+        searchRepository = new JdbcGlobalSearchRepository(
+                jdbcTemplate,
+                new SearchQueryNormalizer());
     }
 
     @Test
