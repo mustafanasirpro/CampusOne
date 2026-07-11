@@ -68,7 +68,7 @@ export function AiUsagePanel() {
         <div>
           <h2 className="text-xl font-bold text-slate-950">AI usage history</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Token estimates recorded by CampusOne for each assistant feature.
+            See how often you use each study assistant feature.
           </p>
         </div>
         <Dropdown
@@ -110,8 +110,8 @@ export function AiUsagePanel() {
                 <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
                   <Badge variant="brand">{aiFeatureLabel(record.feature)}</Badge>
                   <div className="grid flex-1 grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-                    <Metric label="Input tokens" value={record.inputTokenEstimate} />
-                    <Metric label="Output tokens" value={record.outputTokenEstimate} />
+                    <Metric label="Prompt size" value={record.inputTokenEstimate} />
+                    <Metric label="Response size" value={record.outputTokenEstimate} />
                     <Metric
                       label="Total estimate"
                       value={
@@ -174,4 +174,3 @@ function Metric({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
-
