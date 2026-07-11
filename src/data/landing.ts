@@ -104,7 +104,7 @@ export const landingFaqs = [
   {
     question: "Which universities are supported?",
     answer:
-      "The current local seed supports COMSATS University Islamabad and its Computer Science department. The academic directory is designed to expand as more campuses are configured.",
+      "CampusOne currently supports COMSATS University Islamabad and its Computer Science department, with more campuses planned over time.",
   },
   {
     question: "Can I upload my own notes?",
