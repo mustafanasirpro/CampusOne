@@ -40,7 +40,7 @@ class SmtpPasswordResetMailerTest {
     void setUp() {
         properties = new PasswordResetProperties();
         properties.setMailEnabled(true);
-        properties.setMailFrom("CampusOne <no-reply@campusone.dev>");
+        properties.setMailFrom("CampusOne <support@mail.campusone.dev>");
         properties.setFrontendUrl("https://campusone.dev");
         properties.setTokenTtl(Duration.ofMinutes(30));
         mailer = new SmtpPasswordResetMailer(
@@ -66,7 +66,7 @@ class SmtpPasswordResetMailerTest {
         verify(mailSender).send(messageCaptor.capture());
         SimpleMailMessage message = messageCaptor.getValue();
         assertThat(message.getFrom())
-                .isEqualTo("CampusOne <no-reply@campusone.dev>");
+                .isEqualTo("CampusOne <support@mail.campusone.dev>");
         assertThat(message.getTo()).containsExactly("student@example.com");
         assertThat(message.getSubject()).isEqualTo("CampusOne password reset");
         assertThat(message.getText())
