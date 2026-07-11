@@ -143,8 +143,7 @@ export function LoginPage() {
         </Button>
 
         <p className="text-center text-xs leading-5 text-slate-400">
-          CampusOne uses a short-lived access token and a secure refresh
-          session managed by the backend.
+          Your session is protected with secure sign-in.
         </p>
       </form>
     </AuthPageShell>
