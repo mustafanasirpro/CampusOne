@@ -388,7 +388,7 @@ export function SettingsPage() {
               />
               <FormField
                 disabled
-                hint="Email changes are not supported by the current backend."
+                hint="Contact support if you need to change your email."
                 label="Email"
                 value={profile.email}
               />
@@ -527,7 +527,7 @@ export function SettingsPage() {
             <div>
               <h2 className="font-semibold text-slate-950">Preferences</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Preferences persisted by the current backend.
+                Shape CampusOne around the way you like to work.
               </p>
             </div>
           </div>
