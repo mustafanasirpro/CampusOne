@@ -25,12 +25,50 @@ const statusVariants = {
   REJECTED: "danger",
 } as const;
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function queryTerms(query?: string) {
+  if (!query) return [];
+  return Array.from(
+    new Set(
+      query
+        .trim()
+        .split(/[^\p{L}\p{N}]+/u)
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 2),
+    ),
+  ).sort((first, second) => second.length - first.length);
+}
+
+function highlight(value: string, query?: string) {
+  const terms = queryTerms(query);
+  if (terms.length === 0) return value;
+
+  const matcher = new RegExp(`(${terms.map(escapeRegExp).join("|")})`, "gi");
+  return value.split(matcher).map((part, index) =>
+    terms.some((term) => term.toLowerCase() === part.toLowerCase()) ? (
+      <mark
+        className="rounded bg-amber-100 px-0.5 py-0 text-inherit"
+        key={`${part}-${index}`}
+      >
+        {part}
+      </mark>
+    ) : (
+      part
+    ),
+  );
+}
+
 export function NoteCard({
   note,
   owned = false,
+  query,
 }: {
   note: NoteSummary;
   owned?: boolean;
+  query?: string;
 }) {
   return (
     <Card className="group h-full overflow-hidden hover:-translate-y-1 hover:border-brand-200 hover:shadow-xl">
@@ -46,20 +84,22 @@ export function NoteCard({
         </div>
 
         <h2 className="mt-4 line-clamp-2 text-lg font-semibold leading-7 text-slate-950">
-          {note.title}
+          {highlight(note.title, query)}
         </h2>
 
         <div className="mt-4 grid gap-2.5 text-sm text-slate-500">
           <p className="flex items-center gap-2">
             <BookOpen className="size-4 shrink-0 text-brand-500" />
             <span className="truncate">
-              {note.course.courseCode} · {note.course.title}
+              {highlight(note.course.courseCode, query)} ·{" "}
+              {highlight(note.course.title, query)}
             </span>
           </p>
           <p className="flex items-center gap-2">
             <UserRound className="size-4 shrink-0 text-slate-400" />
             <span className="truncate">
-              {note.uploader.fullName} · {note.uploader.university}
+              {highlight(note.uploader.fullName, query)} ·{" "}
+              {note.uploader.university}
             </span>
           </p>
           <p className="flex items-center gap-2">
@@ -77,7 +117,7 @@ export function NoteCard({
                 className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600"
                 key={tag.id}
               >
-                #{tag.name}
+                #{highlight(tag.name, query)}
               </span>
             ))}
           </div>
@@ -112,7 +152,7 @@ export function NoteCard({
             </Link>
           ) : (
             <span className="inline-flex h-10 items-center justify-center rounded-xl bg-slate-50 px-3 text-xs font-medium text-slate-500">
-              Taught by {note.teacherName}
+              Taught by {highlight(note.teacherName, query)}
             </span>
           )}
         </div>
