@@ -89,9 +89,9 @@ app:
     frontend-url: ${APP_FRONTEND_URL:http://localhost:5173}
     mail-provider: ${MAIL_PROVIDER:disabled}
     mail-enabled: ${MAIL_ENABLED:false}
-    mail-from: ${MAIL_FROM:CampusOne <no-reply@campusone.dev>}
+    mail-from: ${MAIL_FROM:}
     resend-api-key: ${RESEND_API_KEY:}
-    resend-from: ${RESEND_FROM:CampusOne <onboarding@resend.dev>}
+    resend-from: ${RESEND_FROM:}
     resend-api-url: ${RESEND_API_URL:https://api.resend.com/emails}
     resend-timeout: ${RESEND_TIMEOUT:10s}
   cors:
