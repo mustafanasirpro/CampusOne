@@ -1,6 +1,7 @@
 package com.campusone.search.exception;
 
 import com.campusone.common.dto.ErrorResponse;
+import com.campusone.note.controller.NoteController;
 import com.campusone.search.controller.SearchController;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
@@ -15,7 +16,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @Order(Ordered.HIGHEST_PRECEDENCE)
-@RestControllerAdvice(assignableTypes = SearchController.class)
+@RestControllerAdvice(assignableTypes = {
+    SearchController.class,
+    NoteController.class
+})
 public class SearchExceptionHandler {
 
     @ExceptionHandler(SearchValidationException.class)
