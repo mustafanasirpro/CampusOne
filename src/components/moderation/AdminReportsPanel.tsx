@@ -181,7 +181,7 @@ export function AdminReportsPanel() {
     event.preventDefault();
     const normalized = reporterInput.trim();
     if (normalized && !isUuid(normalized)) {
-      setFilterError("Reporter user ID must be a valid UUID.");
+      setFilterError("Use a valid reporter ID.");
       return;
     }
     setFilterError(null);
@@ -271,9 +271,9 @@ export function AdminReportsPanel() {
         <FormField
           className="lg:col-span-3"
           error={filterError ?? undefined}
-          label="Reporter user UUID"
+          label="Reporter ID"
           onChange={(event) => setReporterInput(event.target.value)}
-          placeholder="Optional exact UUID"
+          placeholder="Paste an ID if needed"
           value={reporterInput}
         />
         <div className="flex items-end gap-2">
