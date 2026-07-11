@@ -37,10 +37,14 @@ import com.campusone.note.repository.NoteDownloadEventRepository;
 import com.campusone.note.repository.NoteModerationActionRepository;
 import com.campusone.note.repository.NoteRatingRepository;
 import com.campusone.note.repository.NoteRepository;
+import com.campusone.note.repository.NoteSearchRepository;
+import com.campusone.note.repository.NoteSearchResult;
 import com.campusone.note.repository.NoteVersionRepository;
 import com.campusone.note.repository.TagRepository;
 import com.campusone.note.storage.StorageService;
 import com.campusone.note.storage.StoredObject;
+import com.campusone.search.exception.SearchValidationException;
+import com.campusone.search.service.SearchQueryNormalizer;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.nio.charset.StandardCharsets;
@@ -53,8 +57,10 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -78,10 +84,12 @@ public class NoteService {
     private final CourseRepository courseRepository;
     private final DepartmentRepository departmentRepository;
     private final UserRepository userRepository;
+    private final NoteSearchRepository noteSearchRepository;
     private final NoteMapper noteMapper;
     private final CommunityIntegrationService integrationService;
     private final StorageService storageService;
     private final NoteAdminAuthorizationService adminAuthorizationService;
+    private final SearchQueryNormalizer searchQueryNormalizer;
     private final Clock clock;
 
     public NoteService(
@@ -96,10 +104,12 @@ public class NoteService {
             CourseRepository courseRepository,
             DepartmentRepository departmentRepository,
             UserRepository userRepository,
+            NoteSearchRepository noteSearchRepository,
             NoteMapper noteMapper,
             CommunityIntegrationService integrationService,
             StorageService storageService,
             NoteAdminAuthorizationService adminAuthorizationService,
+            SearchQueryNormalizer searchQueryNormalizer,
             Clock clock) {
         this.noteRepository = noteRepository;
         this.fileAssetRepository = fileAssetRepository;
@@ -112,10 +122,12 @@ public class NoteService {
         this.courseRepository = courseRepository;
         this.departmentRepository = departmentRepository;
         this.userRepository = userRepository;
+        this.noteSearchRepository = noteSearchRepository;
         this.noteMapper = noteMapper;
         this.integrationService = integrationService;
         this.storageService = storageService;
         this.adminAuthorizationService = adminAuthorizationService;
+        this.searchQueryNormalizer = searchQueryNormalizer;
         this.clock = clock;
     }
 
@@ -343,7 +355,7 @@ public class NoteService {
             int page,
             int size,
             NoteSort sort) {
-        return listPublicNotes(courseId, null, tag, page, size, sort);
+        return listPublicNotes(courseId, null, null, tag, page, size, sort);
     }
 
     @Transactional(readOnly = true)
@@ -354,9 +366,31 @@ public class NoteService {
             int page,
             int size,
             NoteSort sort) {
+        return listPublicNotes(courseId, courseQuery, null, tag, page, size, sort);
+    }
+
+    @Transactional(readOnly = true)
+    public NotePageResponse listPublicNotes(
+            UUID courseId,
+            String courseQuery,
+            String searchQuery,
+            String tag,
+            int page,
+            int size,
+            NoteSort sort) {
         String normalizedTag = tag == null || tag.isBlank()
                 ? null
                 : Tag.normalize(tag);
+        if (searchQuery != null && !searchQuery.isBlank()) {
+            return searchPublicNotes(
+                    courseId,
+                    courseQuery,
+                    searchQuery,
+                    normalizedTag,
+                    page,
+                    size);
+        }
+
         String normalizedCourseQuery = toSearchPattern(courseQuery);
         Page<Note> notes = noteRepository.findPublicNotes(
                 NoteModerationStatus.APPROVED,
@@ -366,6 +400,64 @@ public class NoteService {
                 normalizedTag,
                 PageRequest.of(page, size, sort(sort)));
         return toPageResponse(notes);
+    }
+
+    private NotePageResponse searchPublicNotes(
+            UUID courseId,
+            String courseQuery,
+            String searchQuery,
+            String normalizedTag,
+            int page,
+            int size) {
+        String normalizedQuery = normalizeSearchQuery(searchQuery);
+        String normalizedCourseFilter = courseQuery == null || courseQuery.isBlank()
+                ? null
+                : searchQueryNormalizer.normalize(courseQuery);
+        NoteSearchResult searchResult = noteSearchRepository.searchPublicNotes(
+                normalizedQuery,
+                courseId,
+                normalizedCourseFilter,
+                normalizedTag,
+                (long) page * size,
+                size);
+        long totalElements = searchResult.totalElements();
+        int totalPages = totalElements == 0
+                ? 0
+                : (int) Math.min(
+                        Integer.MAX_VALUE,
+                        (totalElements + size - 1) / size);
+        if (searchResult.noteIds().isEmpty()) {
+            return new NotePageResponse(
+                    List.of(),
+                    page,
+                    size,
+                    totalElements,
+                    totalPages,
+                    page == 0,
+                    ((long) page + 1) * size >= totalElements);
+        }
+
+        Map<UUID, Note> notesById = noteRepository
+                .findSummariesByIdIn(searchResult.noteIds())
+                .stream()
+                .collect(Collectors.toMap(
+                        Note::getId,
+                        Function.identity(),
+                        (first, second) -> first,
+                        LinkedHashMap::new));
+        List<NoteSummaryResponse> content = searchResult.noteIds().stream()
+                .map(notesById::get)
+                .filter(Objects::nonNull)
+                .map(noteMapper::toSummary)
+                .toList();
+        return new NotePageResponse(
+                content,
+                page,
+                size,
+                totalElements,
+                totalPages,
+                page == 0,
+                ((long) page + 1) * size >= totalElements);
     }
 
     @Transactional(readOnly = true)
@@ -674,6 +766,9 @@ public class NoteService {
 
     private Sort sort(NoteSort noteSort) {
         return switch (noteSort) {
+            case RELEVANCE -> Sort.by(
+                    Sort.Order.desc("createdAt"),
+                    Sort.Order.asc("id"));
             case RATING -> Sort.by(
                     Sort.Order.desc("averageRating"),
                     Sort.Order.desc("ratingCount"),
@@ -686,6 +781,21 @@ public class NoteService {
                     Sort.Order.desc("createdAt"),
                     Sort.Order.asc("id"));
         };
+    }
+
+    private String normalizeSearchQuery(String query) {
+        if (query == null) {
+            throw new SearchValidationException(
+                    "q",
+                    "Query is required.");
+        }
+        String normalized = searchQueryNormalizer.normalize(query);
+        if (normalized.length() < 2 || normalized.length() > 100) {
+            throw new SearchValidationException(
+                    "q",
+                    "Query must contain 2 to 100 searchable characters.");
+        }
+        return normalized;
     }
 
     private String sha256(String value) {
