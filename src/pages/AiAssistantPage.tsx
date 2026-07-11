@@ -25,7 +25,7 @@ export function AiAssistantPage() {
         actions={
           <Badge className="gap-1.5" variant="success">
             <ShieldCheck className="size-3.5" />
-            CampusOne backend
+            CampusOne protected
           </Badge>
         }
         description="Chat, explain concepts, generate revision material, and build practical study plans."
@@ -44,9 +44,8 @@ export function AiAssistantPage() {
               <Sparkles className="size-4 text-amber-300" />
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-              Every result is generated through the authenticated CampusOne AI
-              backend. No external provider key or direct browser AI call is
-              required.
+              Every response is created inside your secure CampusOne workspace,
+              so you can study with confidence.
             </p>
           </div>
         </CardContent>
