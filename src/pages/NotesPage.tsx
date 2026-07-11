@@ -34,9 +34,11 @@ const pageSize = 12;
 export function NotesPage() {
   const [view, setView] = useState<NotesView>("library");
   const [page, setPage] = useState(0);
-  const [sort, setSort] = useState<NoteSort>("NEWEST");
+  const [sort, setSort] = useState<NoteSort>("RELEVANCE");
+  const [query, setQuery] = useState("");
   const [course, setCourse] = useState("");
   const [tag, setTag] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
   const [appliedCourse, setAppliedCourse] = useState("");
   const [appliedTag, setAppliedTag] = useState("");
   const [result, setResult] = useState<NotePage | null>(null);
@@ -80,6 +82,7 @@ export function NotesPage() {
         : listNotes({
             course: appliedCourse || undefined,
             page,
+            q: appliedQuery || undefined,
             signal: controller.signal,
             size: pageSize,
             sort,
@@ -88,7 +91,10 @@ export function NotesPage() {
 
     void request
       .then((response) => {
-        if (active) setResult(response);
+        if (active) {
+          setError(null);
+          setResult(response);
+        }
       })
       .catch((requestError: unknown) => {
         if (active) {
@@ -107,7 +113,7 @@ export function NotesPage() {
       active = false;
       controller.abort();
     };
-  }, [appliedCourse, appliedTag, page, refreshKey, sort, view]);
+  }, [appliedCourse, appliedQuery, appliedTag, page, refreshKey, sort, view]);
 
   const changeView = (nextView: NotesView) => {
     setIsLoading(true);
@@ -118,8 +124,19 @@ export function NotesPage() {
   };
 
   const applyFilters = () => {
+    const normalizedQuery = query.trim();
     const normalizedCourse = course.trim();
     const normalizedTag = tag.trim();
+    if (normalizedQuery && normalizedQuery.length < 2) {
+      setError("Search must contain at least 2 characters.");
+      setIsLoading(false);
+      return;
+    }
+    if (normalizedQuery.length > 100) {
+      setError("Search must contain 100 characters or fewer.");
+      setIsLoading(false);
+      return;
+    }
     if (normalizedCourse && normalizedCourse.length < 2) {
       setError("Course filter must contain at least 2 characters.");
       setIsLoading(false);
@@ -133,6 +150,7 @@ export function NotesPage() {
 
     setIsLoading(true);
     setError(null);
+    setAppliedQuery(normalizedQuery);
     setAppliedCourse(normalizedCourse);
     setAppliedTag(normalizedTag);
     setPage(0);
@@ -142,8 +160,10 @@ export function NotesPage() {
   const clearFilters = () => {
     setIsLoading(true);
     setError(null);
+    setQuery("");
     setCourse("");
     setTag("");
+    setAppliedQuery("");
     setAppliedCourse("");
     setAppliedTag("");
     setPage(0);
@@ -195,6 +215,7 @@ export function NotesPage() {
         onApply={applyFilters}
         onClear={clearFilters}
         onCourseChange={setCourse}
+        onQueryChange={setQuery}
         onSortChange={(value) => {
           setIsLoading(true);
           setError(null);
@@ -203,6 +224,7 @@ export function NotesPage() {
           setRefreshKey((current) => current + 1);
         }}
         onTagChange={setTag}
+        query={query}
         sort={sort}
         tag={tag}
       />
@@ -235,7 +257,7 @@ export function NotesPage() {
         <EmptyState
           action={
             view === "library" &&
-            (appliedCourse || appliedTag) ? (
+            (appliedQuery || appliedCourse || appliedTag) ? (
               <Button onClick={clearFilters} variant="outline">
                 Clear filters
               </Button>
@@ -253,7 +275,9 @@ export function NotesPage() {
               ? canManage
                 ? "No notes have been uploaded by this admin account."
                 : "No notes have been submitted by your account yet."
-              : "No approved public notes match the selected course and tag."
+              : appliedQuery
+                ? `No approved public notes matched "${appliedQuery}". Try one word, a teacher name, course code, tag, or filename.`
+                : "No approved public notes match the selected course and tag."
           }
           icon={<FileSearch className="size-6" />}
           title="No notes found"
@@ -278,6 +302,7 @@ export function NotesPage() {
                 key={note.id}
                 note={note}
                 owned={canManage && view === "mine"}
+                query={appliedQuery}
               />
             ))}
           </div>
