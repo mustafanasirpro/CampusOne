@@ -11,8 +11,10 @@ interface NotesFilterBarProps {
   onApply: () => void;
   onClear: () => void;
   onCourseChange: (value: string) => void;
+  onQueryChange: (value: string) => void;
   onSortChange: (value: NoteSort) => void;
   onTagChange: (value: string) => void;
+  query: string;
   sort: NoteSort;
   tag: string;
 }
@@ -23,13 +25,32 @@ export function NotesFilterBar({
   onApply,
   onClear,
   onCourseChange,
+  onQueryChange,
   onSortChange,
   onTagChange,
+  query,
   sort,
   tag,
 }: NotesFilterBarProps) {
   return (
-    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-card lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-card xl:grid-cols-[1.35fr_1fr_1fr_auto] xl:items-end">
+      <div className="grid gap-1.5">
+        <span className="text-sm font-semibold text-slate-700">
+          Search notes
+        </span>
+        <SearchBar
+          disabled={disabled}
+          onSearch={() => onApply()}
+          onValueChange={onQueryChange}
+          placeholder="Machine, Dr Ahmed, CSC275, midterm..."
+          value={query}
+        />
+        <p className="text-xs text-slate-500">
+          Search title, description, teacher, course, tags, filename, uploader,
+          and metadata.
+        </p>
+      </div>
+
       <FormField
         disabled={disabled}
         hint={
@@ -45,7 +66,7 @@ export function NotesFilterBar({
 
       <div className="grid gap-1.5">
         <span className="text-sm font-semibold text-slate-700">
-          Tag filter
+          Tags
         </span>
         <SearchBar
           disabled={disabled}
