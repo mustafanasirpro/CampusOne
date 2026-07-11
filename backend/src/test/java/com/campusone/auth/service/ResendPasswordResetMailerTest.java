@@ -53,7 +53,7 @@ class ResendPasswordResetMailerTest {
         properties = new PasswordResetProperties();
         properties.setFrontendUrl("https://campusone.dev");
         properties.setResendApiKey("re_secret_key");
-        properties.setResendFrom("CampusOne <onboarding@resend.dev>");
+        properties.setResendFrom("CampusOne <support@mail.campusone.dev>");
         properties.setResendApiUrl(URI.create("https://api.resend.com/emails"));
         properties.setResendTimeout(Duration.ofSeconds(10));
         properties.setTokenTtl(Duration.ofMinutes(30));
@@ -97,7 +97,7 @@ class ResendPasswordResetMailerTest {
                 new TypeReference<>() {
                 });
         assertThat(body.get("from"))
-                .isEqualTo("CampusOne <onboarding@resend.dev>");
+                .isEqualTo("CampusOne <support@mail.campusone.dev>");
         assertThat(body.get("to")).isEqualTo(List.of("student@example.com"));
         assertThat(body.get("subject")).isEqualTo("CampusOne password reset");
         assertThat((String) body.get("html"))
@@ -117,6 +117,48 @@ class ResendPasswordResetMailerTest {
         assertThatThrownBy(() -> mailer.sendResetLink(user, "raw-token"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("RESEND_API_KEY is missing");
+        verify(httpClient, never()).send(
+                any(HttpRequest.class),
+                any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void sendResetLinkMissingSenderFailsSafelyWithoutHttpRequest()
+            throws Exception {
+        properties.setResendFrom("");
+        User user = new User("student@example.com", "$2a$12$password");
+
+        assertThatThrownBy(() -> mailer.sendResetLink(user, "raw-token"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("RESEND_FROM is missing");
+        verify(httpClient, never()).send(
+                any(HttpRequest.class),
+                any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void sendResetLinkRejectsSenderOutsideVerifiedDomain()
+            throws Exception {
+        properties.setResendFrom("CampusOne <onboarding@resend.dev>");
+        User user = new User("student@example.com", "$2a$12$password");
+
+        assertThatThrownBy(() -> mailer.sendResetLink(user, "raw-token"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("mail.campusone.dev");
+        verify(httpClient, never()).send(
+                any(HttpRequest.class),
+                any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void sendResetLinkRejectsCampusOneRootDomainSender()
+            throws Exception {
+        properties.setResendFrom("CampusOne <mail@campusone.dev>");
+        User user = new User("student@example.com", "$2a$12$password");
+
+        assertThatThrownBy(() -> mailer.sendResetLink(user, "raw-token"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("mail.campusone.dev");
         verify(httpClient, never()).send(
                 any(HttpRequest.class),
                 any(HttpResponse.BodyHandler.class));
@@ -156,6 +198,8 @@ class ResendPasswordResetMailerTest {
                 requestBody(requestCaptor.getValue()),
                 new TypeReference<>() {
                 });
+        assertThat(body.get("from"))
+                .isEqualTo("CampusOne <support@mail.campusone.dev>");
         assertThat(body.get("to")).isEqualTo(List.of("admin@example.com"));
         assertThat(body.get("subject")).isEqualTo("CampusOne test email");
     }
