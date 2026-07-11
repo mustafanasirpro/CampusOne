@@ -45,7 +45,8 @@ class GlobalSearchServiceTest {
     void setUp() {
         searchService = new GlobalSearchService(
                 searchRepository,
-                new SearchResultMapper());
+                new SearchResultMapper(),
+                new SearchQueryNormalizer());
     }
 
     @Test
