@@ -25,12 +25,11 @@ export function ModeratorStatusCard({
           </span>
           <div>
             <h2 className="font-semibold text-amber-950">
-              You do not have admin access.
+              This area is available to admins only.
             </h2>
             <p className="mt-1 text-sm leading-6 text-amber-800">
-              Approval queues, report review, and audit history are hidden.
-              You can still submit content reports and track your own reports
-              below.
+              You can still submit content reports and follow your own report
+              history below.
             </p>
           </div>
         </CardContent>
@@ -46,7 +45,7 @@ export function ModeratorStatusCard({
         </span>
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold">Admin access verified</h2>
+            <h2 className="text-lg font-semibold">Admin workspace ready</h2>
             <Badge variant="success">{status.role}</Badge>
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-300">
