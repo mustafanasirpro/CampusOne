@@ -48,10 +48,13 @@ import com.campusone.note.repository.NoteDownloadEventRepository;
 import com.campusone.note.repository.NoteModerationActionRepository;
 import com.campusone.note.repository.NoteRatingRepository;
 import com.campusone.note.repository.NoteRepository;
+import com.campusone.note.repository.NoteSearchRepository;
+import com.campusone.note.repository.NoteSearchResult;
 import com.campusone.note.repository.NoteVersionRepository;
 import com.campusone.note.repository.TagRepository;
 import com.campusone.note.storage.StorageService;
 import com.campusone.note.storage.StoredObject;
+import com.campusone.search.service.SearchQueryNormalizer;
 import com.campusone.user.entity.StudentProfile;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
@@ -122,6 +125,9 @@ class NoteServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private NoteSearchRepository noteSearchRepository;
+
+    @Mock
     private CommunityIntegrationService integrationService;
 
     @Mock
@@ -151,6 +157,7 @@ class NoteServiceTest {
                 courseRepository,
                 departmentRepository,
                 userRepository,
+                noteSearchRepository,
                 new NoteMapper(
                          new CourseMapper(),
                          new FileAssetMapper(),
@@ -158,6 +165,7 @@ class NoteServiceTest {
                 integrationService,
                 storageService,
                 adminAuthorizationService,
+                new SearchQueryNormalizer(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
 
         University university = new University(
@@ -432,6 +440,63 @@ class NoteServiceTest {
                 isNull(),
                 isNull(),
                 org.mockito.ArgumentMatchers.any(Pageable.class));
+    }
+
+    @Test
+    void listPublicNotes_withSearchQuery_returnsRankedSearchResults() {
+        setModerationStatus(note, NoteModerationStatus.APPROVED);
+        when(noteSearchRepository.searchPublicNotes(
+                eq("machine learning"),
+                isNull(),
+                eq("csc 275"),
+                eq("midterm"),
+                eq(0L),
+                eq(20)))
+                .thenReturn(new NoteSearchResult(List.of(NOTE_ID), 1));
+        when(noteRepository.findSummariesByIdIn(List.of(NOTE_ID)))
+                .thenReturn(List.of(note));
+
+        NotePageResponse response = noteService.listPublicNotes(
+                null,
+                " CSC-275 ",
+                "  Machine---   Learning!!! ",
+                " Midterm ",
+                0,
+                20,
+                NoteSort.RELEVANCE);
+
+        assertThat(response.content()).hasSize(1);
+        assertThat(response.content().getFirst().id()).isEqualTo(NOTE_ID);
+        assertThat(response.totalElements()).isEqualTo(1);
+        verify(noteRepository).findSummariesByIdIn(List.of(NOTE_ID));
+    }
+
+    @Test
+    void listPublicNotes_withSearchQueryEmptyPage_preservesTotalCount() {
+        when(noteSearchRepository.searchPublicNotes(
+                eq("machine"),
+                isNull(),
+                isNull(),
+                isNull(),
+                eq(20L),
+                eq(10)))
+                .thenReturn(new NoteSearchResult(List.of(), 15));
+
+        NotePageResponse response = noteService.listPublicNotes(
+                null,
+                null,
+                "machine",
+                null,
+                2,
+                10,
+                NoteSort.RELEVANCE);
+
+        assertThat(response.content()).isEmpty();
+        assertThat(response.totalElements()).isEqualTo(15);
+        assertThat(response.totalPages()).isEqualTo(2);
+        assertThat(response.first()).isFalse();
+        assertThat(response.last()).isTrue();
+        verify(noteRepository, never()).findSummariesByIdIn(anyCollection());
     }
 
     @Test
