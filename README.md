@@ -2,75 +2,105 @@
 
 <div align="center">
 
-**Everything your campus needs, in one place.**
+**A modern campus community platform for notes, discussions, events, internships, marketplace listings, notifications, gamification, and study support.**
 
-A full-stack university community platform for learning, collaboration, campus
-life, and student opportunities.
+Built as a full-stack production-style application with a React/Vite frontend,
+a Spring Boot backend, PostgreSQL persistence, Cloudflare R2 object storage,
+Resend password recovery email, and OpenAPI documentation.
 
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Maven](https://img.shields.io/badge/Maven-3.9+-C71A36?logo=apachemaven&logoColor=white)](https://maven.apache.org/)
-[![JWT](https://img.shields.io/badge/Auth-JWT-000000?logo=jsonwebtokens&logoColor=white)](https://jwt.io/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/License-Not%20specified-lightgrey)](#-license)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vite.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Cloudflare R2](https://img.shields.io/badge/Storage-Cloudflare%20R2-F38020?logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/r2/)
+[![License](https://img.shields.io/badge/License-Not%20specified-lightgrey)](#license)
 
 </div>
 
-## 🎓 Project Overview
+---
 
-CampusOne is a student-focused platform designed to bring university resources
-and communities into one cohesive product. Students can discover notes, ask and
-answer questions, browse campus marketplace listings, find internships, join
-events, receive notifications, track achievements, and use local AI-assisted
-study tools.
+## Overview
 
-The repository currently contains:
+CampusOne brings core student workflows into one cohesive product:
 
-- A responsive React frontend connected to the CampusOne REST APIs.
-- A modular Spring Boot REST backend with PostgreSQL persistence.
-- Secure JWT authentication with rotating, hashed refresh-token sessions.
-- Versioned Flyway migrations covering the implemented backend modules.
-- Automated controller, service, validation, security, and persistence tests.
+- discover and submit study notes and past papers;
+- ask questions, answer discussions, and follow campus activity;
+- browse marketplace listings, internships, and events;
+- receive notifications and track gamification progress;
+- use a local AI study assistant for summaries, flashcards, quizzes, and plans.
 
-## ✨ Features
+The repository contains both applications:
 
-### Frontend
+| App | Location | Description |
+|---|---|---|
+| Frontend | [`src/`](src/) | React 19 + TypeScript + Vite single-page app |
+| Backend | [`backend/`](backend/) | Spring Boot REST API with PostgreSQL, Flyway, JWT auth, R2 storage, and OpenAPI |
 
-- Premium landing, login, and signup experiences
-- Responsive student dashboard and navigation
-- Student profiles, preferences, activity, skills, and achievements
-- Notes library with student PDF submissions, admin approval, search, filters, bookmarks, and downloads
-- Discussion and Q&A experiences with voting and replies
-- Student marketplace listings, wishlists, and seller previews
-- Internship discovery and saved opportunities
-- Campus events, calendar views, and RSVP interactions
-- Notifications, settings, empty states, loading states, and toast feedback
-- Leaderboards, badges, XP progress, streaks, and challenges
-- AI study assistant chat and study-tool interfaces
+## Production Targets
 
-### Backend
+| Service | Target |
+|---|---|
+| Frontend | `https://campusone.dev` |
+| Backend | `https://campusone-backend-otc4.onrender.com` |
+| Database | Neon PostgreSQL |
+| File storage | Cloudflare R2 / S3-compatible storage |
+| Email provider | Resend HTTPS API |
+
+The frontend uses SPA routing. [`vercel.json`](vercel.json) rewrites deep links
+such as `/reset-password?token=...` to the React app.
+
+## Features
+
+### Product experience
+
+- Polished landing, login, signup, forgot-password, and reset-password flows
+- Student dashboard with responsive navigation
+- Profile, settings, preferences, skills, and activity surfaces
+- Notes and past papers with PDF upload, search, bookmarks, ratings, and downloads
+- Marketplace listings with image upload support
+- Discussions and Q&A with voting, answers, and accepted answers
+- Events with capacity and participation flows
+- Internship discovery, posting, filters, and saves
+- Notifications with read state and bulk actions
+- Search across supported content modules
+- Leaderboards, XP, badges, history, and progress
+- AI study assistant with chat and generated study materials
+- Admin and moderation workflows for reports and approval queues
+
+### Backend capabilities
 
 - Registration and login with BCrypt password hashing
-- Secure forgot-password and one-time reset-token flow
-- Short-lived JWT access tokens
-- Rotating opaque refresh tokens stored as SHA-256 hashes
-- Session logout, replay protection, account lockout, and strict CORS handling
-- Student profiles, skills, preferences, and visibility controls
-- R2-backed PDF note submissions, metadata, tags, ratings, downloads, and moderation approval
-- Marketplace listing CRUD, filters, images metadata, and soft deletion
-- Discussion questions, answers, votes, accepted answers, and pagination
-- Event creation, participation, ownership, capacity, and visibility rules
-- Internship posting, filtering, saving, and ownership controls
-- In-app notification storage, read state, filtering, and bulk actions
-- Unified public search across supported content modules
-- XP profiles, badges, history, and weekly/monthly/all-time leaderboards
-- AI chat history, generated study content, and usage tracking
-- Deterministic local AI provider requiring no external credentials
-- OpenAPI documentation and consistent API error responses
+- JWT access tokens and rotating hashed refresh-token sessions
+- Secure password reset with hashed, one-time tokens and Resend email delivery
+- Account lockout, replay protection, logout, and strict CORS/origin validation
+- Flyway-managed PostgreSQL schema with Hibernate validation
+- R2-backed uploads for note PDFs and marketplace images
+- Approval workflow for user-submitted content
+- Public visibility rules for approved content
+- OpenAPI/Swagger documentation
+- Consistent DTO-based API responses and error handling
 
-## 🧰 Tech Stack
+## Modules
+
+| Module | Implemented scope |
+|---|---|
+| Authentication | Register, login, refresh, logout, forgot/reset password, lockout |
+| Academic core | Universities, departments, courses, reference data |
+| Profiles | Current user, public profile, skills, preferences, visibility |
+| Notes | PDF submissions, approval, search, filters, ratings, bookmarks, downloads |
+| Marketplace | Listings, image metadata, filters, ownership, soft deletion |
+| Discussions | Questions, answers, votes, accepted answers, pagination |
+| Events | Creation, editing, participation, capacity, visibility |
+| Internships | Posting, filters, saves, ownership |
+| Notifications | User notifications, unread counts, read/unread, deletion |
+| Search | Unified public search across supported content |
+| Gamification | XP ledger, levels, badges, history, leaderboards |
+| AI Study Assistant | Sessions, messages, generated content, usage records |
+| Admin / Moderation | Reports, moderator authorization, actions, pending approvals |
+
+## Tech Stack
 
 | Layer | Technologies |
 |---|---|
@@ -78,103 +108,73 @@ The repository currently contains:
 | Backend | Java 21, Spring Boot 3.5, Spring Web, Spring Security, Spring Data JPA |
 | Database | PostgreSQL, Hibernate, Flyway |
 | Authentication | JWT access tokens, opaque refresh tokens, BCrypt |
-| API documentation | Springdoc OpenAPI and Swagger UI |
-| File storage | Cloudflare R2 through the AWS SDK for Java v2 |
-| Build tools | Maven, npm |
+| Storage | Cloudflare R2 through AWS SDK for Java v2 |
+| Email | Resend HTTPS API, optional SMTP fallback |
+| API docs | Springdoc OpenAPI, Swagger UI |
 | Testing | JUnit 5, Mockito, MockMvc, Spring Security Test, Testcontainers |
+| Tooling | Maven, npm, ESLint, TypeScript |
 
-## 🏗️ Backend Architecture
+## Architecture
 
-The backend is a modular monolith organized by domain under
-`com.campusone`. Each feature follows a clear layered flow:
+CampusOne is a modular monolith on the backend and a route-driven SPA on the
+frontend.
 
 ```text
-HTTP request
-    │
-    ▼
-Controller → Request DTO validation
-    │
-    ▼
-Service → Transactions, ownership, and business rules
-    │
-    ▼
-Repository → Spring Data JPA
-    │
-    ▼
-PostgreSQL
+React / Vite SPA
+      │
+      ▼
+Spring Boot REST API
+      │
+      ├── Controllers → request validation and DTO boundaries
+      ├── Services    → transactions, permissions, business rules
+      ├── Repositories→ Spring Data JPA / query logic
+      └── Integrations→ R2 storage, Resend email, OpenAPI
+      │
+      ▼
+PostgreSQL + Cloudflare R2
 ```
 
-Responses are produced through explicit response DTOs and manual mappers; JPA
-entities never cross controller boundaries. Schema changes are owned by Flyway,
-Hibernate validates the schema, and primary domain identifiers use UUIDs.
+Backend source is organized by domain under `com.campusone`. Entities stay
+behind service/repository boundaries; controllers return explicit response
+DTOs. Database changes are versioned with Flyway.
 
-Security is stateless for access-token authentication. Refresh sessions are
-persisted so they can be rotated and revoked safely. Protected operations also
-enforce ownership in the service layer.
-
-The AI module uses an `AiProvider` abstraction. Its current
-`LocalStudyAiProvider` is deterministic, performs no network calls, and keeps
-the project runnable without an AI API key.
-
-## ✅ Implemented Modules
-
-| Module | Current backend capabilities |
-|---|---|
-| Authentication | Registration, login, forgot/reset password, JWT access tokens, refresh rotation, logout, lockout |
-| Academic core | Universities, departments, courses, and reference data |
-| User profiles | Profile editing, skills, preferences, visibility |
-| Notes | Student PDF submissions, admin immediate publish/approval, public browsing, tags, ratings, bookmarks, download events |
-| Marketplace | Listing CRUD, filters, image metadata, ownership, soft deletion |
-| Discussions | Questions, answers, voting, accepted answers |
-| Events | Event CRUD, participation, capacity, visibility |
-| Internships | Posting, search/filtering, saves, ownership |
-| Notifications | User notifications, filtering, read state, soft deletion |
-| Global search | Unified search across notes, listings, discussions, events, and internships |
-| Gamification | XP ledger, levels, badges, history, leaderboards |
-| AI Study Assistant | Sessions, messages, summaries, flashcards, quizzes, study plans, usage records |
-| Admin and moderation | User reports, moderator authorization, report workflows, action history |
-
-## 📁 Project Structure
+## Repository Structure
 
 ```text
 CampusOne/
 ├── backend/
 │   ├── pom.xml
+│   ├── README.md
 │   └── src/
 │       ├── main/
 │       │   ├── java/com/campusone/
-│       │   │   ├── ai/
-│       │   │   ├── academic/
-│       │   │   ├── auth/
-│       │   │   ├── discussion/
-│       │   │   ├── event/
-│       │   │   ├── gamification/
-│       │   │   ├── internship/
-│       │   │   ├── marketplace/
-│       │   │   ├── note/
-│       │   │   ├── notification/
-│       │   │   ├── search/
-│       │   │   ├── security/
-│       │   │   ├── user/
-│       │   │   └── common/
-│       │   └── resources/
-│       │       └── db/migration/
+│       │   └── resources/db/migration/
 │       └── test/java/com/campusone/
+├── docs/
 ├── public/
 ├── src/
+│   ├── api/
+│   ├── auth/
 │   ├── components/
 │   ├── data/
 │   ├── pages/
 │   ├── routes/
-│   ├── styles/
 │   ├── types/
 │   └── utils/
+├── .env.example
 ├── CONTRIBUTING.md
 ├── package.json
+├── vercel.json
 └── README.md
 ```
 
-## 🚀 Installation
+## Screenshots
+
+No screenshots are currently committed to the repository. When product images
+are added, place them under `docs/screenshots/` and reference them from this
+section.
+
+## Local Setup
 
 ### Prerequisites
 
@@ -184,10 +184,9 @@ CampusOne/
 - Node.js `20.19+` or `22.12+`
 - npm
 
-### 1. Prepare PostgreSQL
+### 1. Create a local PostgreSQL database
 
-Create a local database and login. Run the following from an administrator
-`psql` session, replacing the example password:
+Run from an administrator `psql` session, replacing the password:
 
 ```sql
 CREATE ROLE campusone WITH LOGIN PASSWORD 'choose-a-local-password';
@@ -196,43 +195,91 @@ CREATE DATABASE campusone OWNER campusone;
 
 ### 2. Configure the backend
 
-From the repository root:
-
 ```bash
 cd backend
 cp .env.example .env
 ```
 
-On PowerShell, use:
+PowerShell:
 
 ```powershell
 cd backend
 Copy-Item .env.example .env
 ```
 
-Edit `backend/.env` and set the database password and a newly generated JWT
-secret. Generate a suitable secret with:
+Edit `backend/.env`, set the database credentials, and provide a unique JWT
+secret. Generate a suitable standard Base64 secret with:
 
 ```bash
 openssl rand -base64 32
 ```
 
-The secret must be standard Base64 representing at least 32 random bytes.
-Never reuse the public development value from `.env.example` in a real
-environment.
+The secret must represent at least 32 random bytes. Do not reuse sample values
+in production.
 
-### 3. Install frontend dependencies
+### 3. Configure the frontend
 
-From the repository root:
+Copy the root frontend environment example:
+
+```bash
+cp .env.example .env
+```
+
+PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Local frontend API target:
+
+```text
+VITE_API_BASE_URL=http://localhost:8080/api/v1
+```
+
+### 4. Install dependencies
 
 ```bash
 npm ci
 ```
 
-## 🔐 Environment Variables
+### 5. Run the applications
 
-The backend optionally loads `backend/.env` through Spring Boot's native
-configuration import. Operating-system environment variables take precedence.
+Terminal 1:
+
+```bash
+cd backend
+mvn spring-boot:run
+```
+
+Terminal 2:
+
+```bash
+npm run dev
+```
+
+Default local URLs:
+
+| App | URL |
+|---|---|
+| Frontend | `http://localhost:5173` |
+| Backend API | `http://localhost:8080/api/v1` |
+| Swagger UI | `http://localhost:8080/api/v1/swagger-ui` |
+| OpenAPI | `http://localhost:8080/api/v1/openapi` |
+
+## Environment Variables
+
+The backend loads `backend/.env` through Spring Boot's optional config import.
+Operating-system variables take precedence. The frontend reads Vite variables
+from the root `.env`.
+
+### Frontend
+
+| Variable | Required | Purpose |
+|---|---:|---|
+| `VITE_API_BASE_URL` | Yes | Backend API base URL, e.g. `http://localhost:8080/api/v1` locally or `https://campusone-backend-otc4.onrender.com/api/v1` on Vercel |
+
+### Backend core
 
 | Variable | Required | Purpose / default |
 |---|---:|---|
@@ -240,188 +287,162 @@ configuration import. Operating-system environment variables take precedence.
 | `DB_URL` | Yes | PostgreSQL JDBC URL |
 | `DB_USERNAME` | Yes | Runtime database user |
 | `DB_PASSWORD` | Yes | Runtime database password |
-| `SERVER_PORT` | Render | Optional Spring server port override |
-| `PORT` | Render | Hosting-platform port; used when `SERVER_PORT` is absent |
-| `JWT_SECRET` | Yes | Standard Base64 secret containing at least 256 bits |
+| `SERVER_PORT` | Hosting | Optional Spring port override |
+| `PORT` | Hosting | Platform port used when `SERVER_PORT` is absent |
+| `JWT_SECRET` | Yes | Standard Base64 secret with at least 256 bits |
 | `JWT_ISSUER` | No | Defaults to `campusone-backend` |
 | `JWT_AUDIENCE` | No | Defaults to `campusone-api` |
 | `JWT_ACCESS_TOKEN_TTL` | No | Defaults to `15m` |
 | `REFRESH_TOKEN_TTL_DAYS` | No | Defaults to `7` |
 | `AUTH_COOKIE_SECURE` | Production | Defaults to `true`; local profile uses `false` |
-| `AUTH_COOKIE_SAME_SITE` | Production | Defaults to `None` for cross-domain deployments; local profile uses `Strict` |
+| `AUTH_COOKIE_SAME_SITE` | Production | Defaults to `None`; local profile uses `Strict` |
 | `REFRESH_TOKEN_CLEANUP_INTERVAL` | No | Defaults to `24h` |
 | `MAX_LOGIN_ATTEMPTS` | No | Defaults to `5` |
 | `ACCOUNT_LOCK_MINUTES` | No | Defaults to `15` |
-| `PASSWORD_RESET_TOKEN_TTL_MINUTES` | No | Password reset links expire after this many minutes; defaults to `30` |
+
+### Password reset and email
+
+| Variable | Required | Purpose / default |
+|---|---:|---|
+| `PASSWORD_RESET_TOKEN_TTL_MINUTES` | No | Reset-link lifetime; defaults to `30` |
 | `APP_FRONTEND_URL` | Production | Frontend base URL used in reset links, e.g. `https://campusone.dev` |
-| `MAIL_PROVIDER` | Production | Set to `resend` for Render production email delivery; defaults to `disabled` |
-| `RESEND_API_KEY` | Production | Resend HTTPS API key for password reset emails |
-| `RESEND_FROM` | Production | Verified Resend sender, e.g. `CampusOne <support@mail.campusone.dev>` |
-| `RESEND_TIMEOUT` | No | Resend HTTPS request timeout; defaults to `10s` |
-| `MAIL_ENABLED` | SMTP fallback | Set to `true` only when `MAIL_PROVIDER=smtp` |
-| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | SMTP fallback | Optional SMTP settings; not required for Resend production mode |
-| `MAIL_SMTP_AUTH`, `MAIL_SMTP_STARTTLS_ENABLE`, `MAIL_SMTP_STARTTLS_REQUIRED` | SMTP fallback | SMTP transport switches; auth and STARTTLS default on when `MAIL_ENABLED=true` |
-| `MAIL_SMTP_CONNECTION_TIMEOUT_MS`, `MAIL_SMTP_TIMEOUT_MS`, `MAIL_SMTP_WRITE_TIMEOUT_MS` | SMTP fallback | SMTP connection/read/write timeouts; each defaults to `10000` ms |
-| `APP_CORS_ALLOWED_ORIGINS` | Production | Comma-separated exact frontend origins for Render, for example `https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app` |
-| `CORS_ALLOWED_ORIGINS` | No | Legacy alias for the same exact-origin CORS setting |
-| `OPENAPI_ENABLED` | No | Enabled by default; set to `false` to disable API documentation |
-| `STORAGE_PROVIDER` | Uploads | Set to `r2` to enable real note PDF and marketplace image uploads; otherwise upload requests return a clean configuration error |
-| `R2_ENDPOINT` | R2 | Cloudflare account S3 API endpoint |
-| `R2_ACCESS_KEY_ID` | R2 | R2 API token access key |
-| `R2_SECRET_ACCESS_KEY` | R2 | R2 API token secret key |
-| `R2_BUCKET` | R2 | Bucket that stores note PDFs under `notes/` and marketplace images under `marketplace/` |
-| `R2_REGION` | No | Defaults to `auto`, as required by R2's S3-compatible API |
-| `R2_PUBLIC_BASE_URL` | No | Public bucket/custom-domain base URL; when omitted, private presigned download URLs are generated |
-| `MAX_UPLOAD_SIZE_MB` | No | Maximum PDF upload size; defaults to `25` MB |
-| `MARKETPLACE_MAX_IMAGES_PER_LISTING` | No | Maximum marketplace images per listing; defaults to `5` |
-| `MARKETPLACE_MAX_IMAGE_SIZE_MB` | No | Maximum marketplace image size; defaults to `5` MB |
-| `ADMIN_MAX_UPLOADS_PER_DAY` | No | Per-uploader daily upload count; defaults to `200` |
-| `ADMIN_MAX_STORAGE_MB_PER_MONTH` | No | Per-uploader monthly uploaded storage; defaults to `5000` MB |
-| `GLOBAL_UPLOAD_STORAGE_CAP_MB` | No | Global monthly upload safety cap; defaults to `8192` MB (8 GB) |
-| `ADMIN_UPLOAD_EMAILS` | No | Optional comma-separated fallback admin emails for approval/immediate-publish permissions; prefer active `ADMIN` moderator assignments |
-| `STORAGE_DOWNLOAD_URL_TTL` | No | Private presigned download lifetime; defaults to `10m` |
-| `FLYWAY_URL` | No | Optional migration-role JDBC URL; falls back to `DB_URL` |
-| `FLYWAY_USERNAME` | No | Optional migration user; falls back to `DB_USERNAME` |
-| `FLYWAY_PASSWORD` | No | Optional migration password; falls back to `DB_PASSWORD` |
+| `MAIL_PROVIDER` | Production | Set to `resend` for Render production email; defaults to `disabled` |
+| `RESEND_API_KEY` | Production | Resend API key |
+| `RESEND_FROM` | Production | Verified sender on `mail.campusone.dev`, e.g. `CampusOne <support@mail.campusone.dev>` |
+| `RESEND_TIMEOUT` | No | Resend request timeout; defaults to `10s` |
+| `MAIL_ENABLED` | SMTP fallback | Use only with `MAIL_PROVIDER=smtp` |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM` | SMTP fallback | Optional SMTP fallback settings; not required for Resend mode |
+
+Production password reset email uses Resend over HTTPS. Do not use
+`onboarding@resend.dev` or `mail@campusone.dev` for production delivery.
+
+### CORS, OpenAPI, and migrations
+
+| Variable | Required | Purpose / default |
+|---|---:|---|
+| `APP_CORS_ALLOWED_ORIGINS` | Production | Comma-separated exact frontend origins |
+| `CORS_ALLOWED_ORIGINS` | No | Legacy alias for exact-origin CORS |
+| `OPENAPI_ENABLED` | No | Defaults to `true` |
+| `FLYWAY_URL` | No | Migration JDBC URL; falls back to `DB_URL` |
+| `FLYWAY_USERNAME` | No | Migration user; falls back to `DB_USERNAME` |
+| `FLYWAY_PASSWORD` | No | Migration password; falls back to `DB_PASSWORD` |
+
+### Storage and uploads
+
+| Variable | Required | Purpose / default |
+|---|---:|---|
+| `STORAGE_PROVIDER` | Uploads | Set to `r2` to enable note PDF and marketplace image uploads |
+| `R2_ENDPOINT` | R2 | Cloudflare R2 S3 API endpoint |
+| `R2_ACCESS_KEY_ID` | R2 | R2 access key |
+| `R2_SECRET_ACCESS_KEY` | R2 | R2 secret key |
+| `R2_BUCKET` | R2 | Bucket for uploaded files |
+| `R2_REGION` | No | Defaults to `auto` |
+| `R2_PUBLIC_BASE_URL` | No | Optional public/custom-domain base URL; otherwise signed URLs are generated |
+| `MAX_UPLOAD_SIZE_MB` | No | Maximum PDF upload size; defaults to `25` |
+| `MARKETPLACE_MAX_IMAGES_PER_LISTING` | No | Defaults to `5` |
+| `MARKETPLACE_MAX_IMAGE_SIZE_MB` | No | Defaults to `5` |
+| `ADMIN_MAX_UPLOADS_PER_DAY` | No | Defaults to `200` |
+| `ADMIN_MAX_STORAGE_MB_PER_MONTH` | No | Defaults to `5000` |
+| `GLOBAL_UPLOAD_STORAGE_CAP_MB` | No | Defaults to `8192` |
+| `ADMIN_UPLOAD_EMAILS` | No | Optional comma-separated fallback admin emails |
+| `STORAGE_DOWNLOAD_URL_TTL` | No | Defaults to `10m` |
 
 Secrets and local `.env` files must never be committed.
 
-Cloudflare R2 stores uploaded PDF/image bytes; PostgreSQL stores only generated
-object keys, public/signed URLs, and file metadata. Notes use the `notes/`
-prefix and marketplace images use the `marketplace/` prefix in the same bucket.
-On Render, set `STORAGE_PROVIDER=r2` and every required `R2_*` credential above.
-The Vercel frontend requires only:
+## Deployment
+
+### Vercel frontend
+
+Set:
 
 ```text
 VITE_API_BASE_URL=https://campusone-backend-otc4.onrender.com/api/v1
 ```
 
-For the deployed backend, Render should include:
+The repository includes [`vercel.json`](vercel.json) so browser refreshes and
+email links work with React Router.
+
+### Render backend
+
+Minimum production values:
 
 ```text
 APP_CORS_ALLOWED_ORIGINS=https://campusone.dev,https://www.campusone.dev,https://campus-one-ruby.vercel.app,http://localhost:5173,http://127.0.0.1:5173
 AUTH_COOKIE_SECURE=true
 AUTH_COOKIE_SAME_SITE=None
-PASSWORD_RESET_TOKEN_TTL_MINUTES=30
 APP_FRONTEND_URL=https://campusone.dev
 MAIL_PROVIDER=resend
 RESEND_API_KEY=<your-resend-api-key>
 RESEND_FROM=CampusOne <support@mail.campusone.dev>
 RESEND_TIMEOUT=10s
+STORAGE_PROVIDER=r2
+R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=<secret>
+R2_SECRET_ACCESS_KEY=<secret>
+R2_BUCKET=<bucket-name>
+R2_REGION=auto
 ```
 
-Production password reset email uses Resend's HTTPS API because Render may not
-reliably connect to Gmail SMTP. Gmail SMTP variables are not required when
-`MAIL_PROVIDER=resend`. The current verified sending domain is
-`mail.campusone.dev`, so `RESEND_FROM` must use an address on that domain such
-as `CampusOne <support@mail.campusone.dev>`. Do not use
-`onboarding@resend.dev` or `mail@campusone.dev` for production delivery, and do
-not commit `RESEND_API_KEY`.
+Use Neon PostgreSQL for `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`. Use a
+certificate-verified PostgreSQL connection string where required by the
+environment.
 
-## 💻 Running Locally
+## API Documentation
 
-### Backend
+When the backend is running:
 
-Ensure PostgreSQL is running, then:
+| Resource | URL |
+|---|---|
+| Swagger UI | `http://localhost:8080/api/v1/swagger-ui` |
+| OpenAPI | `http://localhost:8080/api/v1/openapi` |
+| Health | `http://localhost:8080/api/v1/health` |
 
-```bash
-cd backend
-mvn spring-boot:run
-```
+For authenticated endpoints, log in through `POST /api/v1/auth/login`, then
+use the returned bearer token in Swagger UI.
 
-The Maven run goal activates the `local` profile. Flyway applies pending
-migrations automatically, and the API starts on `http://localhost:8080`.
+## Quality Checks
 
-### Frontend
-
-In a second terminal, from the repository root:
-
-```bash
-npm run dev
-```
-
-Vite serves the frontend at `http://localhost:5173` by default.
-
-## 🧪 Running Tests and Quality Checks
-
-Run the complete backend verification gate:
+Backend:
 
 ```bash
 cd backend
 mvn clean verify
 ```
 
-Repository tests requiring PostgreSQL Testcontainers run when Docker is
-available.
-
-Check and build the frontend:
+Frontend:
 
 ```bash
 npm run lint
 npm run build
 ```
 
-## 📚 API Documentation
+Some integration tests use Testcontainers and run when Docker is available.
 
-With the backend running under the local profile:
+## Contributing
 
-- Swagger UI: [http://localhost:8080/api/v1/swagger-ui](http://localhost:8080/api/v1/swagger-ui)
-- OpenAPI JSON: [http://localhost:8080/api/v1/openapi](http://localhost:8080/api/v1/openapi)
-- Health endpoint: [http://localhost:8080/api/v1/health](http://localhost:8080/api/v1/health)
-
-Use `POST /api/v1/auth/register` and `POST /api/v1/auth/login` to obtain an
-access token, then select **Authorize** in Swagger UI and enter the bearer
-token.
-
-## 🗺️ Roadmap
-
-- [x] Responsive React product interface
-- [x] Spring Boot foundation and PostgreSQL schema
-- [x] JWT and refresh-token authentication
-- [x] Profiles, notes, marketplace, discussions, events, and internships
-- [x] Notifications, global search, gamification, and local AI study tools
-- [x] Connect the React frontend to the REST APIs
-- [x] Store uploaded note PDFs and marketplace images in S3-compatible object storage
-- [x] Gate user-submitted notes, listings, events, discussion questions, and internships behind admin approval
-- [x] Add password recovery with one-time reset tokens
-- [x] Add marketplace image uploads through private object storage
-- [x] Implement administration and moderation workflows
-- [x] Connect notification and XP triggers across domain modules
-- [ ] Add production deployment and release automation
-
-## 🔭 Future Improvements
-
-- A production AI provider behind the existing provider abstraction, with
-  quotas, privacy controls, retention rules, and safety checks
-- Content reporting, campus verification, and moderator audit trails
-- Reliable asynchronous notification delivery when product scale requires it
-- Secure marketplace conversations without payment processing
-- Search ranking and recommendation improvements based on measured usage
-- Expanded integration, concurrency, accessibility, and performance testing
-- Production observability, backup procedures, and documented recovery drills
-
-## 🤝 Contributing
-
-Contributions are welcome once the repository's license and contribution terms
-are finalized. Before opening a pull request:
+Contributions are welcome once repository licensing and contribution terms are
+finalized. Before opening a pull request:
 
 1. Read [CONTRIBUTING.md](CONTRIBUTING.md).
-2. Keep changes focused on one module or concern.
-3. Follow the existing package and layered architecture.
-4. Add tests for changed behavior.
-5. Run `mvn clean verify`, `npm run lint`, and `npm run build`.
-6. Do not commit credentials, `.env` files, generated artifacts, or local data.
+2. Keep changes focused and aligned with the existing module structure.
+3. Add or update tests for changed behavior.
+4. Run backend and frontend quality checks.
+5. Never commit credentials, `.env` files, build outputs, logs, or local data.
 
-For larger proposals, open an issue before implementation so the design can be
-discussed first.
+For larger changes, open an issue first so the design can be discussed.
 
-## 📄 License
+## Additional Documentation
+
+- [Backend README](backend/README.md)
+- [Local setup notes](docs/LOCAL_SETUP.md)
+- [Contributing guide](CONTRIBUTING.md)
+
+## License
 
 This repository does not currently include a software license. Until a license
 is added, the source code is not granted for copying, modification,
-distribution, or reuse. A recognized open-source license should be selected
-before accepting external contributions or distributing releases.
+distribution, or reuse.
 
-## 👤 Author
+## Author
 
 Designed and developed by **Mustafa Nasir**.
