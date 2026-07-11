@@ -19,6 +19,7 @@ import com.campusone.note.repository.NoteRepository;
 import com.campusone.note.repository.TagRepository;
 import com.campusone.search.dto.SearchSort;
 import com.campusone.search.dto.SearchType;
+import com.campusone.search.service.SearchQueryNormalizer;
 import com.campusone.user.entity.AccountStatus;
 import com.campusone.user.entity.StudentProfile;
 import com.campusone.user.entity.User;
@@ -98,7 +99,8 @@ class JdbcGlobalSearchRepositoryIntegrationTest {
     @BeforeEach
     void setUp() {
         searchRepository = new JdbcGlobalSearchRepository(
-                new NamedParameterJdbcTemplate(dataSource));
+                new NamedParameterJdbcTemplate(dataSource),
+                new SearchQueryNormalizer());
         seedNotes();
         entityManager.flush();
         entityManager.clear();
