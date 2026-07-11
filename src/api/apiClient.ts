@@ -72,11 +72,15 @@ function toApiError(response: Response, body: unknown) {
     typeof body === "object" && body !== null
       ? (body as ErrorPayload)
       : undefined;
+  const message = payload?.message?.trim();
+  const safeMessage =
+    message && !/unexpected error|internal server/i.test(message)
+      ? message
+      : response.status >= 500
+        ? "Something went wrong. Please try again."
+        : "The request could not be completed.";
   return new ApiError(
-    payload?.message ||
-      (response.status >= 500
-        ? "CampusOne is temporarily unavailable. Please try again."
-        : "The request could not be completed."),
+    safeMessage,
     response.status,
     payload?.code,
     payload?.fieldErrors,
@@ -169,7 +173,7 @@ export async function apiRequest<T>(
       );
     }
     throw new ApiError(
-      "CampusOne is temporarily unreachable. Please try again.",
+      "We could not connect to CampusOne. Please try again.",
       0,
       "NETWORK_ERROR",
     );
