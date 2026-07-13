@@ -5,6 +5,7 @@ import {
   CalendarDays,
   FileText,
   Home,
+  MapPin,
   MessageSquareText,
   Search,
   Settings,
@@ -27,6 +28,7 @@ export const primaryNavigation: NavigationItem[] = [
     icon: MessageSquareText,
   },
   { label: "Marketplace", path: paths.marketplace, icon: ShoppingBag },
+  { label: "Lost & Found", path: paths.lostFound, icon: MapPin },
   {
     label: "Internships",
     path: paths.internships,

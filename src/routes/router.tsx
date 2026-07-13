@@ -70,6 +70,31 @@ const MarketplaceListingDetailPage = lazy(async () => {
   return { default: module.MarketplaceListingDetailPage };
 });
 
+const LostFoundPage = lazy(async () => {
+  const module = await import("@/pages/LostFoundPage");
+  return { default: module.LostFoundPage };
+});
+
+const LostFoundItemDetailPage = lazy(async () => {
+  const module = await import("@/pages/LostFoundItemDetailPage");
+  return { default: module.LostFoundItemDetailPage };
+});
+
+const CreateLostFoundItemPage = lazy(async () => {
+  const module = await import("@/pages/CreateLostFoundItemPage");
+  return { default: module.CreateLostFoundItemPage };
+});
+
+const EditLostFoundItemPage = lazy(async () => {
+  const module = await import("@/pages/EditLostFoundItemPage");
+  return { default: module.EditLostFoundItemPage };
+});
+
+const LostFoundClaimsPage = lazy(async () => {
+  const module = await import("@/pages/LostFoundClaimsPage");
+  return { default: module.LostFoundClaimsPage };
+});
+
 const CreateMarketplaceListingPage = lazy(async () => {
   const module = await import("@/pages/CreateMarketplaceListingPage");
   return { default: module.CreateMarketplaceListingPage };
@@ -275,6 +300,35 @@ export const router = createBrowserRouter([
             element: lazyRoute(
               <MarketplaceListingDetailPage />,
               paths.marketplace,
+            ),
+          },
+          {
+            path: paths.lostFound,
+            element: lazyRoute(<LostFoundPage />, paths.lostFound),
+          },
+          {
+            path: paths.lostFoundNew,
+            element: lazyRoute(
+              <CreateLostFoundItemPage />,
+              paths.lostFoundNew,
+            ),
+          },
+          {
+            path: paths.lostFoundClaims,
+            element: lazyRoute(
+              <LostFoundClaimsPage />,
+              paths.lostFoundClaims,
+            ),
+          },
+          {
+            path: "/lost-found/:itemId/edit",
+            element: lazyRoute(<EditLostFoundItemPage />, paths.lostFound),
+          },
+          {
+            path: "/lost-found/:itemId",
+            element: lazyRoute(
+              <LostFoundItemDetailPage />,
+              paths.lostFound,
             ),
           },
           {
