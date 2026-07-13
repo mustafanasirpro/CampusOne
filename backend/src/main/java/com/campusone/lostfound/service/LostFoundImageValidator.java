@@ -10,6 +10,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -23,6 +24,11 @@ public class LostFoundImageValidator {
             Set.of("image/jpeg", "image/png", "image/webp");
     private static final Set<String> ALLOWED_EXTENSIONS =
             Set.of(".jpg", ".jpeg", ".png", ".webp");
+    private static final Map<String, String> EXTENSION_MIME_TYPES = Map.of(
+            ".jpg", "image/jpeg",
+            ".jpeg", "image/jpeg",
+            ".png", "image/png",
+            ".webp", "image/webp");
 
     private final int maximumImageSizeMb;
 
@@ -56,8 +62,16 @@ public class LostFoundImageValidator {
         }
         String originalFilename = safeOriginalFilename(file.getOriginalFilename());
         String lowerFilename = originalFilename.toLowerCase(Locale.ROOT);
-        if (!ALLOWED_TYPES.contains(file.getContentType())
-                || ALLOWED_EXTENSIONS.stream().noneMatch(lowerFilename::endsWith)) {
+        String contentType = file.getContentType() == null
+                ? ""
+                : file.getContentType().trim().toLowerCase(Locale.ROOT);
+        String extension = ALLOWED_EXTENSIONS.stream()
+                .filter(lowerFilename::endsWith)
+                .findFirst()
+                .orElse("");
+        if (!ALLOWED_TYPES.contains(contentType)
+                || extension.isBlank()
+                || !contentType.equals(EXTENSION_MIME_TYPES.get(extension))) {
             throw new InvalidFileUploadException(
                     "Only JPG, PNG, or WebP images are allowed.");
         }
@@ -77,11 +91,43 @@ public class LostFoundImageValidator {
         if (content.length > maximumSizeBytes) {
             throw new FileUploadTooLargeException(maximumImageSizeMb);
         }
+        if (!hasExpectedSignature(contentType, content)) {
+            throw new InvalidFileUploadException(
+                    "Only JPG, PNG, or WebP images are allowed.");
+        }
         return new ValidatedNoteFile(
                 originalFilename,
-                file.getContentType(),
+                contentType,
                 content,
                 sha256(content));
+    }
+
+    private boolean hasExpectedSignature(String contentType, byte[] content) {
+        return switch (contentType) {
+            case "image/jpeg" -> content.length >= 3
+                    && (content[0] & 0xFF) == 0xFF
+                    && (content[1] & 0xFF) == 0xD8
+                    && (content[2] & 0xFF) == 0xFF;
+            case "image/png" -> content.length >= 8
+                    && (content[0] & 0xFF) == 0x89
+                    && content[1] == 0x50
+                    && content[2] == 0x4E
+                    && content[3] == 0x47
+                    && content[4] == 0x0D
+                    && content[5] == 0x0A
+                    && content[6] == 0x1A
+                    && content[7] == 0x0A;
+            case "image/webp" -> content.length >= 12
+                    && content[0] == 0x52
+                    && content[1] == 0x49
+                    && content[2] == 0x46
+                    && content[3] == 0x46
+                    && content[8] == 0x57
+                    && content[9] == 0x45
+                    && content[10] == 0x42
+                    && content[11] == 0x50;
+            default -> false;
+        };
     }
 
     private String safeOriginalFilename(String filename) {

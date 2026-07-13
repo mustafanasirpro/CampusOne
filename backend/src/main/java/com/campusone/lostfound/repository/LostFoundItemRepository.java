@@ -162,4 +162,19 @@ public interface LostFoundItemRepository
     boolean existsByIdAndStatusInAndDeletedAtIsNull(
             UUID id,
             Set<LostFoundItemStatus> statuses);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select item
+            from LostFoundItem item
+            where item.deletedAt is null
+              and item.status = :status
+              and item.expiresAt is not null
+              and item.expiresAt <= :now
+            order by item.expiresAt asc, item.id asc
+            """)
+    java.util.List<LostFoundItem> findExpiredPublishedForUpdate(
+            @Param("status") LostFoundItemStatus status,
+            @Param("now") Instant now,
+            Pageable pageable);
 }

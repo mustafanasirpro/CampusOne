@@ -27,6 +27,7 @@ import com.campusone.lostfound.mapper.LostFoundMapper;
 import com.campusone.lostfound.repository.LostFoundClaimRepository;
 import com.campusone.lostfound.repository.LostFoundItemRepository;
 import com.campusone.lostfound.repository.LostFoundMatchRepository;
+import com.campusone.moderation.service.ModeratorAuthorizationService;
 import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.note.storage.StorageService;
 import com.campusone.note.storage.StoredObject;
@@ -67,6 +68,7 @@ public class LostFoundService {
     private final LostFoundMatchingService matchingService;
     private final CommunityIntegrationService integrationService;
     private final NoteAdminAuthorizationService adminAuthorizationService;
+    private final ModeratorAuthorizationService moderatorAuthorizationService;
     private final Clock clock;
 
     public LostFoundService(
@@ -80,6 +82,7 @@ public class LostFoundService {
             LostFoundMatchingService matchingService,
             CommunityIntegrationService integrationService,
             NoteAdminAuthorizationService adminAuthorizationService,
+            ModeratorAuthorizationService moderatorAuthorizationService,
             Clock clock) {
         this.itemRepository = itemRepository;
         this.claimRepository = claimRepository;
@@ -91,6 +94,7 @@ public class LostFoundService {
         this.matchingService = matchingService;
         this.integrationService = integrationService;
         this.adminAuthorizationService = adminAuthorizationService;
+        this.moderatorAuthorizationService = moderatorAuthorizationService;
         this.clock = clock;
     }
 
@@ -211,8 +215,12 @@ public class LostFoundService {
                 request.brand(),
                 request.color());
         if (images != null) {
+            List<StoredObject> previousImages = item.getImages().stream()
+                    .map(this::toStoredObject)
+                    .toList();
             List<StoredObject> storedImages = uploadImages(userId, images);
             item.replaceImages(toImages(storedImages));
+            registerStorageCleanupAfterCommit(previousImages);
             hasMetadataChanges = true;
         }
         if (hasMetadataChanges) {
@@ -230,7 +238,11 @@ public class LostFoundService {
         LostFoundItem item = requireItem(itemId);
         requireOwner(item, userId);
         requireNoApprovedClaim(item);
+        List<StoredObject> imagesToDelete = item.getImages().stream()
+                .map(this::toStoredObject)
+                .toList();
         item.softDelete(clock.instant());
+        registerStorageCleanupAfterCommit(imagesToDelete);
     }
 
     @Transactional
@@ -323,7 +335,13 @@ public class LostFoundService {
             throw new LostFoundConflictException(
                     "Only a published lost report can be marked recovered.");
         }
-        item.resolve(clock.instant());
+        Instant now = clock.instant();
+        item.resolve(now);
+        rejectRemainingPendingClaims(
+                item,
+                null,
+                requireUser(userId),
+                now);
         return mapper.toDetail(item, userId, clock.instant());
     }
 
@@ -365,7 +383,7 @@ public class LostFoundService {
                 item.getId(),
                 claim.getId(),
                 item.getTitle());
-        return mapper.toClaim(claim, true);
+        return mapper.toClaim(claim, true, userId);
     }
 
     @Transactional(readOnly = true)
@@ -434,7 +452,7 @@ public class LostFoundService {
                 claim.getId(),
                 claim.getItem().getTitle(),
                 true);
-        return mapper.toClaim(claim, true);
+        return mapper.toClaim(claim, true, userId);
     }
 
     @Transactional
@@ -464,7 +482,7 @@ public class LostFoundService {
                 claim.getId(),
                 claim.getItem().getTitle(),
                 false);
-        return mapper.toClaim(claim, true);
+        return mapper.toClaim(claim, true, userId);
     }
 
     @Transactional
@@ -488,7 +506,7 @@ public class LostFoundService {
                 EnumSet.of(LostFoundClaimStatus.APPROVED))) {
             claim.getItem().reopenAfterRejectedClaim();
         }
-        return mapper.toClaim(claim, true);
+        return mapper.toClaim(claim, true, userId);
     }
 
     @Transactional
@@ -501,8 +519,8 @@ public class LostFoundService {
             throw new AccessDeniedException(
                     "Only the claimant can confirm claimant handover.");
         }
-        confirmHandover(claim, request, false);
-        return mapper.toClaim(claim, true);
+        confirmHandover(claim, request, false, userId);
+        return mapper.toClaim(claim, true, userId);
     }
 
     @Transactional
@@ -515,8 +533,8 @@ public class LostFoundService {
             throw new AccessDeniedException(
                     "Only the reporter or an admin can confirm reporter handover.");
         }
-        confirmHandover(claim, request, true);
-        return mapper.toClaim(claim, true);
+        confirmHandover(claim, request, true, userId);
+        return mapper.toClaim(claim, true, userId);
     }
 
     @Transactional
@@ -533,19 +551,25 @@ public class LostFoundService {
         Instant now = clock.instant();
         claim.complete(request.handoverNote(), now);
         claim.getItem().resolve(now);
+        rejectRemainingPendingClaims(
+                claim.getItem(),
+                claim.getId(),
+                requireUser(userId),
+                now);
         integrationService.lostFoundClaimCompleted(
                 claim.getClaimant().getId(),
                 claim.getItem().getReporter().getId(),
                 claim.getItem().getId(),
                 claim.getId(),
                 claim.getItem().getTitle());
-        return mapper.toClaim(claim, true);
+        return mapper.toClaim(claim, true, userId);
     }
 
     private void confirmHandover(
             LostFoundClaim claim,
             CompleteLostFoundClaimRequest request,
-            boolean reporterSide) {
+            boolean reporterSide,
+            UUID confirmerUserId) {
         if (claim.getStatus() != LostFoundClaimStatus.APPROVED) {
             throw new LostFoundConflictException(
                     "Only an approved claim can be confirmed.");
@@ -561,6 +585,11 @@ public class LostFoundService {
                     request == null ? null : request.handoverNote(),
                     now);
             claim.getItem().resolve(now);
+            rejectRemainingPendingClaims(
+                    claim.getItem(),
+                    claim.getId(),
+                    requireUser(confirmerUserId),
+                    now);
             integrationService.lostFoundClaimCompleted(
                     claim.getClaimant().getId(),
                     claim.getItem().getReporter().getId(),
@@ -622,10 +651,7 @@ public class LostFoundService {
 
     @Transactional(readOnly = true)
     public LostFoundStatsResponse stats(UUID adminUserId) {
-        if (!isAdmin(adminUserId)) {
-            throw new AccessDeniedException(
-                    "Only admins can view Lost & Found moderation stats.");
-        }
+        moderatorAuthorizationService.requireActiveModerator(adminUserId);
         Map<String, Long> counts = new LinkedHashMap<>();
         itemRepository.countByStatus().forEach(row ->
                 counts.put(String.valueOf(row[0]), (Long) row[1]));
@@ -684,8 +710,13 @@ public class LostFoundService {
         List<ValidatedNoteFile> validatedImages =
                 imageValidator.validate(imageFiles);
         List<StoredObject> storedImages = new ArrayList<>();
-        for (ValidatedNoteFile image : validatedImages) {
-            storedImages.add(storageService.uploadLostFoundImage(userId, image));
+        try {
+            for (ValidatedNoteFile image : validatedImages) {
+                storedImages.add(storageService.uploadLostFoundImage(userId, image));
+            }
+        } catch (RuntimeException exception) {
+            storedImages.forEach(storageService::delete);
+            throw exception;
         }
         registerStorageCleanupOnRollback(storedImages);
         return List.copyOf(storedImages);
@@ -713,6 +744,50 @@ public class LostFoundService {
                         }
                     }
                 });
+    }
+
+    private void registerStorageCleanupAfterCommit(List<StoredObject> storedObjects) {
+        if (storedObjects.isEmpty()) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            storedObjects.forEach(storageService::delete);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        storedObjects.forEach(storageService::delete);
+                    }
+                });
+    }
+
+    private StoredObject toStoredObject(LostFoundItemImage image) {
+        return new StoredObject(
+                image.getStorageProvider(),
+                image.getBucketName(),
+                image.getObjectKey(),
+                image.getOriginalFilename(),
+                image.getMimeType(),
+                image.getFileSizeBytes(),
+                image.getChecksumSha256());
+    }
+
+    private void rejectRemainingPendingClaims(
+            LostFoundItem item,
+            UUID completedClaimId,
+            User reviewer,
+            Instant now) {
+        claimRepository.findByItemIdAndStatus(
+                        item.getId(),
+                        LostFoundClaimStatus.PENDING)
+                .stream()
+                .filter(claim -> !claim.getId().equals(completedClaimId))
+                .forEach(claim -> claim.reject(
+                        reviewer,
+                        "Item was resolved.",
+                        now));
     }
 
     private boolean hasMetadataChanges(UpdateLostFoundItemRequest request) {

@@ -3,6 +3,7 @@ package com.campusone.lostfound.repository;
 import com.campusone.lostfound.entity.LostFoundClaim;
 import com.campusone.lostfound.entity.LostFoundClaimStatus;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -75,4 +76,18 @@ public interface LostFoundClaimRepository
     boolean existsByItemIdAndStatusIn(
             UUID itemId,
             Collection<LostFoundClaimStatus> statuses);
+
+    @EntityGraph(attributePaths = {
+        "item",
+        "item.reporter",
+        "item.reporter.studentProfile",
+        "item.university",
+        "claimant",
+        "claimant.studentProfile",
+        "reviewedBy",
+        "reviewedBy.studentProfile"
+    })
+    List<LostFoundClaim> findByItemIdAndStatus(
+            UUID itemId,
+            LostFoundClaimStatus status);
 }

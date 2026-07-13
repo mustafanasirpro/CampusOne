@@ -1,5 +1,6 @@
 package com.campusone.moderation.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -34,6 +35,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -168,6 +171,41 @@ class ContentApprovalServiceTest {
                 NOTE_ID,
                 "Blue umbrella",
                 true);
+    }
+
+    @Test
+    void listPending_forModeratorDefaultsToLostFoundQueueOnly() {
+        when(userRepository.findById(ADMIN_ID)).thenReturn(Optional.of(admin));
+        when(adminAuthorizationService.canManage(ADMIN_ID, "admin@example.com"))
+                .thenReturn(false);
+        when(lostFoundItemRepository.findAllByStatusAndDeletedAtIsNull(
+                com.campusone.lostfound.entity.LostFoundItemStatus
+                        .PENDING_REVIEW,
+                PageRequest.of(0, 20)))
+                .thenReturn(Page.empty(PageRequest.of(0, 20)));
+
+        var response = contentApprovalService.listPending(
+                ADMIN_ID,
+                null,
+                0,
+                20);
+
+        assertThat(response.content()).isEmpty();
+        verify(moderatorAuthorizationService).requireActiveModerator(ADMIN_ID);
+        verify(lostFoundItemRepository).findAllByStatusAndDeletedAtIsNull(
+                com.campusone.lostfound.entity.LostFoundItemStatus
+                        .PENDING_REVIEW,
+                PageRequest.of(0, 20));
+        verify(noteRepository, never())
+                .findAllByModerationStatusAndDeletedAtIsNull(any(), any());
+        verify(listingRepository, never())
+                .findAllByStatusAndDeletedAtIsNull(any(), any());
+        verify(eventRepository, never())
+                .findAllByStatusAndDeletedFalse(any(), any());
+        verify(questionRepository, never())
+                .findAllByStatusAndDeletedFalse(any(), any());
+        verify(internshipRepository, never())
+                .findAllByStatusAndDeletedFalse(any(), any());
     }
 
     @Test

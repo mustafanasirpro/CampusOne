@@ -17,5 +17,7 @@ public record LostFoundClaimResponse(
         Instant reviewedAt,
         Instant reporterHandoverConfirmedAt,
         Instant claimantHandoverConfirmedAt,
-        Instant handoverCompletedAt) {
+        Instant handoverCompletedAt,
+        boolean claimantIsCurrentUser,
+        boolean reporterIsCurrentUser) {
 }

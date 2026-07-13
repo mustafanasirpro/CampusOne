@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.campusone.academic.entity.Department;
 import com.campusone.academic.entity.University;
 import com.campusone.common.service.CommunityIntegrationService;
+import com.campusone.lostfound.dto.request.CompleteLostFoundClaimRequest;
 import com.campusone.lostfound.dto.request.CreateLostFoundClaimRequest;
 import com.campusone.lostfound.dto.request.CreateLostFoundItemRequest;
 import com.campusone.lostfound.dto.request.ReviewLostFoundClaimRequest;
@@ -19,6 +20,7 @@ import com.campusone.lostfound.entity.LostFoundCategory;
 import com.campusone.lostfound.entity.LostFoundClaim;
 import com.campusone.lostfound.entity.LostFoundClaimStatus;
 import com.campusone.lostfound.entity.LostFoundItem;
+import com.campusone.lostfound.entity.LostFoundItemImage;
 import com.campusone.lostfound.entity.LostFoundItemStatus;
 import com.campusone.lostfound.entity.LostFoundItemType;
 import com.campusone.lostfound.exception.LostFoundConflictException;
@@ -26,8 +28,11 @@ import com.campusone.lostfound.mapper.LostFoundMapper;
 import com.campusone.lostfound.repository.LostFoundClaimRepository;
 import com.campusone.lostfound.repository.LostFoundItemRepository;
 import com.campusone.lostfound.repository.LostFoundMatchRepository;
+import com.campusone.moderation.service.ModeratorAuthorizationService;
+import com.campusone.note.entity.StorageProvider;
 import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.note.storage.StorageService;
+import com.campusone.note.storage.StoredObject;
 import com.campusone.user.entity.StudentProfile;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
@@ -44,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -84,6 +90,9 @@ class LostFoundServiceTest {
     @Mock
     private NoteAdminAuthorizationService adminAuthorizationService;
 
+    @Mock
+    private ModeratorAuthorizationService moderatorAuthorizationService;
+
     private LostFoundService service;
     private User reporter;
     private User claimant;
@@ -120,6 +129,7 @@ class LostFoundServiceTest {
                 matchingService,
                 integrationService,
                 adminAuthorizationService,
+                moderatorAuthorizationService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -165,6 +175,53 @@ class LostFoundServiceTest {
                 null))
                 .isInstanceOf(LostFoundConflictException.class)
                 .hasMessage("Lost and found item type cannot be changed.");
+    }
+
+    @Test
+    void createItem_deletesAlreadyUploadedImagesWhenLaterUploadFails() {
+        StoredObject firstObject = storedObject("first.jpg");
+        when(userRepository.findById(REPORTER_ID)).thenReturn(Optional.of(reporter));
+        when(storageService.uploadLostFoundImage(any(), any()))
+                .thenReturn(firstObject)
+                .thenThrow(new RuntimeException("R2 unavailable"));
+
+        assertThatThrownBy(() -> service.createItem(
+                REPORTER_ID,
+                createRequest(LostFoundItemType.LOST),
+                List.of(jpeg("first.jpg"), jpeg("second.jpg"))))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("R2 unavailable");
+
+        verify(storageService).delete(firstObject);
+    }
+
+    @Test
+    void updateItem_deletesReplacedImageObjectsAfterSuccessfulReplacement() {
+        LostFoundItem item = publishedFoundItem();
+        StoredObject oldObject = storedObject("old.jpg");
+        item.replaceImages(List.of(new LostFoundItemImage(oldObject, 0)));
+        StoredObject newObject = storedObject("new.jpg");
+        when(userRepository.findById(REPORTER_ID)).thenReturn(Optional.of(reporter));
+        when(itemRepository.findDetailedById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(storageService.uploadLostFoundImage(any(), any()))
+                .thenReturn(newObject);
+
+        LostFoundItemDetailResponse response = service.updateItem(
+                REPORTER_ID,
+                ITEM_ID,
+                new UpdateLostFoundItemRequest(
+                        null,
+                        null,
+                        "Updated laptop bag",
+                        "Updated description with enough detail.",
+                        null,
+                        null,
+                        null,
+                        null),
+                List.of(jpeg("new.jpg")));
+
+        assertThat(response.status()).isEqualTo(LostFoundItemStatus.PENDING_REVIEW);
+        verify(storageService).delete(oldObject);
     }
 
     @Test
@@ -231,6 +288,43 @@ class LostFoundServiceTest {
                 true);
     }
 
+    @Test
+    void completeClaim_rejectsRemainingPendingClaims() {
+        LostFoundItem item = publishedFoundItem();
+        LostFoundClaim approvedClaim = persistClaim(new LostFoundClaim(
+                item,
+                claimant,
+                "The zipper has a blue keychain attached."));
+        approvedClaim.approve(reporter, "Verified privately.", NOW);
+        LostFoundClaim pendingClaim = persistClaimWithId(
+                new LostFoundClaim(
+                        item,
+                        user(
+                                UUID.fromString("10000000-0000-4000-8000-000000000003"),
+                                "other@example.com",
+                                university,
+                                claimant.getStudentProfile().getDepartment()),
+                        "The front pocket contains my student card."),
+                UUID.fromString("30000000-0000-4000-8000-000000000002"));
+        when(claimRepository.findDetailedById(CLAIM_ID))
+                .thenReturn(Optional.of(approvedClaim));
+        when(userRepository.findById(REPORTER_ID)).thenReturn(Optional.of(reporter));
+        when(claimRepository.findByItemIdAndStatus(
+                ITEM_ID,
+                LostFoundClaimStatus.PENDING))
+                .thenReturn(List.of(pendingClaim));
+
+        service.completeClaim(
+                REPORTER_ID,
+                CLAIM_ID,
+                new CompleteLostFoundClaimRequest("Returned safely."));
+
+        assertThat(approvedClaim.getStatus()).isEqualTo(LostFoundClaimStatus.COMPLETED);
+        assertThat(item.getStatus()).isEqualTo(LostFoundItemStatus.RESOLVED);
+        assertThat(pendingClaim.getStatus()).isEqualTo(LostFoundClaimStatus.REJECTED);
+        assertThat(pendingClaim.getReviewerNote()).isEqualTo("Item was resolved.");
+    }
+
     private CreateLostFoundItemRequest createRequest(LostFoundItemType type) {
         return new CreateLostFoundItemRequest(
                 type,
@@ -268,10 +362,40 @@ class LostFoundServiceTest {
     }
 
     private LostFoundClaim persistClaim(LostFoundClaim claim) {
-        ReflectionTestUtils.setField(claim, "id", CLAIM_ID);
+        return persistClaimWithId(claim, CLAIM_ID);
+    }
+
+    private LostFoundClaim persistClaimWithId(
+            LostFoundClaim claim,
+            UUID claimId) {
+        ReflectionTestUtils.setField(claim, "id", claimId);
         ReflectionTestUtils.setField(claim, "createdAt", NOW);
         ReflectionTestUtils.setField(claim, "updatedAt", NOW);
         return claim;
+    }
+
+    private MockMultipartFile jpeg(String filename) {
+        return new MockMultipartFile(
+                "images",
+                filename,
+                "image/jpeg",
+                new byte[] {
+                    (byte) 0xFF,
+                    (byte) 0xD8,
+                    (byte) 0xFF,
+                    0x00
+                });
+    }
+
+    private StoredObject storedObject(String filename) {
+        return new StoredObject(
+                StorageProvider.S3_COMPATIBLE,
+                "campusone",
+                "lost-found/" + filename,
+                filename,
+                "image/jpeg",
+                4L,
+                "a".repeat(64));
     }
 
     private User user(

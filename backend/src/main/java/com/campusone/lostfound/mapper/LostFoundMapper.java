@@ -101,6 +101,13 @@ public class LostFoundMapper {
     public LostFoundClaimResponse toClaim(
             LostFoundClaim claim,
             boolean includeProof) {
+        return toClaim(claim, includeProof, null);
+    }
+
+    public LostFoundClaimResponse toClaim(
+            LostFoundClaim claim,
+            boolean includeProof,
+            UUID viewerUserId) {
         return new LostFoundClaimResponse(
                 claim.getId(),
                 claim.getItem().getId(),
@@ -114,7 +121,9 @@ public class LostFoundMapper {
                 claim.getReviewedAt(),
                 claim.getReporterHandoverConfirmedAt(),
                 claim.getClaimantHandoverConfirmedAt(),
-                claim.getHandoverCompletedAt());
+                claim.getHandoverCompletedAt(),
+                viewerUserId != null && claim.isClaimant(viewerUserId),
+                viewerUserId != null && claim.getItem().isOwnedBy(viewerUserId));
     }
 
     public LostFoundMatchResponse toMatch(LostFoundMatch match) {
@@ -150,7 +159,8 @@ public class LostFoundMapper {
                 .map(claim -> toClaim(
                         claim,
                         claim.isClaimant(viewerUserId)
-                                || claim.getItem().isOwnedBy(viewerUserId)))
+                                || claim.getItem().isOwnedBy(viewerUserId),
+                        viewerUserId))
                 .toList();
         return new LostFoundClaimPageResponse(
                 content,

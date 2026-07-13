@@ -98,10 +98,25 @@ public class ContentApprovalService {
             ModerationTargetType targetType,
             int page,
             int size) {
-        requireAdmin(adminUserId);
+        boolean lostFoundOnlyReviewer = false;
+        if (targetType == ModerationTargetType.LOST_FOUND_ITEM) {
+            requireApprover(adminUserId, targetType);
+        } else if (targetType == null) {
+            lostFoundOnlyReviewer = !isAdmin(adminUserId);
+            if (lostFoundOnlyReviewer) {
+                moderatorAuthorizationService.requireActiveModerator(
+                        adminUserId);
+            }
+        } else {
+            requireAdmin(adminUserId);
+        }
         PageRequest pageRequest = PageRequest.of(page, size);
         Page<PendingApprovalItemResponse> pendingPage =
-                targetType == null
+                lostFoundOnlyReviewer
+                        ? pendingPageForTarget(
+                                ModerationTargetType.LOST_FOUND_ITEM,
+                                pageRequest)
+                : targetType == null
                         ? combinedPendingPage(pageRequest)
                         : pendingPageForTarget(targetType, pageRequest);
         return new PendingApprovalPageResponse(
@@ -465,6 +480,14 @@ public class ContentApprovalService {
                 .orElseThrow(() -> new ResourceNotFoundException("User"));
         adminAuthorizationService.requireAdmin(admin.getId(), admin.getEmail());
         return admin;
+    }
+
+    private boolean isAdmin(UUID userId) {
+        return userRepository.findById(userId)
+                .map(user -> adminAuthorizationService.canManage(
+                        user.getId(),
+                        user.getEmail()))
+                .orElse(false);
     }
 
     private User requireApprover(
