@@ -19,6 +19,7 @@ The backend is a modular Spring Boot API for CampusOne:
 - Normalized student skills and personal display preferences
 - Public and private student profile visibility
 - Notes with real R2-backed PDF upload and tracked downloads
+- Lost & Found reports with R2-backed images, moderation, private claims, and deterministic matching
 - Marketplace, discussions, events, internships, and notifications
 - Admin approval queues for user-submitted marketplace listings, events,
   discussion questions, and internships
@@ -123,6 +124,8 @@ JWT signing uses:
   per listing; defaults to `5`
 - `MARKETPLACE_MAX_IMAGE_SIZE_MB`: optional maximum marketplace image size;
   defaults to `5`
+- `APP_LOST_FOUND_MAX_IMAGE_SIZE_MB`: optional maximum Lost & Found image
+  size; defaults to `5`
 - `ADMIN_MAX_UPLOADS_PER_DAY`: optional per-uploader daily upload count;
   defaults to `200`
 - `ADMIN_MAX_STORAGE_MB_PER_MONTH`: optional per-uploader monthly uploaded
@@ -204,6 +207,14 @@ require an active `ADMIN` assignment (or an email explicitly listed in
 Quota checks use UTC calendar days/months and PostgreSQL transaction locks so
 concurrent requests and multiple backend instances cannot bypass the limits.
 
+Lost & Found reports can upload up to three JPG, PNG, or WebP images through
+multipart form data at `POST /api/v1/lost-found/items` and
+`PATCH /api/v1/lost-found/items/{itemId}`. Images are stored in the same R2
+bucket under `lost-found/`; PostgreSQL stores image metadata only. Lost &
+Found items are always submitted as `PENDING_REVIEW`, remain hidden from
+same-university browse until approved, and use private claims plus deterministic
+local matching to help students recover items safely.
+
 Marketplace listings can also upload images through multipart form data at
 `POST /api/v1/marketplace/listings/upload` and
 `PATCH /api/v1/marketplace/listings/{listingId}/upload`. Images are stored in
@@ -233,6 +244,7 @@ R2_PUBLIC_BASE_URL=
 MAX_UPLOAD_SIZE_MB=25
 MARKETPLACE_MAX_IMAGES_PER_LISTING=5
 MARKETPLACE_MAX_IMAGE_SIZE_MB=5
+APP_LOST_FOUND_MAX_IMAGE_SIZE_MB=5
 ADMIN_MAX_UPLOADS_PER_DAY=200
 ADMIN_MAX_STORAGE_MB_PER_MONTH=5000
 GLOBAL_UPLOAD_STORAGE_CAP_MB=8192
@@ -329,5 +341,7 @@ mvn clean verify
 - Replace current skills: `PUT http://localhost:8080/api/v1/users/me/skills`
 - Public profile: `GET http://localhost:8080/api/v1/profiles/{userId}`
 - Upload note PDF: `POST http://localhost:8080/api/v1/notes/upload`
+- Lost & Found browse: `GET http://localhost:8080/api/v1/lost-found/items`
+- Lost & Found submit: `POST http://localhost:8080/api/v1/lost-found/items`
 - OpenAPI JSON: `http://localhost:8080/api/v1/openapi`
 - Swagger UI: `http://localhost:8080/api/v1/swagger-ui`
