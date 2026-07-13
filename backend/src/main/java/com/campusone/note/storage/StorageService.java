@@ -9,6 +9,8 @@ public interface StorageService extends AutoCloseable {
 
     StoredObject uploadMarketplaceImage(UUID ownerId, ValidatedNoteFile file);
 
+    StoredObject uploadLostFoundImage(UUID ownerId, ValidatedNoteFile file);
+
     String createDownloadUrl(FileAsset fileAsset);
 
     String createObjectUrl(
