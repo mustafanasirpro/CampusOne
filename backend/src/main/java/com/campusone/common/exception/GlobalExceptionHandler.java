@@ -1,6 +1,7 @@
 package com.campusone.common.exception;
 
 import com.campusone.common.dto.ErrorResponse;
+import com.campusone.lostfound.exception.LostFoundConflictException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
@@ -162,6 +163,18 @@ public class GlobalExceptionHandler {
         return response(
                 HttpStatus.CONFLICT,
                 "INVALID_NOTE_STATE",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(LostFoundConflictException.class)
+    ResponseEntity<ErrorResponse> handleLostFoundConflict(
+            LostFoundConflictException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.CONFLICT,
+                "LOST_FOUND_STATE_CONFLICT",
                 exception.getMessage(),
                 request,
                 Map.of());

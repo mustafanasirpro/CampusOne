@@ -300,6 +300,88 @@ public class CommunityIntegrationService {
     }
 
     @Transactional
+    public void lostFoundItemSubmittedForApproval(
+            UUID submitterUserId,
+            UUID itemId,
+            String itemTitle) {
+        LinkedHashSet<UUID> recipients = approvalRecipientUserIds();
+        recipients.remove(submitterUserId);
+        notificationService.createBulkNotifications(
+                recipients,
+                NotificationType.LOST_FOUND_UPDATE,
+                "New Lost & Found item pending approval",
+                "A student submitted \"%s\" for Lost & Found review."
+                        .formatted(safeTitle(itemTitle, "a Lost & Found item")),
+                NotificationTargetType.LOST_FOUND_ITEM,
+                itemId,
+                "/admin");
+    }
+
+    @Transactional
+    public void lostFoundClaimCreated(
+            UUID reporterUserId,
+            UUID claimantUserId,
+            UUID itemId,
+            UUID claimId,
+            String itemTitle) {
+        if (reporterUserId.equals(claimantUserId)) {
+            return;
+        }
+        notificationService.createNotification(
+                reporterUserId,
+                NotificationType.LOST_FOUND_UPDATE,
+                "New claim on your Lost & Found item",
+                "A student submitted a claim for \"%s\"."
+                        .formatted(safeTitle(itemTitle, "your item")),
+                NotificationTargetType.LOST_FOUND_CLAIM,
+                claimId,
+                "/lost-found/" + itemId);
+    }
+
+    @Transactional
+    public void lostFoundClaimReviewed(
+            UUID claimantUserId,
+            UUID reviewerUserId,
+            UUID itemId,
+            UUID claimId,
+            String itemTitle,
+            boolean approved) {
+        if (claimantUserId.equals(reviewerUserId)) {
+            return;
+        }
+        notificationService.createNotification(
+                claimantUserId,
+                NotificationType.LOST_FOUND_UPDATE,
+                approved ? "Your claim was approved" : "Your claim was declined",
+                approved
+                        ? "Your claim for \"%s\" was approved. Arrange handover safely."
+                                .formatted(safeTitle(itemTitle, "the item"))
+                        : "Your claim for \"%s\" was reviewed and declined."
+                                .formatted(safeTitle(itemTitle, "the item")),
+                NotificationTargetType.LOST_FOUND_CLAIM,
+                claimId,
+                "/lost-found/" + itemId);
+    }
+
+    @Transactional
+    public void lostFoundClaimCompleted(
+            UUID claimantUserId,
+            UUID reporterUserId,
+            UUID itemId,
+            UUID claimId,
+            String itemTitle) {
+        notificationService.createBulkNotifications(
+                java.util.List.of(claimantUserId, reporterUserId),
+                NotificationType.LOST_FOUND_UPDATE,
+                "Lost & Found handover completed",
+                "\"%s\" has been marked as resolved."
+                        .formatted(safeTitle(itemTitle, "The item")),
+                NotificationTargetType.LOST_FOUND_CLAIM,
+                claimId,
+                "/lost-found/" + itemId);
+    }
+
+    @Transactional
     public void contentApprovalReviewed(
             UUID submitterUserId,
             UUID moderatorUserId,
@@ -446,6 +528,7 @@ public class CommunityIntegrationService {
             case DISCUSSION_QUESTION -> NotificationTargetType.DISCUSSION_QUESTION;
             case DISCUSSION_ANSWER -> NotificationTargetType.DISCUSSION_ANSWER;
             case INTERNSHIP -> NotificationTargetType.INTERNSHIP;
+            case LOST_FOUND_ITEM -> NotificationTargetType.LOST_FOUND_ITEM;
             case USER_PROFILE -> NotificationTargetType.USER;
             case AI_GENERATED_ITEM, SYSTEM -> NotificationTargetType.SYSTEM;
         };
@@ -460,6 +543,7 @@ public class CommunityIntegrationService {
             case EVENT -> "/events/" + targetId;
             case DISCUSSION_QUESTION -> "/discussions/questions/" + targetId;
             case INTERNSHIP -> "/internships/" + targetId;
+            case LOST_FOUND_ITEM -> "/lost-found/" + targetId;
             case DISCUSSION_ANSWER, AI_GENERATED_ITEM, USER_PROFILE, SYSTEM ->
                     "/admin";
         };

@@ -8,5 +8,8 @@ public enum NotificationTargetType {
     DISCUSSION_QUESTION,
     DISCUSSION_ANSWER,
     EVENT,
-    INTERNSHIP
+    INTERNSHIP,
+    LOST_FOUND_ITEM,
+    LOST_FOUND_CLAIM,
+    LOST_FOUND_MATCH
 }
