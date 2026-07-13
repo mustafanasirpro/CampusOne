@@ -10,12 +10,14 @@ import com.campusone.search.exception.SearchValidationException;
 import com.campusone.search.mapper.SearchResultMapper;
 import com.campusone.search.repository.GlobalSearchRepository;
 import com.campusone.search.repository.SearchRepositoryResult;
+import com.campusone.user.repository.UserRepository;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,14 +30,17 @@ public class GlobalSearchService {
     private final GlobalSearchRepository searchRepository;
     private final SearchResultMapper searchResultMapper;
     private final SearchQueryNormalizer queryNormalizer;
+    private final UserRepository userRepository;
 
     public GlobalSearchService(
             GlobalSearchRepository searchRepository,
             SearchResultMapper searchResultMapper,
-            SearchQueryNormalizer queryNormalizer) {
+            SearchQueryNormalizer queryNormalizer,
+            UserRepository userRepository) {
         this.searchRepository = searchRepository;
         this.searchResultMapper = searchResultMapper;
         this.queryNormalizer = queryNormalizer;
+        this.userRepository = userRepository;
     }
 
     @Transactional(readOnly = true)
@@ -44,13 +49,21 @@ public class GlobalSearchService {
             Set<SearchType> requestedTypes,
             int page,
             int size,
-            SearchSort sort) {
+            SearchSort sort,
+            UUID requesterUserId) {
         String normalizedQuery = normalizeQuery(query);
-        Set<SearchType> types = normalizeTypes(requestedTypes);
+        UUID requesterUniversityId = requesterUniversityId(requesterUserId);
+        Set<SearchType> types = normalizeTypes(
+                requestedTypes,
+                requesterUniversityId);
+        if (types.isEmpty()) {
+            return emptyResponse(query, page, size);
+        }
         long offset = (long) page * size;
         SearchRepositoryResult repositoryResult = searchRepository.search(
                 normalizedQuery,
                 types,
+                requesterUniversityId,
                 offset,
                 size,
                 sort);
@@ -81,11 +94,13 @@ public class GlobalSearchService {
     @Transactional(readOnly = true)
     public SearchSuggestionResponse suggestions(
             String query,
-            int limit) {
+            int limit,
+            UUID requesterUserId) {
         String normalizedQuery = normalizeQuery(query);
         List<String> suggestions = deduplicateSuggestions(
                 searchRepository.findSuggestions(
                         normalizedQuery,
+                        requesterUniversityId(requesterUserId),
                         limit));
         return new SearchSuggestionResponse(
                 displayQuery(query),
@@ -114,7 +129,11 @@ public class GlobalSearchService {
                 new SearchTypeResponse(
                         SearchType.INTERNSHIP,
                         "Internships",
-                        "Available internship opportunities."));
+                        "Available internship opportunities."),
+                new SearchTypeResponse(
+                        SearchType.LOST_FOUND,
+                        "Lost & Found",
+                        "Published campus lost-and-found reports for signed-in students."));
     }
 
     private String normalizeQuery(String query) {
@@ -138,11 +157,42 @@ public class GlobalSearchService {
     }
 
     private Set<SearchType> normalizeTypes(
-            Set<SearchType> requestedTypes) {
-        if (requestedTypes == null || requestedTypes.isEmpty()) {
-            return EnumSet.allOf(SearchType.class);
+            Set<SearchType> requestedTypes,
+            UUID requesterUniversityId) {
+        EnumSet<SearchType> types =
+                requestedTypes == null || requestedTypes.isEmpty()
+                        ? EnumSet.allOf(SearchType.class)
+                        : EnumSet.copyOf(requestedTypes);
+        if (requesterUniversityId == null) {
+            types.remove(SearchType.LOST_FOUND);
         }
-        return EnumSet.copyOf(requestedTypes);
+        return types;
+    }
+
+    private UUID requesterUniversityId(UUID requesterUserId) {
+        if (requesterUserId == null) {
+            return null;
+        }
+        return userRepository.findById(requesterUserId)
+                .map(user -> user.getStudentProfile() == null
+                        ? null
+                        : user.getStudentProfile().getUniversity())
+                .map(university -> university == null ? null : university.getId())
+                .orElse(null);
+    }
+
+    private GlobalSearchResponse emptyResponse(
+            String query,
+            int page,
+            int size) {
+        return new GlobalSearchResponse(
+                displayQuery(query),
+                page,
+                size,
+                0,
+                0,
+                false,
+                List.of());
     }
 
     private List<String> deduplicateSuggestions(

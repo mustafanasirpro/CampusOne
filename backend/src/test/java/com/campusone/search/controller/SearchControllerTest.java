@@ -59,7 +59,8 @@ class SearchControllerTest {
                 null,
                 0,
                 10,
-                SearchSort.RELEVANCE))
+                SearchSort.RELEVANCE,
+                null))
                 .thenReturn(emptySearchResponse());
 
         mockMvc.perform(get("/api/v1/search")
@@ -76,7 +77,8 @@ class SearchControllerTest {
                 eq(Set.of(SearchType.NOTE, SearchType.EVENT)),
                 eq(0),
                 eq(10),
-                eq(SearchSort.RELEVANCE)))
+                eq(SearchSort.RELEVANCE),
+                eq(null)))
                 .thenReturn(emptySearchResponse());
 
         mockMvc.perform(get("/api/v1/search")
@@ -125,7 +127,7 @@ class SearchControllerTest {
 
     @Test
     void suggestions_withoutAuthentication_isPublic() throws Exception {
-        when(searchService.suggestions("java", 5))
+        when(searchService.suggestions("java", 5, null))
                 .thenReturn(new SearchSuggestionResponse(
                         "java",
                         List.of("Java OOP Notes")));

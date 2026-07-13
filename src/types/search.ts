@@ -3,7 +3,8 @@ export type GlobalSearchType =
   | "MARKETPLACE"
   | "DISCUSSION"
   | "EVENT"
-  | "INTERNSHIP";
+  | "INTERNSHIP"
+  | "LOST_FOUND";
 
 export type GlobalSearchSort = "RELEVANCE" | "NEWEST" | "OLDEST";
 
@@ -48,4 +49,3 @@ export interface GlobalSearchParameters {
   sort?: GlobalSearchSort;
   types?: GlobalSearchType[];
 }
-

@@ -6,6 +6,7 @@ export function searchTypeLabel(type: GlobalSearchType) {
     DISCUSSION: "Discussion",
     EVENT: "Event",
     INTERNSHIP: "Internship",
+    LOST_FOUND: "Lost & Found",
     MARKETPLACE: "Marketplace",
     NOTE: "Note",
   }[type];

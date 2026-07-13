@@ -5,5 +5,6 @@ public enum SearchType {
     MARKETPLACE,
     DISCUSSION,
     EVENT,
-    INTERNSHIP
+    INTERNSHIP,
+    LOST_FOUND
 }

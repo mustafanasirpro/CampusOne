@@ -492,6 +492,103 @@ public class JdbcGlobalSearchRepository
                                 NOT LIKE '%' || query_token.token || '%'
                     )
               )
+
+            UNION ALL
+
+            SELECT
+                item.id,
+                'LOST_FOUND'::VARCHAR AS search_type,
+                item.title,
+                item.description AS snippet_source,
+                CASE
+                    WHEN profile.visibility = 'PUBLIC' THEN profile.full_name
+                    ELSE NULL
+                END AS owner_name,
+                REPLACE(item.category, '_', ' ') AS category,
+                item.location_text AS location,
+                NULL::VARCHAR AS company_name,
+                NULL::NUMERIC AS price,
+                NULL::VARCHAR AS currency,
+                item.status,
+                item.item_date::TIMESTAMPTZ AS relevant_date,
+                item.created_at,
+                item.updated_at,
+                CASE
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(item.title, ''), '[^[:alnum:]]+', ' ', 'g'))) = :exactQuery
+                        THEN 1000
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(item.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :prefixPattern ESCAPE '\\'
+                        THEN 900
+                    WHEN (' ' || BTRIM(LOWER(REGEXP_REPLACE(COALESCE(item.title, ''), '[^[:alnum:]]+', ' ', 'g'))) || ' ')
+                            LIKE :wholeWordPattern ESCAPE '\\'
+                        THEN 850
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(item.title, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 800
+                    WHEN LOWER(item.title) % :exactQuery
+                        THEN 770
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(item.category, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 700
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(item.location_text, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 680
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(item_images.image_terms, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 660
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(item.brand, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                         OR BTRIM(LOWER(REGEXP_REPLACE(COALESCE(item.color, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 640
+                    WHEN profile.visibility = 'PUBLIC'
+                         AND BTRIM(LOWER(REGEXP_REPLACE(COALESCE(profile.full_name, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 620
+                    WHEN BTRIM(LOWER(REGEXP_REPLACE(COALESCE(item.description, ''), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                        THEN 500
+                    ELSE 300
+                END AS relevance_score
+            FROM lost_found_items item
+            LEFT JOIN student_profiles profile
+                ON profile.user_id = item.reporter_user_id
+            LEFT JOIN LATERAL (
+                SELECT STRING_AGG(image.original_filename, ' ') AS image_terms
+                FROM lost_found_item_images image
+                WHERE image.item_id = item.id
+            ) item_images ON TRUE
+            WHERE item.deleted_at IS NULL
+              AND item.status = 'PUBLISHED'
+              AND (:requesterUniversityId IS NOT NULL
+                    AND item.university_id = :requesterUniversityId)
+              AND (item.expires_at IS NULL OR CURRENT_TIMESTAMP < item.expires_at)
+              AND (
+                    BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                        item.title,
+                        item.description,
+                        item.category,
+                        item.location_text,
+                        item.brand,
+                        item.color,
+                        item_images.image_terms,
+                        CASE
+                            WHEN profile.visibility = 'PUBLIC' THEN profile.full_name
+                            ELSE NULL
+                        END
+                    ), '[^[:alnum:]]+', ' ', 'g'))) LIKE :searchPattern ESCAPE '\\'
+                    OR LOWER(item.title) % :exactQuery
+                    OR NOT EXISTS (
+                        SELECT 1
+                        FROM UNNEST(STRING_TO_ARRAY(:tokensText, ' ')) AS query_token(token)
+                        WHERE query_token.token <> ''
+                          AND BTRIM(LOWER(REGEXP_REPLACE(CONCAT_WS(' ',
+                                item.title,
+                                item.description,
+                                item.category,
+                                item.location_text,
+                                item.brand,
+                                item.color,
+                                item_images.image_terms,
+                                CASE
+                                    WHEN profile.visibility = 'PUBLIC' THEN profile.full_name
+                                    ELSE NULL
+                                END
+                              ), '[^[:alnum:]]+', ' ', 'g')))
+                                NOT LIKE '%' || query_token.token || '%'
+                    )
+              )
             """;
 
     private static final String INTERNSHIP_COMPANY_SUGGESTIONS = """
@@ -527,10 +624,13 @@ public class JdbcGlobalSearchRepository
     public SearchRepositoryResult search(
             String normalizedQuery,
             Set<SearchType> types,
+            UUID requesterUniversityId,
             long offset,
             int limit,
             SearchSort sort) {
-        MapSqlParameterSource parameters = parameters(normalizedQuery)
+        MapSqlParameterSource parameters = parameters(
+                normalizedQuery,
+                requesterUniversityId)
                 .addValue(
                         "types",
                         types.stream().map(Enum::name).toList())
@@ -570,8 +670,11 @@ public class JdbcGlobalSearchRepository
     @Override
     public List<String> findSuggestions(
             String normalizedQuery,
+            UUID requesterUniversityId,
             int limit) {
-        MapSqlParameterSource parameters = parameters(normalizedQuery)
+        MapSqlParameterSource parameters = parameters(
+                normalizedQuery,
+                requesterUniversityId)
                 .addValue("suggestionLimit", limit);
         String sql = """
                 WITH matching_documents AS (
@@ -682,9 +785,12 @@ public class JdbcGlobalSearchRepository
                 resultSet.getInt("relevance_score"));
     }
 
-    private MapSqlParameterSource parameters(String normalizedQuery) {
+    private MapSqlParameterSource parameters(
+            String normalizedQuery,
+            UUID requesterUniversityId) {
         String compactQuery = normalizer.compact(normalizedQuery);
         return new MapSqlParameterSource()
+                .addValue("requesterUniversityId", requesterUniversityId)
                 .addValue("exactQuery", normalizedQuery)
                 .addValue("compactExactQuery", compactQuery)
                 .addValue("tokensText", normalizedQuery)

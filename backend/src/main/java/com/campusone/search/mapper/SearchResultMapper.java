@@ -49,6 +49,7 @@ public class SearchResultMapper {
             case DISCUSSION -> "/discussions/questions/" + id;
             case EVENT -> "/events/" + id;
             case INTERNSHIP -> "/internships/" + id;
+            case LOST_FOUND -> "/lost-found/" + id;
         };
     }
 

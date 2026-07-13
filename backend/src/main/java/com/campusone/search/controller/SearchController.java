@@ -6,6 +6,7 @@ import com.campusone.search.dto.response.GlobalSearchResponse;
 import com.campusone.search.dto.response.SearchSuggestionResponse;
 import com.campusone.search.dto.response.SearchTypeResponse;
 import com.campusone.search.service.GlobalSearchService;
+import com.campusone.security.CampusOneUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,6 +18,7 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.Set;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,13 +56,15 @@ public class SearchController {
             Set<SearchType> types,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size,
-            @RequestParam(defaultValue = "RELEVANCE") SearchSort sort) {
+            @RequestParam(defaultValue = "RELEVANCE") SearchSort sort,
+            @AuthenticationPrincipal CampusOneUserPrincipal principal) {
         return ResponseEntity.ok(searchService.search(
                 query,
                 types,
                 page,
                 size,
-                sort));
+                sort,
+                principal == null ? null : principal.getUserId()));
     }
 
     @GetMapping("/suggestions")
@@ -74,10 +78,12 @@ public class SearchController {
                     message = "must contain at least 2 characters after trimming")
             String query,
             @RequestParam(defaultValue = "5") @Min(1) @Max(10)
-            int limit) {
+            int limit,
+            @AuthenticationPrincipal CampusOneUserPrincipal principal) {
         return ResponseEntity.ok(searchService.suggestions(
                 query,
-                limit));
+                limit,
+                principal == null ? null : principal.getUserId()));
     }
 
     @GetMapping("/types")

@@ -56,6 +56,7 @@ class JdbcGlobalSearchRepositoryTest {
         searchRepository.search(
                 "java",
                 Set.of(SearchType.NOTE),
+                null,
                 0,
                 10,
                 SearchSort.RELEVANCE);
@@ -80,7 +81,9 @@ class JdbcGlobalSearchRepositoryTest {
                         "event.visibility = 'PUBLIC'",
                         "event.status IN ('UPCOMING', 'CANCELLED', 'COMPLETED')",
                         "internship.status IN ('OPEN', 'CLOSED', 'EXPIRED')",
-                        "internship.deleted = FALSE");
+                        "internship.deleted = FALSE",
+                        "item.status = 'PUBLISHED'",
+                        "item.university_id = :requesterUniversityId");
     }
 
     @Test
@@ -100,6 +103,7 @@ class JdbcGlobalSearchRepositoryTest {
         searchRepository.search(
                 "java_100%",
                 Set.of(SearchType.NOTE, SearchType.EVENT),
+                null,
                 5,
                 5,
                 SearchSort.NEWEST);
@@ -131,6 +135,8 @@ class JdbcGlobalSearchRepositoryTest {
                 .containsExactlyInAnyOrder("NOTE", "EVENT");
         assertThat(parameters.getValue().getValue("offset"))
                 .isEqualTo(5L);
+        assertThat(parameters.getValue().getValue("requesterUniversityId"))
+                .isNull();
     }
 
     @Test
@@ -150,6 +156,7 @@ class JdbcGlobalSearchRepositoryTest {
         searchRepository.search(
                 "machine learning",
                 Set.of(SearchType.NOTE, SearchType.MARKETPLACE),
+                null,
                 0,
                 10,
                 SearchSort.RELEVANCE);
@@ -195,6 +202,7 @@ class JdbcGlobalSearchRepositoryTest {
         searchRepository.search(
                 "machine learning",
                 Set.of(SearchType.NOTE),
+                null,
                 0,
                 10,
                 SearchSort.RELEVANCE);
@@ -240,7 +248,7 @@ class JdbcGlobalSearchRepositoryTest {
                 eq(String.class)))
                 .thenReturn(List.of("Systems Limited"));
 
-        var suggestions = searchRepository.findSuggestions("systems", 5);
+        var suggestions = searchRepository.findSuggestions("systems", null, 5);
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate).queryForList(

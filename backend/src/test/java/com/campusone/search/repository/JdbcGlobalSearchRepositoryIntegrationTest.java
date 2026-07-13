@@ -168,6 +168,7 @@ class JdbcGlobalSearchRepositoryIntegrationTest {
         return searchRepository.search(
                 normalize(query),
                 Set.of(SearchType.NOTE),
+                null,
                 0,
                 10,
                 SearchSort.RELEVANCE);
