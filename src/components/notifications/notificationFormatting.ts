@@ -14,6 +14,7 @@ export const notificationTypeOptions: Array<{
   { label: "Event reminders", value: "EVENT_REMINDER" },
   { label: "Internships", value: "INTERNSHIP_POSTED" },
   { label: "Note activity", value: "NOTE_ACTIVITY" },
+  { label: "Lost & Found", value: "LOST_FOUND_UPDATE" },
   { label: "Admin messages", value: "ADMIN_MESSAGE" },
 ];
 
