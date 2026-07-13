@@ -1,0 +1,60 @@
+# CampusOne Test Plan
+
+## Standard Quality Gates
+
+Backend:
+
+```bash
+cd backend
+mvn clean verify
+```
+
+Frontend:
+
+```bash
+npm run lint
+npm run build
+```
+
+## Lost & Found Automated Coverage
+
+Focused backend tests added:
+
+- `LostFoundServiceTest`
+  - item creation derives reporter/university and starts as pending review;
+  - item type cannot be changed after creation;
+  - pending claim creation keeps a found item published;
+  - claim approval moves a found item to claim-in-progress.
+- `LostFoundMatchingServiceTest`
+  - strong matches create explainable suggested matches;
+  - weak matches do not create rows;
+  - rejected matches are not overwritten by recalculation.
+- `ContentApprovalServiceTest`
+  - Lost & Found approval uses moderator authorization;
+  - existing note approval remains admin-gated.
+
+## Manual Lost & Found Regression Checklist
+
+Run these in a local or staging environment with authentication and R2 configured:
+
+1. Student submits a lost item with no image.
+2. Student submits a found item with up to three JPG/PNG/WebP images.
+3. Submitted items appear in "My submissions" as pending.
+4. Pending items do not appear in public browse.
+5. Moderator/admin approves an item from the existing moderation queue.
+6. Approved item appears in same-university browse.
+7. Other-university users cannot view or claim the item.
+8. User submits a private claim against a found item.
+9. Reporter approves/rejects the claim.
+10. Claimant and reporter handover confirmations resolve the found item.
+11. Suggested matches appear for involved owners after approval.
+12. Involved users can confirm or reject a suggested match.
+13. Owner can close, archive, reopen, renew, resolve, or delete only where allowed.
+14. Content report flow accepts visible Lost & Found items and rejects inaccessible UUIDs.
+15. Notification links open the correct Lost & Found routes.
+
+## Verification Boundaries
+
+- Do not claim production verification unless the deployed Render/Vercel services were actually tested.
+- Do not claim R2 upload verification unless a real configured R2 environment was used.
+- Docker-dependent Testcontainers tests may be skipped locally when Docker is unavailable.
