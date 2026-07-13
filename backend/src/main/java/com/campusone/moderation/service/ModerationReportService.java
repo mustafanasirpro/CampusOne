@@ -2,6 +2,8 @@ package com.campusone.moderation.service;
 
 import com.campusone.common.exception.ResourceNotFoundException;
 import com.campusone.common.service.CommunityIntegrationService;
+import com.campusone.lostfound.entity.LostFoundItem;
+import com.campusone.lostfound.repository.LostFoundItemRepository;
 import com.campusone.moderation.dto.request.CreateReportRequest;
 import com.campusone.moderation.dto.response.ContentReportDetailResponse;
 import com.campusone.moderation.dto.response.ContentReportPageResponse;
@@ -36,6 +38,7 @@ public class ModerationReportService {
     private final ContentReportRepository reportRepository;
     private final UserRepository userRepository;
     private final ModeratorRepository moderatorRepository;
+    private final LostFoundItemRepository lostFoundItemRepository;
     private final ModerationMapper moderationMapper;
     private final CommunityIntegrationService integrationService;
 
@@ -43,11 +46,13 @@ public class ModerationReportService {
             ContentReportRepository reportRepository,
             UserRepository userRepository,
             ModeratorRepository moderatorRepository,
+            LostFoundItemRepository lostFoundItemRepository,
             ModerationMapper moderationMapper,
             CommunityIntegrationService integrationService) {
         this.reportRepository = reportRepository;
         this.userRepository = userRepository;
         this.moderatorRepository = moderatorRepository;
+        this.lostFoundItemRepository = lostFoundItemRepository;
         this.moderationMapper = moderationMapper;
         this.integrationService = integrationService;
     }
@@ -67,6 +72,7 @@ public class ModerationReportService {
 
         User reporter = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User"));
+        validateLostFoundTargetIfNeeded(reporter, request);
         ContentReport report = new ContentReport(
                 reporter,
                 request.targetType(),
@@ -82,6 +88,25 @@ public class ModerationReportService {
             return moderationMapper.toReportDetail(savedReport);
         } catch (DataIntegrityViolationException exception) {
             throw new DuplicateActiveReportException();
+        }
+    }
+
+    private void validateLostFoundTargetIfNeeded(
+            User reporter,
+            CreateReportRequest request) {
+        if (request.targetType() != ModerationTargetType.LOST_FOUND_ITEM) {
+            return;
+        }
+        LostFoundItem item = lostFoundItemRepository
+                .findDetailedById(request.targetId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Lost and found item"));
+        var reporterProfile = reporter.getStudentProfile();
+        if (reporterProfile == null
+                || reporterProfile.getUniversity() == null
+                || !item.isSameUniversity(reporterProfile.getUniversity().getId())
+                || !item.isPubliclyVisibleAt(java.time.Instant.now())) {
+            throw new ResourceNotFoundException("Lost and found item");
         }
     }
 
