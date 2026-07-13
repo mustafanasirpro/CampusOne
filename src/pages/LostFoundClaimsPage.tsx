@@ -181,38 +181,52 @@ export function LostFoundClaimsPage() {
                     <div className="flex flex-wrap gap-2">
                       {claim.status === "APPROVED" ? (
                         <>
-                          <Button
-                            loading={
-                              actingId === `confirm-claimant-${claim.id}`
-                            }
-                            onClick={() =>
-                              void updateClaim(
-                                claim.id,
-                                "confirm-claimant",
-                              )
-                            }
-                            size="sm"
-                            variant="outline"
-                          >
-                            <CheckCircle2 className="size-4" />
-                            Confirm as claimant
-                          </Button>
-                          <Button
-                            loading={
-                              actingId === `confirm-reporter-${claim.id}`
-                            }
-                            onClick={() =>
-                              void updateClaim(
-                                claim.id,
-                                "confirm-reporter",
-                              )
-                            }
-                            size="sm"
-                            variant="outline"
-                          >
-                            <CheckCircle2 className="size-4" />
-                            Confirm as reporter
-                          </Button>
+                          {claim.claimantIsCurrentUser ? (
+                            <Button
+                              disabled={
+                                claim.claimantHandoverConfirmedAt !== null
+                              }
+                              loading={
+                                actingId === `confirm-claimant-${claim.id}`
+                              }
+                              onClick={() =>
+                                void updateClaim(
+                                  claim.id,
+                                  "confirm-claimant",
+                                )
+                              }
+                              size="sm"
+                              variant="outline"
+                            >
+                              <CheckCircle2 className="size-4" />
+                              {claim.claimantHandoverConfirmedAt
+                                ? "Claimant confirmed"
+                                : "Confirm handover"}
+                            </Button>
+                          ) : null}
+                          {claim.reporterIsCurrentUser ? (
+                            <Button
+                              disabled={
+                                claim.reporterHandoverConfirmedAt !== null
+                              }
+                              loading={
+                                actingId === `confirm-reporter-${claim.id}`
+                              }
+                              onClick={() =>
+                                void updateClaim(
+                                  claim.id,
+                                  "confirm-reporter",
+                                )
+                              }
+                              size="sm"
+                              variant="outline"
+                            >
+                              <CheckCircle2 className="size-4" />
+                              {claim.reporterHandoverConfirmedAt
+                                ? "Reporter confirmed"
+                                : "Confirm handover"}
+                            </Button>
+                          ) : null}
                         </>
                       ) : null}
                       {claim.status === "PENDING" ||

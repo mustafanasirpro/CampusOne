@@ -9,6 +9,7 @@ import type {
   LostFoundListParameters,
   LostFoundMatch,
   LostFoundMatchPage,
+  LostFoundStats,
   UpdateLostFoundItemRequest,
 } from "@/types/lostFound";
 
@@ -262,6 +263,10 @@ export function rejectLostFoundMatch(matchId: string) {
   return apiRequest<LostFoundMatch>(`${basePath}/matches/${matchId}/reject`, {
     method: "PATCH",
   });
+}
+
+export function getLostFoundStats(signal?: AbortSignal) {
+  return apiRequest<LostFoundStats>(`${basePath}/admin/stats`, { signal });
 }
 
 export const lostFoundCategories: LostFoundCategory[] = [

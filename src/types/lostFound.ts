@@ -114,6 +114,7 @@ export interface LostFoundClaim {
   claimant: LostFoundReporter;
   createdAt: string;
   claimantHandoverConfirmedAt: string | null;
+  claimantIsCurrentUser: boolean;
   handoverCompletedAt: string | null;
   handoverNote: string | null;
   id: string;
@@ -121,6 +122,7 @@ export interface LostFoundClaim {
   itemTitle: string;
   proofText: string | null;
   reporterHandoverConfirmedAt: string | null;
+  reporterIsCurrentUser: boolean;
   reviewedAt: string | null;
   reviewerNote: string | null;
   status: LostFoundClaimStatus;
@@ -155,4 +157,8 @@ export interface LostFoundMatchPage {
   size: number;
   totalElements: number;
   totalPages: number;
+}
+
+export interface LostFoundStats {
+  statusCounts: Record<string, number>;
 }
