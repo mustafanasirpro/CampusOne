@@ -2,6 +2,7 @@ package com.campusone.moderation.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -10,7 +11,11 @@ import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.discussion.repository.DiscussionQuestionRepository;
 import com.campusone.event.repository.CampusEventRepository;
 import com.campusone.internship.repository.InternshipRepository;
+import com.campusone.lostfound.repository.LostFoundItemRepository;
+import com.campusone.lostfound.service.LostFoundService;
 import com.campusone.marketplace.repository.MarketplaceListingRepository;
+import com.campusone.moderation.dto.response.PendingApprovalItemResponse;
+import com.campusone.moderation.dto.response.ReporterSummaryResponse;
 import com.campusone.moderation.entity.ModerationTargetType;
 import com.campusone.moderation.repository.ModerationActionRepository;
 import com.campusone.note.entity.Note;
@@ -58,6 +63,9 @@ class ContentApprovalServiceTest {
     private InternshipRepository internshipRepository;
 
     @Mock
+    private LostFoundItemRepository lostFoundItemRepository;
+
+    @Mock
     private ModerationActionRepository actionRepository;
 
     @Mock
@@ -67,7 +75,13 @@ class ContentApprovalServiceTest {
     private NoteAdminAuthorizationService adminAuthorizationService;
 
     @Mock
+    private ModeratorAuthorizationService moderatorAuthorizationService;
+
+    @Mock
     private CommunityIntegrationService integrationService;
+
+    @Mock
+    private LostFoundService lostFoundService;
 
     @Mock
     private Note note;
@@ -86,10 +100,13 @@ class ContentApprovalServiceTest {
                 eventRepository,
                 questionRepository,
                 internshipRepository,
+                lostFoundItemRepository,
                 actionRepository,
                 userRepository,
                 adminAuthorizationService,
+                moderatorAuthorizationService,
                 integrationService,
+                lostFoundService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -116,6 +133,40 @@ class ContentApprovalServiceTest {
                 ModerationTargetType.NOTE,
                 NOTE_ID,
                 "OOP Notes",
+                true);
+    }
+
+    @Test
+    void approveLostFoundItem_usesModeratorAuthorizationWithoutBroadeningNoteAdminRules() {
+        when(userRepository.findById(ADMIN_ID)).thenReturn(Optional.of(admin));
+        PendingApprovalItemResponse approvalItem =
+                new PendingApprovalItemResponse(
+                        NOTE_ID,
+                        ModerationTargetType.LOST_FOUND_ITEM,
+                        "Blue umbrella",
+                        "Found near the library.",
+                        new ReporterSummaryResponse(SUBMITTER_ID, null),
+                        NOW,
+                        "PUBLISHED",
+                        null,
+                        "/lost-found/" + NOTE_ID);
+        when(lostFoundService.approveItem(admin, NOTE_ID))
+                .thenReturn(approvalItem);
+
+        contentApprovalService.approve(
+                ADMIN_ID,
+                ModerationTargetType.LOST_FOUND_ITEM,
+                NOTE_ID);
+
+        verify(moderatorAuthorizationService).requireActiveModerator(ADMIN_ID);
+        verify(adminAuthorizationService, never()).requireAdmin(any(), any());
+        verify(lostFoundService).approveItem(admin, NOTE_ID);
+        verify(integrationService).contentApprovalReviewed(
+                SUBMITTER_ID,
+                ADMIN_ID,
+                ModerationTargetType.LOST_FOUND_ITEM,
+                NOTE_ID,
+                "Blue umbrella",
                 true);
     }
 

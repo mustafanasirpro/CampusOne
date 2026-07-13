@@ -19,6 +19,7 @@ import com.campusone.moderation.exception.DuplicateActiveReportException;
 import com.campusone.moderation.mapper.ModerationMapper;
 import com.campusone.moderation.repository.ContentReportRepository;
 import com.campusone.moderation.repository.ModeratorRepository;
+import com.campusone.lostfound.repository.LostFoundItemRepository;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.time.Instant;
@@ -59,6 +60,9 @@ class ModerationReportServiceTest {
     private ModeratorRepository moderatorRepository;
 
     @Mock
+    private LostFoundItemRepository lostFoundItemRepository;
+
+    @Mock
     private CommunityIntegrationService integrationService;
 
     private ModerationReportService service;
@@ -73,6 +77,7 @@ class ModerationReportServiceTest {
                 reportRepository,
                 userRepository,
                 moderatorRepository,
+                lostFoundItemRepository,
                 new ModerationMapper(),
                 integrationService);
     }
