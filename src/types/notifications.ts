@@ -8,6 +8,7 @@ export type NotificationType =
   | "EVENT_REMINDER"
   | "INTERNSHIP_POSTED"
   | "NOTE_ACTIVITY"
+  | "LOST_FOUND_UPDATE"
   | "ADMIN_MESSAGE";
 
 export type NotificationTargetType =
@@ -18,7 +19,10 @@ export type NotificationTargetType =
   | "DISCUSSION_QUESTION"
   | "DISCUSSION_ANSWER"
   | "EVENT"
-  | "INTERNSHIP";
+  | "INTERNSHIP"
+  | "LOST_FOUND_ITEM"
+  | "LOST_FOUND_CLAIM"
+  | "LOST_FOUND_MATCH";
 
 export type NotificationSort = "NEWEST" | "OLDEST";
 
@@ -63,4 +67,3 @@ export interface NotificationListParameters {
   type?: NotificationType;
   unreadOnly?: boolean;
 }
-

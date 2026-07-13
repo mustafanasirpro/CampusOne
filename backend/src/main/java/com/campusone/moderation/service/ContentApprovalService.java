@@ -14,6 +14,9 @@ import com.campusone.common.service.CommunityIntegrationService;
 import com.campusone.marketplace.entity.MarketplaceListing;
 import com.campusone.marketplace.entity.MarketplaceListingStatus;
 import com.campusone.marketplace.repository.MarketplaceListingRepository;
+import com.campusone.lostfound.entity.LostFoundItemStatus;
+import com.campusone.lostfound.repository.LostFoundItemRepository;
+import com.campusone.lostfound.service.LostFoundService;
 import com.campusone.moderation.dto.response.PendingApprovalItemResponse;
 import com.campusone.moderation.dto.response.PendingApprovalPageResponse;
 import com.campusone.moderation.dto.response.ReporterSummaryResponse;
@@ -51,10 +54,13 @@ public class ContentApprovalService {
     private final CampusEventRepository eventRepository;
     private final DiscussionQuestionRepository questionRepository;
     private final InternshipRepository internshipRepository;
+    private final LostFoundItemRepository lostFoundItemRepository;
     private final ModerationActionRepository actionRepository;
     private final UserRepository userRepository;
     private final NoteAdminAuthorizationService adminAuthorizationService;
+    private final ModeratorAuthorizationService moderatorAuthorizationService;
     private final CommunityIntegrationService integrationService;
+    private final LostFoundService lostFoundService;
     private final Clock clock;
 
     public ContentApprovalService(
@@ -63,20 +69,26 @@ public class ContentApprovalService {
             CampusEventRepository eventRepository,
             DiscussionQuestionRepository questionRepository,
             InternshipRepository internshipRepository,
+            LostFoundItemRepository lostFoundItemRepository,
             ModerationActionRepository actionRepository,
             UserRepository userRepository,
             NoteAdminAuthorizationService adminAuthorizationService,
+            ModeratorAuthorizationService moderatorAuthorizationService,
             CommunityIntegrationService integrationService,
+            LostFoundService lostFoundService,
             Clock clock) {
         this.noteRepository = noteRepository;
         this.listingRepository = listingRepository;
         this.eventRepository = eventRepository;
         this.questionRepository = questionRepository;
         this.internshipRepository = internshipRepository;
+        this.lostFoundItemRepository = lostFoundItemRepository;
         this.actionRepository = actionRepository;
         this.userRepository = userRepository;
         this.adminAuthorizationService = adminAuthorizationService;
+        this.moderatorAuthorizationService = moderatorAuthorizationService;
         this.integrationService = integrationService;
+        this.lostFoundService = lostFoundService;
         this.clock = clock;
     }
 
@@ -107,13 +119,14 @@ public class ContentApprovalService {
             UUID adminUserId,
             ModerationTargetType targetType,
             UUID targetId) {
-        User admin = requireAdmin(adminUserId);
+        User admin = requireApprover(adminUserId, targetType);
         PendingApprovalItemResponse response = switch (targetType) {
             case NOTE -> approveNote(admin, targetId);
             case MARKETPLACE_LISTING -> approveListing(targetId);
             case EVENT -> approveEvent(targetId);
             case DISCUSSION_QUESTION -> approveQuestion(targetId);
             case INTERNSHIP -> approveInternship(targetId);
+            case LOST_FOUND_ITEM -> lostFoundService.approveItem(admin, targetId);
             default -> throw unsupportedTarget();
         };
         recordAction(
@@ -138,7 +151,7 @@ public class ContentApprovalService {
             ModerationTargetType targetType,
             UUID targetId,
             String reason) {
-        User admin = requireAdmin(adminUserId);
+        User admin = requireApprover(adminUserId, targetType);
         String normalizedReason = normalizeReason(reason);
         PendingApprovalItemResponse response = switch (targetType) {
             case NOTE -> rejectNote(admin, targetId, normalizedReason);
@@ -146,6 +159,10 @@ public class ContentApprovalService {
             case EVENT -> rejectEvent(targetId, normalizedReason);
             case DISCUSSION_QUESTION -> rejectQuestion(targetId, normalizedReason);
             case INTERNSHIP -> rejectInternship(targetId, normalizedReason);
+            case LOST_FOUND_ITEM -> lostFoundService.rejectItem(
+                    admin,
+                    targetId,
+                    normalizedReason);
             default -> throw unsupportedTarget();
         };
         recordAction(
@@ -198,7 +215,13 @@ public class ContentApprovalService {
                                                 fetchPage)
                                         .getContent()
                                         .stream()
-                                        .map(this::toPendingItem))
+                                        .map(this::toPendingItem),
+                                lostFoundItemRepository.findAllByStatusAndDeletedAtIsNull(
+                                                LostFoundItemStatus.PENDING_REVIEW,
+                                                fetchPage)
+                                        .getContent()
+                                        .stream()
+                                        .map(lostFoundService::toPendingApprovalItem))
                         .flatMap(stream -> stream)
                         .sorted(Comparator
                                 .comparing(
@@ -239,6 +262,11 @@ public class ContentApprovalService {
                             InternshipStatus.PENDING_REVIEW,
                             pageRequest)
                     .map(this::toPendingItem);
+            case LOST_FOUND_ITEM -> lostFoundItemRepository
+                    .findAllByStatusAndDeletedAtIsNull(
+                            LostFoundItemStatus.PENDING_REVIEW,
+                            pageRequest)
+                    .map(lostFoundService::toPendingApprovalItem);
             default -> throw unsupportedTarget();
         };
     }
@@ -437,6 +465,17 @@ public class ContentApprovalService {
                 .orElseThrow(() -> new ResourceNotFoundException("User"));
         adminAuthorizationService.requireAdmin(admin.getId(), admin.getEmail());
         return admin;
+    }
+
+    private User requireApprover(
+            UUID userId,
+            ModerationTargetType targetType) {
+        if (targetType == ModerationTargetType.LOST_FOUND_ITEM) {
+            moderatorAuthorizationService.requireActiveModerator(userId);
+            return userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User"));
+        }
+        return requireAdmin(userId);
     }
 
     private void recordAction(

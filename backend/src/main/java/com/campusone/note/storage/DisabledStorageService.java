@@ -17,6 +17,11 @@ public class DisabledStorageService implements StorageService {
     }
 
     @Override
+    public StoredObject uploadLostFoundImage(UUID ownerId, ValidatedNoteFile file) {
+        throw new StorageNotConfiguredException();
+    }
+
+    @Override
     public String createDownloadUrl(FileAsset fileAsset) {
         throw new StorageNotConfiguredException();
     }

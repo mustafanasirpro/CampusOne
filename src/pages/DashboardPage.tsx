@@ -5,6 +5,7 @@ import {
   CalendarDays,
   FilePlus2,
   FileText,
+  MapPin,
   MessageSquarePlus,
   MessageSquareText,
   Search,
@@ -51,6 +52,13 @@ const workspaceCards = [
     label: "Marketplace",
     path: paths.marketplace,
     tone: "bg-violet-50 text-violet-700",
+  },
+  {
+    description: "Report lost or found items and review safe matches.",
+    icon: MapPin,
+    label: "Lost & Found",
+    path: paths.lostFound,
+    tone: "bg-teal-50 text-teal-700",
   },
   {
     description: "Find campus activities, organize events, and join in.",
@@ -109,6 +117,12 @@ const quickActions = [
     icon: FilePlus2,
     label: "Upload a note",
     path: paths.noteNew,
+  },
+  {
+    adminOnly: false,
+    icon: MapPin,
+    label: "Submit Lost & Found item",
+    path: paths.lostFoundNew,
   },
   {
     adminOnly: false,

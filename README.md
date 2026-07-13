@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**A modern campus community platform for notes, discussions, events, internships, marketplace listings, notifications, gamification, and study support.**
+**A modern campus community platform for notes, lost-and-found reports, discussions, events, internships, marketplace listings, notifications, gamification, and study support.**
 
 Built as a full-stack production-style application with a React/Vite frontend,
 a Spring Boot backend, PostgreSQL persistence, Cloudflare R2 object storage,
@@ -26,6 +26,7 @@ Resend password recovery email, and OpenAPI documentation.
 CampusOne brings core student workflows into one cohesive product:
 
 - discover and submit study notes and past papers;
+- report and recover lost or found campus items through moderated, privacy-safe flows;
 - ask questions, answer discussions, and follow campus activity;
 - browse marketplace listings, internships, and events;
 - receive notifications and track gamification progress;
@@ -59,6 +60,7 @@ such as `/reset-password?token=...` to the React app.
 - Student dashboard with responsive navigation
 - Profile, settings, preferences, skills, and activity surfaces
 - Notes and past papers with PDF upload, search, bookmarks, ratings, and downloads
+- Lost & Found reports with image upload, moderation approval, private claims, and suggested matches
 - Marketplace listings with image upload support
 - Discussions and Q&A with voting, answers, and accepted answers
 - Events with capacity and participation flows
@@ -90,6 +92,7 @@ such as `/reset-password?token=...` to the React app.
 | Academic core | Universities, departments, courses, reference data |
 | Profiles | Current user, public profile, skills, preferences, visibility |
 | Notes | PDF submissions, approval, search, filters, ratings, bookmarks, downloads |
+| Lost & Found | Same-university reports, moderation approval, images, private claims, handover, deterministic matching |
 | Marketplace | Listings, image metadata, filters, ownership, soft deletion |
 | Discussions | Questions, answers, votes, accepted answers, pagination |
 | Events | Creation, editing, participation, capacity, visibility |
@@ -341,6 +344,7 @@ Production password reset email uses Resend over HTTPS. Do not use
 | `MAX_UPLOAD_SIZE_MB` | No | Maximum PDF upload size; defaults to `25` |
 | `MARKETPLACE_MAX_IMAGES_PER_LISTING` | No | Defaults to `5` |
 | `MARKETPLACE_MAX_IMAGE_SIZE_MB` | No | Defaults to `5` |
+| `APP_LOST_FOUND_MAX_IMAGE_SIZE_MB` | No | Maximum Lost & Found image size; defaults to `5` |
 | `ADMIN_MAX_UPLOADS_PER_DAY` | No | Defaults to `200` |
 | `ADMIN_MAX_STORAGE_MB_PER_MONTH` | No | Defaults to `5000` |
 | `GLOBAL_UPLOAD_STORAGE_CAP_MB` | No | Defaults to `8192` |

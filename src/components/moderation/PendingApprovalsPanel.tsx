@@ -36,6 +36,7 @@ const approvalTargetOptions = moderationTargetOptions.filter((option) =>
     "EVENT",
     "DISCUSSION_QUESTION",
     "INTERNSHIP",
+    "LOST_FOUND_ITEM",
   ].includes(option.value),
 );
 

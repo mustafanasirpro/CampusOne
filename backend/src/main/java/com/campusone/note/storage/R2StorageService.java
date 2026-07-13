@@ -58,6 +58,16 @@ public class R2StorageService implements StorageService {
         return uploadObject(objectKey, file);
     }
 
+    @Override
+    public StoredObject uploadLostFoundImage(UUID ownerId, ValidatedNoteFile file) {
+        String objectKey = objectKey(
+                "lost-found",
+                ownerId,
+                file.originalFilename(),
+                "image");
+        return uploadObject(objectKey, file);
+    }
+
     private StoredObject uploadObject(String objectKey, ValidatedNoteFile file) {
         String bucket = properties.getR2().getBucket();
         PutObjectRequest request = PutObjectRequest.builder()

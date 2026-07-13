@@ -21,6 +21,11 @@ export const paths = {
   marketplaceDetail: (listingId: string) => `/marketplace/${listingId}`,
   marketplaceEdit: (listingId: string) =>
     `/marketplace/${listingId}/edit`,
+  lostFound: "/lost-found",
+  lostFoundNew: "/lost-found/new",
+  lostFoundClaims: "/lost-found/claims",
+  lostFoundDetail: (itemId: string) => `/lost-found/${itemId}`,
+  lostFoundEdit: (itemId: string) => `/lost-found/${itemId}/edit`,
   internships: "/internships",
   internshipNew: "/internships/new",
   internshipDetail: (internshipId: string) =>

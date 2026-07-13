@@ -7,6 +7,9 @@ import com.campusone.academic.repository.CourseRepository;
 import com.campusone.academic.repository.UniversityRepository;
 import com.campusone.auth.repository.PasswordResetTokenRepository;
 import com.campusone.auth.repository.RefreshTokenRepository;
+import com.campusone.lostfound.repository.LostFoundClaimRepository;
+import com.campusone.lostfound.repository.LostFoundItemRepository;
+import com.campusone.lostfound.repository.LostFoundMatchRepository;
 import com.campusone.note.repository.FileAssetRepository;
 import com.campusone.note.repository.NoteBookmarkRepository;
 import com.campusone.note.repository.NoteDownloadEventRepository;
@@ -84,6 +87,15 @@ class SecurityApplicationContextTest {
 
     @MockitoBean
     private UploadQuotaRepository uploadQuotaRepository;
+
+    @MockitoBean
+    private LostFoundItemRepository lostFoundItemRepository;
+
+    @MockitoBean
+    private LostFoundClaimRepository lostFoundClaimRepository;
+
+    @MockitoBean
+    private LostFoundMatchRepository lostFoundMatchRepository;
 
     @Autowired
     private SecurityConfig securityConfig;

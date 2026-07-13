@@ -16,6 +16,7 @@ export const moderationTargetOptions: Array<{
   { label: "Discussion answer", value: "DISCUSSION_ANSWER" },
   { label: "Event", value: "EVENT" },
   { label: "Internship", value: "INTERNSHIP" },
+  { label: "Lost & Found item", value: "LOST_FOUND_ITEM" },
   { label: "AI generated item", value: "AI_GENERATED_ITEM" },
   { label: "User profile", value: "USER_PROFILE" },
   { label: "System", value: "SYSTEM" },

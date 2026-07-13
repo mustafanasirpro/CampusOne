@@ -1,0 +1,74 @@
+# CampusOne API Documentation
+
+This file summarizes project-specific API notes that complement Swagger/OpenAPI.
+The generated OpenAPI document remains the source of truth when the backend is running.
+
+## Lost & Found API
+
+Base path:
+
+```text
+/api/v1/lost-found
+```
+
+All Lost & Found endpoints require authentication.
+
+### Items
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/items` | Browse same-university, published, non-expired items with filters and pagination. |
+| `POST` | `/items` | Submit a lost/found item as multipart form data with JSON `item` and optional image parts. |
+| `GET` | `/items/my` | List the current user's own submissions across statuses. |
+| `GET` | `/items/{itemId}` | Get contextual item detail with owner/public privacy rules. |
+| `PATCH` | `/items/{itemId}` | Edit an owned item; material edits resubmit for review. |
+| `DELETE` | `/items/{itemId}` | Soft-delete an owned item when no approved claim is active. |
+| `PATCH` | `/items/{itemId}/close` | Close an owned published item. |
+| `PATCH` | `/items/{itemId}/archive` | Archive an owned published or closed item. |
+| `PATCH` | `/items/{itemId}/renew` | Renew/resubmit an owned eligible item for review. |
+| `PATCH` | `/items/{itemId}/reopen` | Reopen a closed item or resubmit it for review when needed. |
+| `PATCH` | `/items/{itemId}/resolve` | Mark an owned published lost report as recovered. |
+
+### Claims
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/items/{itemId}/claims` | Submit private proof for a claim against a found item. |
+| `GET` | `/items/{itemId}/claims` | List claims for an owned item or authorized admin/moderator. |
+| `GET` | `/claims/my` | List claims related to the current user. |
+| `PATCH` | `/claims/{claimId}/approve` | Reporter/admin approves a pending claim. |
+| `PATCH` | `/claims/{claimId}/reject` | Reporter/admin rejects a pending claim. |
+| `PATCH` | `/claims/{claimId}/cancel` | Claimant cancels a pending claim, or involved users cancel eligible approved claims. |
+| `PATCH` | `/claims/{claimId}/handover/claimant` | Claimant confirms handover. |
+| `PATCH` | `/claims/{claimId}/handover/reporter` | Reporter/admin confirms handover. |
+| `PATCH` | `/claims/{claimId}/complete` | Reporter/admin completes an approved handover directly when appropriate. |
+
+### Matches
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/matches/my` | List suggested matches involving the current user. |
+| `GET` | `/items/{itemId}/matches` | List suggested matches for an owned item. |
+| `PATCH` | `/matches/{matchId}/confirm` | Involved user confirms a suggested match. |
+| `PATCH` | `/matches/{matchId}/reject` | Involved user rejects a suggested match. |
+
+### Admin/statistics
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/admin/stats` | Return aggregate Lost & Found counts for authorized admins. |
+
+Lost & Found item approval/rejection uses the existing admin moderation endpoints:
+
+```text
+GET   /api/v1/admin/moderation/pending?targetType=LOST_FOUND_ITEM
+PATCH /api/v1/admin/moderation/LOST_FOUND_ITEM/{targetId}/approve
+PATCH /api/v1/admin/moderation/LOST_FOUND_ITEM/{targetId}/reject
+```
+
+## Privacy Notes
+
+- Public item DTOs do not include reporter email, phone, credentials, claim proof, or reviewer notes.
+- Owner and claim DTOs expose private proof only to involved users.
+- Same-university isolation is enforced server-side.
+- Lost & Found is intentionally not exposed through public unauthenticated global search.
