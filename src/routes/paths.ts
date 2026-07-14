@@ -41,5 +41,6 @@ export const paths = {
   leaderboard: "/leaderboard",
   assistant: "/ai",
   admin: "/admin",
+  adminAura: "/admin/aura",
   settings: "/settings",
 } as const;

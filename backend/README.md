@@ -20,6 +20,8 @@ The backend is a modular Spring Boot API for CampusOne:
 - Public and private student profile visibility
 - Notes with real R2-backed PDF upload and tracked downloads
 - Lost & Found reports with R2-backed images, moderation, private claims, and deterministic matching
+- AURA timetable generation with normalized setup data, Timefold optimization,
+  timetable versioning, clash detection, and admin publishing
 - Marketplace, discussions, events, internships, and notifications
 - Admin approval queues for user-submitted marketplace listings, events,
   discussion questions, and internships
@@ -35,6 +37,8 @@ The backend is a modular Spring Boot API for CampusOne:
 - Notes, marketplace, discussions, events, and internships
 - Notifications, search, gamification, AI, and moderation
 - S3-compatible note PDF upload/download
+- AURA academic term, room, instructor, section, offering, requirement,
+  generation, clash, and timetable-version APIs
 - Java 21 development environment
 - Maven build and test pipeline
 - JWT configuration validation
@@ -44,6 +48,7 @@ The backend is a modular Spring Boot API for CampusOne:
 
 - Multi-session management
 - Email Verification
+- AURA CSV import/export and richer manual repair workflow
 
 ## Requirements
 

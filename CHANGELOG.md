@@ -14,11 +14,19 @@
   - frontend routes, navigation entry, dashboard card, item forms, browse/detail pages, and claims/matches page.
 - Deterministic Lost & Found matching with a 60-point threshold and explainable JSON reasons.
 - Focused unit tests for Lost & Found service behavior, matching behavior, and moderation authorization boundaries.
+- Native AURA timetable generator:
+  - normalized Flyway schema for academic terms, programs, batches, sections, instructors, rooms, timeslots, offerings, requirements, generation runs, timetable versions, sessions, clashes, suggestions, and manual moves;
+  - admin-only Spring Boot API under `/api/v1/admin/aura`;
+  - Timefold Solver Community Edition integration for in-process timetable generation;
+  - readiness validation, asynchronous generation runs, clash detection, timetable version publishing, and manual move preview/apply support;
+  - frontend admin workbench at `/admin/aura`;
+  - focused tests for readiness, authorization, clash detection, and solver assignment.
 
 ### Changed
 
 - Extended existing moderation, notification, and storage code to recognize Lost & Found targets.
 - Frontend moderation and notification labels now include Lost & Found.
+- Admin navigation now includes the AURA workbench.
 
 ### Notes
 

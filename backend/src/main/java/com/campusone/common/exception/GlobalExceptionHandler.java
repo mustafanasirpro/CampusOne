@@ -1,6 +1,7 @@
 package com.campusone.common.exception;
 
 import com.campusone.common.dto.ErrorResponse;
+import com.campusone.aura.exception.AuraStateException;
 import com.campusone.lostfound.exception.LostFoundConflictException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -175,6 +176,18 @@ public class GlobalExceptionHandler {
         return response(
                 HttpStatus.CONFLICT,
                 "LOST_FOUND_STATE_CONFLICT",
+                exception.getMessage(),
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(AuraStateException.class)
+    ResponseEntity<ErrorResponse> handleAuraState(
+            AuraStateException exception,
+            HttpServletRequest request) {
+        return response(
+                HttpStatus.CONFLICT,
+                "AURA_STATE_CONFLICT",
                 exception.getMessage(),
                 request,
                 Map.of());

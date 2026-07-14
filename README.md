@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**A modern campus community platform for notes, lost-and-found reports, discussions, events, internships, marketplace listings, notifications, gamification, and study support.**
+**A modern campus community platform for notes, lost-and-found reports, timetable planning, discussions, events, internships, marketplace listings, notifications, gamification, and study support.**
 
 Built as a full-stack production-style application with a React/Vite frontend,
 a Spring Boot backend, PostgreSQL persistence, Cloudflare R2 object storage,
@@ -27,6 +27,7 @@ CampusOne brings core student workflows into one cohesive product:
 
 - discover and submit study notes and past papers;
 - report and recover lost or found campus items through moderated, privacy-safe flows;
+- generate and review university timetables through AURA, CampusOne's automated scheduling workbench;
 - ask questions, answer discussions, and follow campus activity;
 - browse marketplace listings, internships, and events;
 - receive notifications and track gamification progress;
@@ -61,6 +62,7 @@ such as `/reset-password?token=...` to the React app.
 - Profile, settings, preferences, skills, and activity surfaces
 - Notes and past papers with PDF upload, search, bookmarks, ratings, and downloads
 - Lost & Found reports with image upload, moderation approval, private claims, and suggested matches
+- AURA timetable generation with setup data, Timefold-powered scheduling, clash detection, version publishing, and admin review
 - Marketplace listings with image upload support
 - Discussions and Q&A with voting, answers, and accepted answers
 - Events with capacity and participation flows
@@ -93,6 +95,7 @@ such as `/reset-password?token=...` to the React app.
 | Profiles | Current user, public profile, skills, preferences, visibility |
 | Notes | PDF submissions, approval, search, filters, ratings, bookmarks, downloads |
 | Lost & Found | Same-university reports, moderation approval, images, private claims, handover, deterministic matching |
+| AURA Timetable Generator | Admin-only setup, readiness checks, Timefold solver runs, timetable versions, clash review, publish workflow |
 | Marketplace | Listings, image metadata, filters, ownership, soft deletion |
 | Discussions | Questions, answers, votes, accepted answers, pagination |
 | Events | Creation, editing, participation, capacity, visibility |
@@ -108,8 +111,9 @@ such as `/reset-password?token=...` to the React app.
 | Layer | Technologies |
 |---|---|
 | Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, React Router, Lucide React |
-| Backend | Java 21, Spring Boot 3.5, Spring Web, Spring Security, Spring Data JPA |
+| Backend | Java 21, Spring Boot 3.5, Spring Web, Spring Security, Spring Data JPA, Spring JDBC |
 | Database | PostgreSQL, Hibernate, Flyway |
+| Optimization | Timefold Solver Community Edition for AURA timetable generation |
 | Authentication | JWT access tokens, opaque refresh tokens, BCrypt |
 | Storage | Cloudflare R2 through AWS SDK for Java v2 |
 | Email | Resend HTTPS API, optional SMTP fallback |

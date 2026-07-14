@@ -175,6 +175,11 @@ const AdminPage = lazy(async () => {
   return { default: module.AdminPage };
 });
 
+const AuraWorkbenchPage = lazy(async () => {
+  const module = await import("@/pages/AuraWorkbenchPage");
+  return { default: module.AuraWorkbenchPage };
+});
+
 const ForgotPasswordPage = lazy(async () => {
   const module = await import("@/pages/ForgotPasswordPage");
   return { default: module.ForgotPasswordPage };
@@ -398,6 +403,10 @@ export const router = createBrowserRouter([
           {
             path: paths.admin,
             element: lazyRoute(<AdminPage />, paths.admin),
+          },
+          {
+            path: paths.adminAura,
+            element: lazyRoute(<AuraWorkbenchPage />, paths.adminAura),
           },
           {
             path: paths.settings,

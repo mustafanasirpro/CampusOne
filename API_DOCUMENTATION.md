@@ -72,3 +72,60 @@ PATCH /api/v1/admin/moderation/LOST_FOUND_ITEM/{targetId}/reject
 - Owner and claim DTOs expose private proof only to involved users.
 - Same-university isolation is enforced server-side.
 - Lost & Found is intentionally not exposed through public unauthenticated global search.
+
+## AURA Timetable API
+
+Base path:
+
+```text
+/api/v1/admin/aura
+```
+
+AURA endpoints are admin-only and use the authenticated admin's university as
+the trusted boundary. Clients do not provide a trusted university ID except
+when creating an academic term, where the backend still verifies admin access.
+
+### Setup data
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/terms` | Create an academic term for timetable planning. |
+| `GET` | `/terms` | List AURA academic terms. |
+| `POST` | `/programs` | Create a program under a university. |
+| `GET` | `/programs` | List programs. |
+| `POST` | `/batches` | Create a batch/cohort. |
+| `GET` | `/batches` | List batches. |
+| `POST` | `/sections` | Create a section. |
+| `GET` | `/sections` | List sections. |
+| `POST` | `/instructors` | Create an instructor profile for scheduling. |
+| `GET` | `/instructors` | List instructors. |
+| `POST` | `/rooms` | Create a room/lab/hall. |
+| `GET` | `/rooms` | List rooms. |
+| `POST` | `/timeslots` | Create a weekly timeslot. |
+| `GET` | `/timeslots` | List timeslots. |
+| `POST` | `/offerings` | Create a course offering for a term. |
+| `GET` | `/terms/{termId}/offerings` | List term offerings. |
+| `POST` | `/meeting-requirements` | Add required weekly sessions for an offering. |
+| `GET` | `/offerings/{offeringId}/meeting-requirements` | List offering requirements. |
+
+### Generation and review
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/terms/{termId}/readiness` | Validate whether a term has enough setup data to generate a timetable. |
+| `POST` | `/terms/{termId}/runs` | Start an asynchronous Timefold timetable generation run. |
+| `GET` | `/runs/{runId}` | Read generation status, score, and result metadata. |
+| `POST` | `/runs/{runId}/cancel` | Cancel a queued or running generation attempt. |
+| `GET` | `/terms/{termId}/versions` | List generated timetable versions for a term. |
+| `GET` | `/versions/{versionId}` | Read one timetable version summary. |
+| `POST` | `/versions/{versionId}/publish` | Publish a generated version and archive any previous published version. |
+| `GET` | `/versions/{versionId}/sessions` | List scheduled sessions for a timetable version. |
+| `GET` | `/versions/{versionId}/clashes` | List detected hard clashes for a timetable version. |
+| `POST` | `/sessions/{sessionId}/move-preview` | Preview a manual room/timeslot move and its resulting clashes. |
+| `PATCH` | `/sessions/{sessionId}/move` | Apply a manual move and refresh clash records. |
+| `GET` | `/terms/{termId}/metrics` | Return aggregate generation/version/clash metrics for admin dashboards. |
+
+AURA stores timetable data in normalized PostgreSQL tables managed by Flyway
+and keeps generated versions immutable apart from publish state and explicit
+manual moves. The solver uses Timefold Solver Community Edition in-process; no
+external scheduling service, queue, or database is required.

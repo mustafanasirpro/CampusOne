@@ -3,6 +3,7 @@ import {
   Bell,
   BriefcaseBusiness,
   CalendarDays,
+  CalendarClock,
   FileText,
   Home,
   MapPin,
@@ -43,5 +44,6 @@ export const primaryNavigation: NavigationItem[] = [
 
 export const secondaryNavigation: NavigationItem[] = [
   { label: "Admin", path: paths.admin, icon: ShieldCheck },
+  { label: "AURA", path: paths.adminAura, icon: CalendarClock },
   { label: "Settings", path: paths.settings, icon: Settings },
 ];

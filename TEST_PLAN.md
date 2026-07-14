@@ -58,3 +58,35 @@ Run these in a local or staging environment with authentication and R2 configure
 - Do not claim production verification unless the deployed Render/Vercel services were actually tested.
 - Do not claim R2 upload verification unless a real configured R2 environment was used.
 - Docker-dependent Testcontainers tests may be skipped locally when Docker is unavailable.
+
+## AURA Automated Coverage
+
+Focused backend tests added:
+
+- `AuraReadinessValidatorTest`
+  - reports missing setup data clearly;
+  - marks a term ready when rooms, timeslots, instructors, offerings, and requirements exist;
+  - warns when required sessions exceed the simple room/timeslot capacity envelope.
+- `AuraClashDetectorTest`
+  - detects room, instructor, and section clashes from persisted session DTOs;
+  - previews manual moves without mutating the original session list.
+- `AuraAuthorizationServiceTest`
+  - requires admin permissions for AURA management;
+  - accepts existing admin-upload authorization fallback.
+- `AuraSolverServiceTest`
+  - verifies the Timefold solver assigns sessions without hard clashes for a small fixture.
+
+## Manual AURA Regression Checklist
+
+Run these in a local or staging environment as an admin:
+
+1. Open `/admin/aura`.
+2. Create an academic term.
+3. Add or seed rooms, timeslots, instructors, sections, offerings, and meeting requirements through the admin API.
+4. Confirm readiness changes from blocked to ready.
+5. Start a generation run and watch it move from queued/running to completed.
+6. Open the generated timetable version and inspect scheduled sessions.
+7. Confirm hard clashes are absent or listed with clear messages.
+8. Publish a generated version and verify only one version is published.
+9. Preview and apply a manual room/timeslot move.
+10. Confirm sessions and clash counts refresh after the move.
