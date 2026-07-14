@@ -20,6 +20,14 @@ public class AuraTimetableSolution {
     @ValueRangeProvider(id = "timeslotRange")
     private List<AuraTimeslotFact> timeslots = new ArrayList<>();
 
+    @ProblemFactCollectionProperty
+    private List<AuraInstructorAvailabilityFact> instructorAvailability =
+            new ArrayList<>();
+
+    @ProblemFactCollectionProperty
+    private List<AuraRoomAvailabilityFact> roomAvailability =
+            new ArrayList<>();
+
     @PlanningEntityCollectionProperty
     private List<AuraPlanningLesson> lessons = new ArrayList<>();
 
@@ -32,9 +40,13 @@ public class AuraTimetableSolution {
     public AuraTimetableSolution(
             List<AuraRoomFact> rooms,
             List<AuraTimeslotFact> timeslots,
+            List<AuraInstructorAvailabilityFact> instructorAvailability,
+            List<AuraRoomAvailabilityFact> roomAvailability,
             List<AuraPlanningLesson> lessons) {
         this.rooms = new ArrayList<>(rooms);
         this.timeslots = new ArrayList<>(timeslots);
+        this.instructorAvailability = new ArrayList<>(instructorAvailability);
+        this.roomAvailability = new ArrayList<>(roomAvailability);
         this.lessons = new ArrayList<>(lessons);
     }
 
@@ -44,6 +56,14 @@ public class AuraTimetableSolution {
 
     public List<AuraTimeslotFact> getTimeslots() {
         return timeslots;
+    }
+
+    public List<AuraInstructorAvailabilityFact> getInstructorAvailability() {
+        return instructorAvailability;
+    }
+
+    public List<AuraRoomAvailabilityFact> getRoomAvailability() {
+        return roomAvailability;
     }
 
     public List<AuraPlanningLesson> getLessons() {
