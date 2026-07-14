@@ -113,6 +113,9 @@ JWT signing uses:
 - `CORS_ALLOWED_ORIGINS`: legacy alias for the same exact-origin CORS property
 - `OPENAPI_ENABLED`: defaults to `true`; set to `false` to disable API
   documentation
+- `AURA_ENABLED`: defaults to `true`; controls the AURA timetable module as one
+  consistent runtime unit. Leave enabled in production. Set to `false` only for
+  diagnostics or narrow tests that intentionally exclude JDBC/JPA.
 - `STORAGE_PROVIDER`: set to `r2` to enable real note PDF uploads and
   marketplace image uploads; defaults to disabled so missing storage
   credentials never prevent startup
