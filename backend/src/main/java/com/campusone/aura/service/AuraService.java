@@ -257,6 +257,10 @@ public class AuraService {
             throw new AuraStateException(
                     "AURA is not ready to generate this timetable yet.");
         }
+        if (repository.hasActiveGenerationRun(termId)) {
+            throw new AuraStateException(
+                    "A generation run is already active for this term.");
+        }
         int terminationSeconds = request.terminationSeconds() == null
                 ? 30
                 : Math.max(1, Math.min(request.terminationSeconds(), 300));
@@ -321,6 +325,15 @@ public class AuraService {
             UUID versionId) {
         authorizationService.requireAdmin(userId);
         TimetableVersionResponse version = getVersion(userId, versionId);
+        if (!"DRAFT".equals(version.status())) {
+            throw new AuraStateException(
+                    "Only draft timetable versions can be published.");
+        }
+        long openHardClashes = repository.countOpenHardClashes(versionId);
+        if (openHardClashes > 0) {
+            throw new AuraStateException(
+                    "Resolve all hard timetable clashes before publishing.");
+        }
         repository.publishVersion(versionId, version.termId());
         return getVersion(userId, versionId);
     }
