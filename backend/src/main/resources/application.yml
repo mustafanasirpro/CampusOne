@@ -68,6 +68,10 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
 
+campusone:
+  aura:
+    enabled: ${AURA_ENABLED:true}
+
 app:
   jwt:
     # Standard Base64 encoding of at least 32 cryptographically random bytes.
