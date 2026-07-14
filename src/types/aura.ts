@@ -196,3 +196,10 @@ export interface CreateAuraRoomAvailabilityRequest {
   roomId: string;
   timeslotId: string;
 }
+
+export interface CreateAuraSectionAvailabilityRequest {
+  availability: AuraAvailabilityType;
+  reason?: string;
+  sectionId: string;
+  timeslotId: string;
+}
