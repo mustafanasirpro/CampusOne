@@ -33,6 +33,10 @@ class AuraServiceTest {
             "20000000-0000-4000-8000-000000000001");
     private static final UUID VERSION_ID = UUID.fromString(
             "30000000-0000-4000-8000-000000000001");
+    private static final UUID SECTION_ID = UUID.fromString(
+            "50000000-0000-4000-8000-000000000001");
+    private static final UUID TIMESLOT_ID = UUID.fromString(
+            "60000000-0000-4000-8000-000000000001");
     private static final Instant NOW = Instant.parse("2026-07-15T00:00:00Z");
 
     @Mock
@@ -109,6 +113,28 @@ class AuraServiceTest {
                 .hasMessage("Resolve all hard timetable clashes before publishing.");
 
         verify(repository, never()).publishVersion(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void upsertSectionAvailability_rejectsCrossUniversityTimeslot() {
+        when(repository.sectionAndTimeslotShareUniversity(
+                SECTION_ID,
+                TIMESLOT_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.upsertSectionAvailability(
+                USER_ID,
+                new AuraDtos.CreateSectionAvailabilityRequest(
+                        SECTION_ID,
+                        TIMESLOT_ID,
+                        "UNAVAILABLE",
+                        "Shared hall exam setup")))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessage("Section availability must use a timeslot from the same university.");
+
+        verify(repository, never()).upsertSectionAvailability(
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
     }
