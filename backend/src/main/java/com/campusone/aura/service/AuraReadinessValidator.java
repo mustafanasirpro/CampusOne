@@ -3,6 +3,7 @@ package com.campusone.aura.service;
 import com.campusone.aura.dto.AuraDtos.ReadinessIssue;
 import com.campusone.aura.dto.AuraDtos.ReadinessResponse;
 import com.campusone.aura.repository.AuraJdbcRepository;
+import com.campusone.aura.repository.AuraJdbcRepository.RequirementCandidateIssue;
 import com.campusone.aura.repository.AuraJdbcRepository.TermCounts;
 import java.util.ArrayList;
 import java.util.List;
@@ -65,6 +66,20 @@ public class AuraReadinessValidator {
                     "There are more required sessions than available room-timeslot combinations.",
                     "TERM",
                     termId));
+        }
+
+        for (RequirementCandidateIssue candidateIssue
+                : repository.requirementsWithoutCandidates(termId)) {
+            issues.add(new ReadinessIssue(
+                    "AURA_NO_VALID_ROOM_TIME_CANDIDATE",
+                    "ERROR",
+                    "No available room and timeslot can host "
+                            + candidateIssue.courseCode()
+                            + " "
+                            + candidateIssue.courseTitle()
+                            + ". Check room capacity, room type, and availability.",
+                    "MEETING_REQUIREMENT",
+                    candidateIssue.requirementId()));
         }
 
         return new ReadinessResponse(
