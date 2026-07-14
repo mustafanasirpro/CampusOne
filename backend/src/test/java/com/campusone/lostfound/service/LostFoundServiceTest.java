@@ -13,6 +13,7 @@ import com.campusone.lostfound.dto.request.CompleteLostFoundClaimRequest;
 import com.campusone.lostfound.dto.request.CreateLostFoundClaimRequest;
 import com.campusone.lostfound.dto.request.CreateLostFoundItemRequest;
 import com.campusone.lostfound.dto.request.ReviewLostFoundClaimRequest;
+import com.campusone.lostfound.dto.request.UpdateLostFoundClaimContactPhoneRequest;
 import com.campusone.lostfound.dto.request.UpdateLostFoundItemRequest;
 import com.campusone.lostfound.dto.response.LostFoundClaimResponse;
 import com.campusone.lostfound.dto.response.LostFoundItemDetailResponse;
@@ -49,6 +50,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -130,6 +133,7 @@ class LostFoundServiceTest {
                 integrationService,
                 adminAuthorizationService,
                 moderatorAuthorizationService,
+                new LostFoundContactPhoneNormalizer(),
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -243,10 +247,11 @@ class LostFoundServiceTest {
         LostFoundClaimResponse response = service.createClaim(
                 CLAIMANT_ID,
                 ITEM_ID,
-                new CreateLostFoundClaimRequest(
-                        "The zipper has a blue keychain attached."));
+                claimRequest("+92 300 1234567", true));
 
         assertThat(response.status()).isEqualTo(LostFoundClaimStatus.PENDING);
+        assertThat(response.contactPhone()).isEqualTo("+923001234567");
+        assertThat(response.contactPhoneVisible()).isTrue();
         assertThat(item.getStatus()).isEqualTo(LostFoundItemStatus.PUBLISHED);
         verify(integrationService).lostFoundClaimCreated(
                 REPORTER_ID,
@@ -254,6 +259,199 @@ class LostFoundServiceTest {
                 ITEM_ID,
                 CLAIM_ID,
                 "Black laptop bag");
+    }
+
+    @Test
+    void createClaim_rejectsMissingContactSharingConsent() {
+        LostFoundItem item = publishedFoundItem();
+        when(userRepository.findById(CLAIMANT_ID)).thenReturn(Optional.of(claimant));
+        when(itemRepository.findActiveByIdForUpdate(ITEM_ID))
+                .thenReturn(Optional.of(item));
+        when(claimRepository.existsByItemIdAndClaimantIdAndStatusIn(
+                ITEM_ID,
+                CLAIMANT_ID,
+                EnumSet.of(
+                        LostFoundClaimStatus.PENDING,
+                        LostFoundClaimStatus.APPROVED)))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> service.createClaim(
+                CLAIMANT_ID,
+                ITEM_ID,
+                claimRequest("+923001234567", false)))
+                .isInstanceOf(LostFoundConflictException.class)
+                .hasMessage(
+                        "Agree to share your handover contact number after approval.");
+    }
+
+    @Test
+    void listItemClaims_masksPendingContactPhoneForReporter() {
+        LostFoundItem item = publishedFoundItem();
+        LostFoundClaim claim = persistClaim(new LostFoundClaim(
+                item,
+                claimant,
+                "The zipper has a blue keychain attached.",
+                "+923001234567",
+                NOW));
+        when(itemRepository.findDetailedById(ITEM_ID)).thenReturn(Optional.of(item));
+        when(claimRepository.findForItem(ITEM_ID, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(
+                        List.of(claim),
+                        PageRequest.of(0, 20),
+                        1));
+
+        LostFoundClaimResponse response = service.listItemClaims(
+                REPORTER_ID,
+                ITEM_ID,
+                0,
+                20).content().getFirst();
+
+        assertThat(response.contactPhone()).isNull();
+        assertThat(response.maskedContactPhone()).isEqualTo("+92••••••4567");
+        assertThat(response.contactPhoneVisible()).isFalse();
+    }
+
+    @Test
+    void approveClaim_returnsFullContactPhoneToReporter() {
+        LostFoundItem item = publishedFoundItem();
+        LostFoundClaim claim = persistClaim(new LostFoundClaim(
+                item,
+                claimant,
+                "The zipper has a blue keychain attached.",
+                "+923001234567",
+                NOW));
+        when(claimRepository.findDetailedById(CLAIM_ID))
+                .thenReturn(Optional.of(claim));
+        when(userRepository.findById(REPORTER_ID)).thenReturn(Optional.of(reporter));
+        when(claimRepository.existsByItemIdAndStatusIn(
+                ITEM_ID,
+                EnumSet.of(LostFoundClaimStatus.APPROVED)))
+                .thenReturn(false);
+
+        LostFoundClaimResponse response = service.approveClaim(
+                REPORTER_ID,
+                CLAIM_ID,
+                new ReviewLostFoundClaimRequest("Verified privately."));
+
+        assertThat(response.contactPhone()).isEqualTo("+923001234567");
+        assertThat(response.contactPhoneVisible()).isTrue();
+    }
+
+    @Test
+    void rejectClaim_doesNotReturnFullContactPhoneToReporter() {
+        LostFoundItem item = publishedFoundItem();
+        LostFoundClaim claim = persistClaim(new LostFoundClaim(
+                item,
+                claimant,
+                "The zipper has a blue keychain attached.",
+                "+923001234567",
+                NOW));
+        when(claimRepository.findDetailedById(CLAIM_ID))
+                .thenReturn(Optional.of(claim));
+        when(userRepository.findById(REPORTER_ID)).thenReturn(Optional.of(reporter));
+        when(claimRepository.existsByItemIdAndStatusIn(
+                ITEM_ID,
+                EnumSet.of(
+                        LostFoundClaimStatus.PENDING,
+                        LostFoundClaimStatus.APPROVED)))
+                .thenReturn(false);
+
+        LostFoundClaimResponse response = service.rejectClaim(
+                REPORTER_ID,
+                CLAIM_ID,
+                new ReviewLostFoundClaimRequest("Not enough proof."));
+
+        assertThat(response.contactPhone()).isNull();
+        assertThat(response.maskedContactPhone()).isEqualTo("+92••••••4567");
+        assertThat(response.contactPhoneVisible()).isFalse();
+    }
+
+    @Test
+    void updateClaimContactPhone_allowsPendingClaimantCorrection() {
+        LostFoundItem item = publishedFoundItem();
+        LostFoundClaim claim = persistClaim(new LostFoundClaim(
+                item,
+                claimant,
+                "The zipper has a blue keychain attached.",
+                "+923001234567",
+                NOW.minusSeconds(60)));
+        when(claimRepository.findDetailedById(CLAIM_ID))
+                .thenReturn(Optional.of(claim));
+
+        LostFoundClaimResponse response = service.updateClaimContactPhone(
+                CLAIMANT_ID,
+                CLAIM_ID,
+                new UpdateLostFoundClaimContactPhoneRequest(
+                        "03 111 222 333",
+                        true));
+
+        assertThat(response.contactPhone()).isEqualTo("+923111222333");
+        assertThat(claim.getClaimantContactPhone()).isEqualTo("+923111222333");
+        assertThat(claim.getContactShareConsentAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void updateClaimContactPhone_rejectsNonClaimant() {
+        LostFoundItem item = publishedFoundItem();
+        LostFoundClaim claim = persistClaim(new LostFoundClaim(
+                item,
+                claimant,
+                "The zipper has a blue keychain attached.",
+                "+923001234567",
+                NOW));
+        when(claimRepository.findDetailedById(CLAIM_ID))
+                .thenReturn(Optional.of(claim));
+
+        assertThatThrownBy(() -> service.updateClaimContactPhone(
+                REPORTER_ID,
+                CLAIM_ID,
+                new UpdateLostFoundClaimContactPhoneRequest(
+                        "+923111222333",
+                        true)))
+                .isInstanceOf(org.springframework.security.access
+                        .AccessDeniedException.class);
+    }
+
+    @Test
+    void updateClaimContactPhone_rejectsApprovedClaim() {
+        LostFoundItem item = publishedFoundItem();
+        LostFoundClaim claim = persistClaim(new LostFoundClaim(
+                item,
+                claimant,
+                "The zipper has a blue keychain attached.",
+                "+923001234567",
+                NOW));
+        claim.approve(reporter, "Verified.", NOW);
+        when(claimRepository.findDetailedById(CLAIM_ID))
+                .thenReturn(Optional.of(claim));
+
+        assertThatThrownBy(() -> service.updateClaimContactPhone(
+                CLAIMANT_ID,
+                CLAIM_ID,
+                new UpdateLostFoundClaimContactPhoneRequest(
+                        "+923111222333",
+                        true)))
+                .isInstanceOf(LostFoundConflictException.class)
+                .hasMessage("Only a pending claim contact number can be updated.");
+    }
+
+    @Test
+    void legacyClaimWithoutContactPhoneCanStillBeMapped() {
+        LostFoundItem item = publishedFoundItem();
+        LostFoundClaim claim = persistClaim(new LostFoundClaim(
+                item,
+                claimant,
+                "The zipper has a blue keychain attached."));
+
+        LostFoundClaimResponse response =
+                new LostFoundMapper(storageService).toClaim(
+                        claim,
+                        true,
+                        CLAIMANT_ID);
+
+        assertThat(response.contactPhone()).isNull();
+        assertThat(response.maskedContactPhone()).isNull();
+        assertThat(response.contactPhoneVisible()).isFalse();
     }
 
     @Test
@@ -335,6 +533,15 @@ class LostFoundServiceTest {
                 LocalDate.of(2026, 7, 13),
                 "Dell",
                 "Black");
+    }
+
+    private CreateLostFoundClaimRequest claimRequest(
+            String contactPhone,
+            boolean consent) {
+        return new CreateLostFoundClaimRequest(
+                "The zipper has a blue keychain attached.",
+                contactPhone,
+                consent);
     }
 
     private LostFoundItem publishedFoundItem() {
