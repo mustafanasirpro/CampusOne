@@ -24,16 +24,18 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@Profile("!test")
-@ConditionalOnBean(NamedParameterJdbcTemplate.class)
+@ConditionalOnProperty(
+        prefix = "campusone.aura",
+        name = "enabled",
+        havingValue = "true",
+        matchIfMissing = true)
 public class AuraJdbcRepository {
 
     private final NamedParameterJdbcTemplate jdbc;
