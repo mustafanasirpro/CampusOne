@@ -1,6 +1,7 @@
 package com.campusone.aura.controller;
 
 import com.campusone.aura.dto.AuraDtos;
+import com.campusone.aura.dto.AuraDtos.AvailabilityResponse;
 import com.campusone.aura.dto.AuraDtos.BatchResponse;
 import com.campusone.aura.dto.AuraDtos.ClashResponse;
 import com.campusone.aura.dto.AuraDtos.GenerationRunResponse;
@@ -201,6 +202,49 @@ public class AuraAdminController {
         return ResponseEntity.ok(auraService.listTimeslots(
                 principal.getUserId(),
                 universityId));
+    }
+
+    @PostMapping("/instructor-availability")
+    @Operation(summary = "Create or update instructor availability")
+    public ResponseEntity<AvailabilityResponse> upsertInstructorAvailability(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @Valid @RequestBody AuraDtos.CreateInstructorAvailabilityRequest
+                    request) {
+        return ResponseEntity.ok(auraService.upsertInstructorAvailability(
+                principal.getUserId(),
+                request));
+    }
+
+    @GetMapping("/instructors/{instructorId}/availability")
+    @Operation(summary = "List instructor availability")
+    public ResponseEntity<List<AvailabilityResponse>>
+            listInstructorAvailability(
+                    @AuthenticationPrincipal CampusOneUserPrincipal principal,
+                    @PathVariable UUID instructorId) {
+        return ResponseEntity.ok(auraService.listInstructorAvailability(
+                principal.getUserId(),
+                instructorId));
+    }
+
+    @PostMapping("/room-availability")
+    @Operation(summary = "Create or update room availability")
+    public ResponseEntity<AvailabilityResponse> upsertRoomAvailability(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @Valid @RequestBody AuraDtos.CreateRoomAvailabilityRequest
+                    request) {
+        return ResponseEntity.ok(auraService.upsertRoomAvailability(
+                principal.getUserId(),
+                request));
+    }
+
+    @GetMapping("/rooms/{roomId}/availability")
+    @Operation(summary = "List room availability")
+    public ResponseEntity<List<AvailabilityResponse>> listRoomAvailability(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID roomId) {
+        return ResponseEntity.ok(auraService.listRoomAvailability(
+                principal.getUserId(),
+                roomId));
     }
 
     @PostMapping("/offerings")
