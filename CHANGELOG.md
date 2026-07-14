@@ -27,6 +27,14 @@
 - Extended existing moderation, notification, and storage code to recognize Lost & Found targets.
 - Frontend moderation and notification labels now include Lost & Found.
 - Admin navigation now includes the AURA workbench.
+- AURA runtime activation now uses the single `campusone.aura.enabled`
+  property, enabled by default for production and disabled only in intentional
+  test-slice contexts.
+- AURA generation and publication are safer:
+  - only one queued/running generation run may exist per term;
+  - draft versions with unresolved hard clashes cannot be published;
+  - independent clash detection now checks actual overlapping time ranges, not
+    only identical timeslot IDs.
 
 ### Notes
 
