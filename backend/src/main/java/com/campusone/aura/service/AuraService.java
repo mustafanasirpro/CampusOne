@@ -250,6 +250,34 @@ public class AuraService {
         return repository.listRoomAvailability(roomId);
     }
 
+    public AuraDtos.AvailabilityResponse upsertSectionAvailability(
+            UUID userId,
+            AuraDtos.CreateSectionAvailabilityRequest request) {
+        authorizationService.requireAdmin(userId);
+        if (!repository.sectionAndTimeslotShareUniversity(
+                request.sectionId(),
+                request.timeslotId())) {
+            throw new AuraStateException(
+                    "Section availability must use a timeslot from the same university.");
+        }
+        String availability = normalizeAvailability(request.availability());
+        UUID id = repository.upsertSectionAvailability(
+                UUID.randomUUID(),
+                request,
+                availability);
+        return repository.listSectionAvailability(request.sectionId()).stream()
+                .filter(entry -> entry.id().equals(id))
+                .findFirst()
+                .orElseThrow(() -> notFound("Section availability was not found."));
+    }
+
+    public List<AuraDtos.AvailabilityResponse> listSectionAvailability(
+            UUID userId,
+            UUID sectionId) {
+        authorizationService.requireAdmin(userId);
+        return repository.listSectionAvailability(sectionId);
+    }
+
     public OfferingResponse createOffering(
             UUID userId,
             AuraDtos.CreateOfferingRequest request) {
@@ -466,6 +494,7 @@ public class AuraService {
                     repository.solverTimeslots(termId),
                     repository.solverInstructorAvailability(termId),
                     repository.solverRoomAvailability(termId),
+                    repository.solverSectionAvailability(termId),
                     terminationSeconds);
             UUID versionId = repository.insertVersion(
                     UUID.randomUUID(),
