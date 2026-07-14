@@ -3,6 +3,8 @@ package com.campusone.aura.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.campusone.aura.repository.AuraJdbcRepository.SolverRequirement;
+import com.campusone.aura.repository.AuraJdbcRepository.SolverInstructorAvailability;
+import com.campusone.aura.repository.AuraJdbcRepository.SolverRoomAvailability;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverRoom;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverTimeslot;
 import com.campusone.aura.service.AuraSolverService.SolverResult;
@@ -48,6 +50,8 @@ class AuraSolverServiceTest {
                                 2,
                                 LocalTime.of(9, 0),
                                 LocalTime.of(10, 0))),
+                List.of(),
+                List.of(),
                 1);
 
         assertThat(result.assignments()).hasSize(2);
@@ -57,5 +61,53 @@ class AuraSolverServiceTest {
                     assertThat(assignment.timeslotId()).isNotNull();
                 });
         assertThat(result.score()).contains("hard");
+    }
+
+    @Test
+    void solve_respectsInstructorUnavailableTimeslotAsHardConstraint() {
+        UUID instructor = UUID.fromString(
+                "90000000-0000-4000-8000-000000000011");
+        UUID section = UUID.fromString(
+                "90000000-0000-4000-8000-000000000012");
+        UUID unavailableTimeslot = UUID.fromString(
+                "90000000-0000-4000-8000-000000000017");
+        UUID availableTimeslot = UUID.fromString(
+                "90000000-0000-4000-8000-000000000018");
+
+        SolverResult result = new AuraSolverService().solve(
+                List.of(new SolverRequirement(
+                        UUID.fromString("90000000-0000-4000-8000-000000000013"),
+                        UUID.fromString("90000000-0000-4000-8000-000000000014"),
+                        section,
+                        instructor,
+                        1,
+                        "CLASSROOM",
+                        30)),
+                List.of(new SolverRoom(
+                        UUID.fromString("90000000-0000-4000-8000-000000000015"),
+                        40,
+                        "CLASSROOM")),
+                List.of(
+                        new SolverTimeslot(
+                                unavailableTimeslot,
+                                1,
+                                LocalTime.of(9, 0),
+                                LocalTime.of(10, 0)),
+                        new SolverTimeslot(
+                                availableTimeslot,
+                                2,
+                                LocalTime.of(9, 0),
+                                LocalTime.of(10, 0))),
+                List.of(new SolverInstructorAvailability(
+                        instructor,
+                        unavailableTimeslot,
+                        "UNAVAILABLE")),
+                List.of(),
+                1);
+
+        assertThat(result.assignments()).hasSize(1);
+        assertThat(result.assignments().getFirst().timeslotId())
+                .isEqualTo(availableTimeslot);
+        assertThat(result.score()).startsWith("0hard");
     }
 }
