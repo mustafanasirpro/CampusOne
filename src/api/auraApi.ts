@@ -1,5 +1,6 @@
 import { apiRequest } from "@/api/apiClient";
 import type {
+  AuraAvailability,
   AuraClash,
   AuraGenerationRun,
   AuraInstructor,
@@ -12,6 +13,8 @@ import type {
   AuraTerm,
   AuraTimeslot,
   AuraTimetableVersion,
+  CreateAuraInstructorAvailabilityRequest,
+  CreateAuraRoomAvailabilityRequest,
   CreateAuraTermRequest,
   PageResponse,
 } from "@/types/aura";
@@ -125,6 +128,50 @@ export function listAuraTimeslots(
 ) {
   return apiRequest<AuraTimeslot[]>(
     `${adminAuraPath}/timeslots${queryString({ universityId })}`,
+    { signal },
+  );
+}
+
+export function upsertAuraInstructorAvailability(
+  request: CreateAuraInstructorAvailabilityRequest,
+) {
+  return apiRequest<AuraAvailability>(
+    `${adminAuraPath}/instructor-availability`,
+    {
+      body: JSON.stringify(request),
+      method: "POST",
+    },
+  );
+}
+
+export function listAuraInstructorAvailability(
+  instructorId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<AuraAvailability[]>(
+    `${adminAuraPath}/instructors/${instructorId}/availability`,
+    { signal },
+  );
+}
+
+export function upsertAuraRoomAvailability(
+  request: CreateAuraRoomAvailabilityRequest,
+) {
+  return apiRequest<AuraAvailability>(
+    `${adminAuraPath}/room-availability`,
+    {
+      body: JSON.stringify(request),
+      method: "POST",
+    },
+  );
+}
+
+export function listAuraRoomAvailability(
+  roomId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<AuraAvailability[]>(
+    `${adminAuraPath}/rooms/${roomId}/availability`,
     { signal },
   );
 }
