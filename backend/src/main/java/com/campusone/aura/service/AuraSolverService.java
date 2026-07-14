@@ -9,12 +9,14 @@ import com.campusone.aura.repository.AuraJdbcRepository.SolverInstructorAvailabi
 import com.campusone.aura.repository.AuraJdbcRepository.SolverRequirement;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverRoomAvailability;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverRoom;
+import com.campusone.aura.repository.AuraJdbcRepository.SolverSectionAvailability;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverTimeslot;
 import com.campusone.aura.solver.AuraConstraintProvider;
 import com.campusone.aura.solver.AuraInstructorAvailabilityFact;
 import com.campusone.aura.solver.AuraPlanningLesson;
 import com.campusone.aura.solver.AuraRoomAvailabilityFact;
 import com.campusone.aura.solver.AuraRoomFact;
+import com.campusone.aura.solver.AuraSectionAvailabilityFact;
 import com.campusone.aura.solver.AuraTimeslotFact;
 import com.campusone.aura.solver.AuraTimetableSolution;
 import java.util.ArrayList;
@@ -32,6 +34,7 @@ public class AuraSolverService {
             List<SolverTimeslot> timeslots,
             List<SolverInstructorAvailability> instructorAvailability,
             List<SolverRoomAvailability> roomAvailability,
+            List<SolverSectionAvailability> sectionAvailability,
             int terminationSeconds) {
         List<AuraRoomFact> roomFacts = rooms.stream()
                 .map(room -> new AuraRoomFact(
@@ -61,6 +64,13 @@ public class AuraSolverService {
                                 availability.timeslotId(),
                                 availability.availability()))
                         .toList();
+        List<AuraSectionAvailabilityFact> sectionAvailabilityFacts =
+                sectionAvailability.stream()
+                        .map(availability -> new AuraSectionAvailabilityFact(
+                                availability.sectionId(),
+                                availability.timeslotId(),
+                                availability.availability()))
+                        .toList();
         List<AuraPlanningLesson> lessons = expandLessons(requirements);
 
         AuraTimetableSolution problem =
@@ -69,6 +79,7 @@ public class AuraSolverService {
                         timeslotFacts,
                         instructorAvailabilityFacts,
                         roomAvailabilityFacts,
+                        sectionAvailabilityFacts,
                         lessons);
         SolverConfig solverConfig = new SolverConfig()
                 .withSolutionClass(AuraTimetableSolution.class)
