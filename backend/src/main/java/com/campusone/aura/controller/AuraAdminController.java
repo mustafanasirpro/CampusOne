@@ -247,6 +247,27 @@ public class AuraAdminController {
                 roomId));
     }
 
+    @PostMapping("/section-availability")
+    @Operation(summary = "Create or update section availability")
+    public ResponseEntity<AvailabilityResponse> upsertSectionAvailability(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @Valid @RequestBody AuraDtos.CreateSectionAvailabilityRequest
+                    request) {
+        return ResponseEntity.ok(auraService.upsertSectionAvailability(
+                principal.getUserId(),
+                request));
+    }
+
+    @GetMapping("/sections/{sectionId}/availability")
+    @Operation(summary = "List section availability")
+    public ResponseEntity<List<AvailabilityResponse>> listSectionAvailability(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID sectionId) {
+        return ResponseEntity.ok(auraService.listSectionAvailability(
+                principal.getUserId(),
+                sectionId));
+    }
+
     @PostMapping("/offerings")
     @Operation(summary = "Create an AURA course offering")
     public ResponseEntity<OfferingResponse> createOffering(
