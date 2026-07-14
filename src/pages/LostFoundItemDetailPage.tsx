@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   CheckCircle2,
+  Copy,
   Edit,
   Handshake,
   RefreshCw,
@@ -60,6 +61,8 @@ export function LostFoundItemDetailPage() {
   const [item, setItem] = useState<LostFoundItemDetail | null>(null);
   const [claims, setClaims] = useState<LostFoundClaimPage | null>(null);
   const [proofText, setProofText] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactSharingConsent, setContactSharingConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
@@ -123,11 +126,25 @@ export function LostFoundItemDetailPage() {
       setError("Add a few details that help the reporter verify your claim.");
       return;
     }
+    if (!contactPhone.trim()) {
+      setError("Add a handover contact number.");
+      return;
+    }
+    if (!contactSharingConsent) {
+      setError("Agree to share your number with the finder after approval.");
+      return;
+    }
     setIsSubmittingClaim(true);
     setError(null);
     try {
-      await createLostFoundClaim(itemId, proof);
+      await createLostFoundClaim(itemId, {
+        contactPhone,
+        contactSharingConsent,
+        proofText: proof,
+      });
       setProofText("");
+      setContactPhone("");
+      setContactSharingConsent(false);
       showToast({
         title: "Claim submitted",
         message: "The reporter can now review your claim privately.",
@@ -142,6 +159,19 @@ export function LostFoundItemDetailPage() {
       );
     } finally {
       setIsSubmittingClaim(false);
+    }
+  };
+
+  const copyContactPhone = async (phone: string) => {
+    try {
+      await navigator.clipboard.writeText(phone);
+      showToast({
+        title: "Contact number copied",
+        message: "Use it only to arrange a safe handover.",
+        variant: "success",
+      });
+    } catch {
+      setError("The contact number could not be copied.");
     }
   };
 
@@ -409,7 +439,7 @@ export function LostFoundItemDetailPage() {
                     Think this is yours?
                   </h2>
                   <p className="mt-1 text-sm text-slate-500">
-                    Share private proof with the reporter. Do not post contact details publicly.
+                    Share private proof and a handover number. Your number is shared with the finder only after approval.
                   </p>
                 </div>
                 <form className="grid gap-3" onSubmit={submitClaim}>
@@ -420,6 +450,41 @@ export function LostFoundItemDetailPage() {
                     placeholder="Describe identifying details only the owner would know."
                     value={proofText}
                   />
+                  <div className="grid gap-1.5">
+                    <label
+                      className="text-sm font-semibold text-slate-700"
+                      htmlFor="claim-contact-phone"
+                    >
+                      Handover contact number
+                    </label>
+                    <input
+                      autoComplete="tel"
+                      className="rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none focus:border-brand-400 focus:ring-4 focus:ring-brand-100"
+                      id="claim-contact-phone"
+                      onChange={(event) => setContactPhone(event.target.value)}
+                      placeholder="+92 300 1234567"
+                      required
+                      type="tel"
+                      value={contactPhone}
+                    />
+                    <p className="text-xs leading-5 text-slate-500">
+                      Your number stays private and is shared with the finder only after your claim is approved.
+                    </p>
+                  </div>
+                  <label className="flex gap-3 rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+                    <input
+                      checked={contactSharingConsent}
+                      className="mt-1 size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      onChange={(event) =>
+                        setContactSharingConsent(event.target.checked)
+                      }
+                      required
+                      type="checkbox"
+                    />
+                    <span>
+                      I agree that this number may be shared with the finder after my claim is approved so we can arrange the handover.
+                    </span>
+                  </label>
                   <Button loading={isSubmittingClaim} type="submit">
                     <ShieldCheck className="size-4" />
                     Submit claim
@@ -453,6 +518,10 @@ export function LostFoundItemDetailPage() {
                             {claim.proofText}
                           </p>
                         ) : null}
+                        <ClaimContactCard
+                          claim={claim}
+                          onCopy={copyContactPhone}
+                        />
                         <div className="flex flex-wrap gap-2">
                           {claim.status === "PENDING" ? (
                             <>
@@ -511,6 +580,45 @@ function Info({ label, value }: { label: string; value: string }) {
         {label}
       </dt>
       <dd className="mt-1 font-semibold text-slate-800">{value}</dd>
+    </div>
+  );
+}
+
+function ClaimContactCard({
+  claim,
+  onCopy,
+}: {
+  claim: LostFoundClaim;
+  onCopy: (phone: string) => Promise<void>;
+}) {
+  const visiblePhone = claim.contactPhoneVisible ? claim.contactPhone : null;
+  const displayPhone = visiblePhone ?? claim.maskedContactPhone;
+  if (!displayPhone) return null;
+
+  return (
+    <div className="grid gap-2 rounded-xl bg-slate-50 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Handover contact
+          </p>
+          <p className="font-semibold text-slate-800">{displayPhone}</p>
+        </div>
+        {visiblePhone ? (
+          <Button
+            onClick={() => void onCopy(visiblePhone)}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Copy className="size-4" />
+            Copy
+          </Button>
+        ) : null}
+      </div>
+      <p className="text-xs leading-5 text-slate-500">
+        Meet in a safe university location and confirm the handover in CampusOne only after the item has physically been returned.
+      </p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { apiRequest } from "@/api/apiClient";
 import type {
   CreateLostFoundItemRequest,
+  CreateLostFoundClaimRequest,
   LostFoundCategory,
   LostFoundClaim,
   LostFoundClaimPage,
@@ -10,6 +11,7 @@ import type {
   LostFoundMatch,
   LostFoundMatchPage,
   LostFoundStats,
+  UpdateLostFoundClaimContactPhoneRequest,
   UpdateLostFoundItemRequest,
 } from "@/types/lostFound";
 
@@ -132,11 +134,27 @@ export function resolveLostFoundItem(itemId: string) {
   );
 }
 
-export function createLostFoundClaim(itemId: string, proofText: string) {
+export function createLostFoundClaim(
+  itemId: string,
+  request: CreateLostFoundClaimRequest,
+) {
   return apiRequest<LostFoundClaim>(`${basePath}/items/${itemId}/claims`, {
-    body: JSON.stringify({ proofText }),
+    body: JSON.stringify(request),
     method: "POST",
   });
+}
+
+export function updateLostFoundClaimContactPhone(
+  claimId: string,
+  request: UpdateLostFoundClaimContactPhoneRequest,
+) {
+  return apiRequest<LostFoundClaim>(
+    `${basePath}/claims/${claimId}/contact-phone`,
+    {
+      body: JSON.stringify(request),
+      method: "PATCH",
+    },
+  );
 }
 
 export function listLostFoundClaims({

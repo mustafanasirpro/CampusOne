@@ -115,17 +115,31 @@ export interface LostFoundClaim {
   createdAt: string;
   claimantHandoverConfirmedAt: string | null;
   claimantIsCurrentUser: boolean;
+  contactPhone: string | null;
+  contactPhoneVisible: boolean;
   handoverCompletedAt: string | null;
   handoverNote: string | null;
   id: string;
   itemId: string;
   itemTitle: string;
+  maskedContactPhone: string | null;
   proofText: string | null;
   reporterHandoverConfirmedAt: string | null;
   reporterIsCurrentUser: boolean;
   reviewedAt: string | null;
   reviewerNote: string | null;
   status: LostFoundClaimStatus;
+}
+
+export interface CreateLostFoundClaimRequest {
+  contactPhone: string;
+  contactSharingConsent: boolean;
+  proofText: string;
+}
+
+export interface UpdateLostFoundClaimContactPhoneRequest {
+  contactPhone: string;
+  contactSharingConsent: boolean;
 }
 
 export interface LostFoundClaimPage {
