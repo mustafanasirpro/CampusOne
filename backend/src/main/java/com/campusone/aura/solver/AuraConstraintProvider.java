@@ -16,10 +16,13 @@ public class AuraConstraintProvider implements ConstraintProvider {
                 sectionDoubleBooked(factory),
                 instructorUnavailable(factory),
                 roomUnavailable(factory),
+                sectionUnavailable(factory),
                 instructorAvoid(factory),
                 roomAvoid(factory),
+                sectionAvoid(factory),
                 instructorPreferred(factory),
                 roomPreferred(factory),
+                sectionPreferred(factory),
                 roomTooSmall(factory),
                 roomTypeMismatch(factory),
                 spreadSectionMeetings(factory)
@@ -88,6 +91,23 @@ public class AuraConstraintProvider implements ConstraintProvider {
                 .asConstraint("Room unavailable");
     }
 
+    private Constraint sectionUnavailable(ConstraintFactory factory) {
+        return factory.forEach(AuraPlanningLesson.class)
+                .filter(lesson -> lesson.getTimeslot() != null)
+                .join(
+                        AuraSectionAvailabilityFact.class,
+                        Joiners.equal(
+                                AuraPlanningLesson::getSectionId,
+                                AuraSectionAvailabilityFact::sectionId),
+                        Joiners.equal(
+                                lesson -> lesson.getTimeslot().id(),
+                                AuraSectionAvailabilityFact::timeslotId))
+                .filter((lesson, availability) ->
+                        "UNAVAILABLE".equals(availability.availability()))
+                .penalize(HardMediumSoftScore.ONE_HARD)
+                .asConstraint("Section unavailable");
+    }
+
     private Constraint instructorAvoid(ConstraintFactory factory) {
         return factory.forEach(AuraPlanningLesson.class)
                 .filter(lesson -> lesson.getTimeslot() != null)
@@ -123,6 +143,23 @@ public class AuraConstraintProvider implements ConstraintProvider {
                 .asConstraint("Room avoid timeslot");
     }
 
+    private Constraint sectionAvoid(ConstraintFactory factory) {
+        return factory.forEach(AuraPlanningLesson.class)
+                .filter(lesson -> lesson.getTimeslot() != null)
+                .join(
+                        AuraSectionAvailabilityFact.class,
+                        Joiners.equal(
+                                AuraPlanningLesson::getSectionId,
+                                AuraSectionAvailabilityFact::sectionId),
+                        Joiners.equal(
+                                lesson -> lesson.getTimeslot().id(),
+                                AuraSectionAvailabilityFact::timeslotId))
+                .filter((lesson, availability) ->
+                        "AVOID".equals(availability.availability()))
+                .penalize(HardMediumSoftScore.ONE_MEDIUM)
+                .asConstraint("Section avoid timeslot");
+    }
+
     private Constraint instructorPreferred(ConstraintFactory factory) {
         return factory.forEach(AuraPlanningLesson.class)
                 .filter(lesson -> lesson.getTimeslot() != null)
@@ -156,6 +193,23 @@ public class AuraConstraintProvider implements ConstraintProvider {
                         "PREFERRED".equals(availability.availability()))
                 .reward(HardMediumSoftScore.ONE_SOFT)
                 .asConstraint("Room preferred timeslot");
+    }
+
+    private Constraint sectionPreferred(ConstraintFactory factory) {
+        return factory.forEach(AuraPlanningLesson.class)
+                .filter(lesson -> lesson.getTimeslot() != null)
+                .join(
+                        AuraSectionAvailabilityFact.class,
+                        Joiners.equal(
+                                AuraPlanningLesson::getSectionId,
+                                AuraSectionAvailabilityFact::sectionId),
+                        Joiners.equal(
+                                lesson -> lesson.getTimeslot().id(),
+                                AuraSectionAvailabilityFact::timeslotId))
+                .filter((lesson, availability) ->
+                        "PREFERRED".equals(availability.availability()))
+                .reward(HardMediumSoftScore.ONE_SOFT)
+                .asConstraint("Section preferred timeslot");
     }
 
     private Constraint roomTooSmall(ConstraintFactory factory) {
