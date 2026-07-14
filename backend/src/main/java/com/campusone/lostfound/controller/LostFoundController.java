@@ -4,6 +4,7 @@ import com.campusone.lostfound.dto.request.CompleteLostFoundClaimRequest;
 import com.campusone.lostfound.dto.request.CreateLostFoundClaimRequest;
 import com.campusone.lostfound.dto.request.CreateLostFoundItemRequest;
 import com.campusone.lostfound.dto.request.ReviewLostFoundClaimRequest;
+import com.campusone.lostfound.dto.request.UpdateLostFoundClaimContactPhoneRequest;
 import com.campusone.lostfound.dto.request.UpdateLostFoundItemRequest;
 import com.campusone.lostfound.dto.response.LostFoundClaimPageResponse;
 import com.campusone.lostfound.dto.response.LostFoundClaimResponse;
@@ -263,6 +264,18 @@ public class LostFoundController {
         return ResponseEntity.ok(lostFoundService.cancelClaim(
                 principal.getUserId(),
                 claimId));
+    }
+
+    @PatchMapping("/claims/{claimId}/contact-phone")
+    @Operation(summary = "Update a pending Lost & Found claim handover contact number")
+    public ResponseEntity<LostFoundClaimResponse> updateClaimContactPhone(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID claimId,
+            @Valid @RequestBody UpdateLostFoundClaimContactPhoneRequest request) {
+        return ResponseEntity.ok(lostFoundService.updateClaimContactPhone(
+                principal.getUserId(),
+                claimId,
+                request));
     }
 
     @PatchMapping("/claims/{claimId}/handover/claimant")

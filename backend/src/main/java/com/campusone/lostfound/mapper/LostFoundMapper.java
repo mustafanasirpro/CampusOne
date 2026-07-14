@@ -10,6 +10,7 @@ import com.campusone.lostfound.dto.response.LostFoundMatchPageResponse;
 import com.campusone.lostfound.dto.response.LostFoundMatchResponse;
 import com.campusone.lostfound.dto.response.LostFoundReporterResponse;
 import com.campusone.lostfound.entity.LostFoundClaim;
+import com.campusone.lostfound.entity.LostFoundClaimStatus;
 import com.campusone.lostfound.entity.LostFoundItem;
 import com.campusone.lostfound.entity.LostFoundItemImage;
 import com.campusone.lostfound.entity.LostFoundMatch;
@@ -108,12 +109,34 @@ public class LostFoundMapper {
             LostFoundClaim claim,
             boolean includeProof,
             UUID viewerUserId) {
+        return toClaim(claim, includeProof, viewerUserId, false);
+    }
+
+    public LostFoundClaimResponse toClaim(
+            LostFoundClaim claim,
+            boolean includeProof,
+            UUID viewerUserId,
+            boolean includeModeratorPrivateDetails) {
+        boolean claimantIsViewer =
+                viewerUserId != null && claim.isClaimant(viewerUserId);
+        boolean reporterIsViewer =
+                viewerUserId != null && claim.getItem().isOwnedBy(viewerUserId);
+        boolean contactPhoneVisible = hasVisibleContactPhone(
+                claim,
+                claimantIsViewer,
+                reporterIsViewer,
+                includeModeratorPrivateDetails);
         return new LostFoundClaimResponse(
                 claim.getId(),
                 claim.getItem().getId(),
                 claim.getItem().getTitle(),
                 toReporter(claim.getClaimant()),
                 includeProof ? claim.getProofText() : null,
+                contactPhoneVisible ? claim.getClaimantContactPhone() : null,
+                claim.getClaimantContactPhone() == null
+                        ? null
+                        : maskPhone(claim.getClaimantContactPhone()),
+                contactPhoneVisible,
                 claim.getStatus(),
                 claim.getReviewerNote(),
                 claim.getHandoverNote(),
@@ -122,8 +145,8 @@ public class LostFoundMapper {
                 claim.getReporterHandoverConfirmedAt(),
                 claim.getClaimantHandoverConfirmedAt(),
                 claim.getHandoverCompletedAt(),
-                viewerUserId != null && claim.isClaimant(viewerUserId),
-                viewerUserId != null && claim.getItem().isOwnedBy(viewerUserId));
+                claimantIsViewer,
+                reporterIsViewer);
     }
 
     public LostFoundMatchResponse toMatch(LostFoundMatch match) {
@@ -196,5 +219,33 @@ public class LostFoundMapper {
                 user.getId(),
                 profile.getFullName(),
                 profile.getAvatarUrl());
+    }
+
+    private boolean hasVisibleContactPhone(
+            LostFoundClaim claim,
+            boolean claimantIsViewer,
+            boolean reporterIsViewer,
+            boolean includeModeratorPrivateDetails) {
+        if (claim.getClaimantContactPhone() == null) {
+            return false;
+        }
+        if (claimantIsViewer || includeModeratorPrivateDetails) {
+            return true;
+        }
+        return reporterIsViewer
+                && (claim.getStatus() == LostFoundClaimStatus.APPROVED
+                        || claim.getStatus() == LostFoundClaimStatus.COMPLETED);
+    }
+
+    private String maskPhone(String phone) {
+        if (phone == null || phone.length() <= 6) {
+            return phone;
+        }
+        int prefixLength = phone.startsWith("+92") ? 3 : 2;
+        prefixLength = Math.min(prefixLength, phone.length() - 4);
+        String prefix = phone.substring(0, prefixLength);
+        String suffix = phone.substring(phone.length() - 4);
+        int hiddenLength = Math.max(1, phone.length() - prefixLength - 4);
+        return prefix + "•".repeat(hiddenLength) + suffix;
     }
 }

@@ -62,6 +62,13 @@ public class LostFoundClaim {
     @Column(name = "handover_note", length = 1000)
     private String handoverNote;
 
+    @Size(max = 20)
+    @Column(name = "claimant_contact_phone", length = 20)
+    private String claimantContactPhone;
+
+    @Column(name = "contact_share_consent_at")
+    private Instant contactShareConsentAt;
+
     @Column(name = "reporter_handover_confirmed_at")
     private Instant reporterHandoverConfirmedAt;
 
@@ -91,9 +98,20 @@ public class LostFoundClaim {
             LostFoundItem item,
             User claimant,
             String proofText) {
+        this(item, claimant, proofText, null, null);
+    }
+
+    public LostFoundClaim(
+            LostFoundItem item,
+            User claimant,
+            String proofText,
+            String claimantContactPhone,
+            Instant contactShareConsentAt) {
         this.item = item;
         this.claimant = claimant;
         this.proofText = proofText.trim();
+        this.claimantContactPhone = claimantContactPhone;
+        this.contactShareConsentAt = contactShareConsentAt;
     }
 
     @PrePersist
@@ -149,6 +167,13 @@ public class LostFoundClaim {
         handoverCompletedAt = now;
     }
 
+    public void updateContactPhone(
+            String claimantContactPhone,
+            Instant contactShareConsentAt) {
+        this.claimantContactPhone = claimantContactPhone;
+        this.contactShareConsentAt = contactShareConsentAt;
+    }
+
     public boolean isClaimant(UUID userId) {
         return claimant.getId().equals(userId);
     }
@@ -165,6 +190,8 @@ public class LostFoundClaim {
     public User getReviewedBy() { return reviewedBy; }
     public String getReviewerNote() { return reviewerNote; }
     public String getHandoverNote() { return handoverNote; }
+    public String getClaimantContactPhone() { return claimantContactPhone; }
+    public Instant getContactShareConsentAt() { return contactShareConsentAt; }
     public Instant getReporterHandoverConfirmedAt() {
         return reporterHandoverConfirmedAt;
     }

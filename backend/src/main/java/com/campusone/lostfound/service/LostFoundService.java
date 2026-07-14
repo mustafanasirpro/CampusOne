@@ -6,6 +6,7 @@ import com.campusone.lostfound.dto.request.CompleteLostFoundClaimRequest;
 import com.campusone.lostfound.dto.request.CreateLostFoundClaimRequest;
 import com.campusone.lostfound.dto.request.CreateLostFoundItemRequest;
 import com.campusone.lostfound.dto.request.ReviewLostFoundClaimRequest;
+import com.campusone.lostfound.dto.request.UpdateLostFoundClaimContactPhoneRequest;
 import com.campusone.lostfound.dto.request.UpdateLostFoundItemRequest;
 import com.campusone.lostfound.dto.response.LostFoundClaimPageResponse;
 import com.campusone.lostfound.dto.response.LostFoundClaimResponse;
@@ -44,6 +45,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
@@ -69,6 +71,7 @@ public class LostFoundService {
     private final CommunityIntegrationService integrationService;
     private final NoteAdminAuthorizationService adminAuthorizationService;
     private final ModeratorAuthorizationService moderatorAuthorizationService;
+    private final LostFoundContactPhoneNormalizer contactPhoneNormalizer;
     private final Clock clock;
 
     public LostFoundService(
@@ -83,6 +86,7 @@ public class LostFoundService {
             CommunityIntegrationService integrationService,
             NoteAdminAuthorizationService adminAuthorizationService,
             ModeratorAuthorizationService moderatorAuthorizationService,
+            LostFoundContactPhoneNormalizer contactPhoneNormalizer,
             Clock clock) {
         this.itemRepository = itemRepository;
         this.claimRepository = claimRepository;
@@ -95,6 +99,7 @@ public class LostFoundService {
         this.integrationService = integrationService;
         this.adminAuthorizationService = adminAuthorizationService;
         this.moderatorAuthorizationService = moderatorAuthorizationService;
+        this.contactPhoneNormalizer = contactPhoneNormalizer;
         this.clock = clock;
     }
 
@@ -373,10 +378,16 @@ public class LostFoundService {
             throw new LostFoundConflictException(
                     "You already have an active claim for this item.");
         }
+        requireContactSharingConsent(request.contactSharingConsent());
+        Instant now = clock.instant();
+        String normalizedContactPhone =
+                contactPhoneNormalizer.normalize(request.contactPhone());
         LostFoundClaim claim = claimRepository.save(new LostFoundClaim(
                 item,
                 claimant,
-                request.proofText()));
+                request.proofText(),
+                normalizedContactPhone,
+                now));
         integrationService.lostFoundClaimCreated(
                 item.getReporter().getId(),
                 userId,
@@ -410,15 +421,15 @@ public class LostFoundService {
             int page,
             int size) {
         LostFoundItem item = requireItem(itemId);
-        if (!item.isOwnedBy(userId) && !isAdmin(userId)) {
+        boolean admin = isAdmin(userId);
+        if (!item.isOwnedBy(userId) && !admin) {
             throw new AccessDeniedException(
                     "Only the reporter or an admin can review claims.");
         }
-        return mapper.toClaimPage(
-                claimRepository.findForItem(
-                        itemId,
-                        PageRequest.of(page, size)),
-                userId);
+        return toClaimPage(
+                claimRepository.findForItem(itemId, PageRequest.of(page, size)),
+                userId,
+                admin);
     }
 
     @Transactional
@@ -452,7 +463,7 @@ public class LostFoundService {
                 claim.getId(),
                 claim.getItem().getTitle(),
                 true);
-        return mapper.toClaim(claim, true, userId);
+        return mapper.toClaim(claim, true, userId, isAdmin(userId));
     }
 
     @Transactional
@@ -482,6 +493,27 @@ public class LostFoundService {
                 claim.getId(),
                 claim.getItem().getTitle(),
                 false);
+        return mapper.toClaim(claim, true, userId, isAdmin(userId));
+    }
+
+    @Transactional
+    public LostFoundClaimResponse updateClaimContactPhone(
+            UUID userId,
+            UUID claimId,
+            UpdateLostFoundClaimContactPhoneRequest request) {
+        LostFoundClaim claim = requireClaim(claimId);
+        if (!claim.isClaimant(userId)) {
+            throw new AccessDeniedException(
+                    "Only the claimant can update the handover contact number.");
+        }
+        if (claim.getStatus() != LostFoundClaimStatus.PENDING) {
+            throw new LostFoundConflictException(
+                    "Only a pending claim contact number can be updated.");
+        }
+        requireContactSharingConsent(request.contactSharingConsent());
+        claim.updateContactPhone(
+                contactPhoneNormalizer.normalize(request.contactPhone()),
+                clock.instant());
         return mapper.toClaim(claim, true, userId);
     }
 
@@ -730,6 +762,29 @@ public class LostFoundService {
         return images;
     }
 
+    private LostFoundClaimPageResponse toClaimPage(
+            Page<LostFoundClaim> page,
+            UUID viewerUserId,
+            boolean includeModeratorPrivateDetails) {
+        List<LostFoundClaimResponse> content = page.getContent().stream()
+                .map(claim -> mapper.toClaim(
+                        claim,
+                        claim.isClaimant(viewerUserId)
+                                || claim.getItem().isOwnedBy(viewerUserId)
+                                || includeModeratorPrivateDetails,
+                        viewerUserId,
+                        includeModeratorPrivateDetails))
+                .toList();
+        return new LostFoundClaimPageResponse(
+                content,
+                page.getNumber(),
+                page.getSize(),
+                page.getTotalElements(),
+                page.getTotalPages(),
+                page.isFirst(),
+                page.isLast());
+    }
+
     private void registerStorageCleanupOnRollback(List<StoredObject> storedObjects) {
         if (storedObjects.isEmpty()
                 || !TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -879,6 +934,13 @@ public class LostFoundService {
         }
         throw new AccessDeniedException(
                 "Only involved users can update this match.");
+    }
+
+    private void requireContactSharingConsent(Boolean contactSharingConsent) {
+        if (!Boolean.TRUE.equals(contactSharingConsent)) {
+            throw new LostFoundConflictException(
+                    "Agree to share your handover contact number after approval.");
+        }
     }
 
     private boolean isAdmin(UUID userId) {
