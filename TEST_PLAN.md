@@ -69,7 +69,19 @@ Focused backend tests added:
   - warns when required sessions exceed the simple room/timeslot capacity envelope.
 - `AuraClashDetectorTest`
   - detects room, instructor, and section clashes from persisted session DTOs;
+  - detects overlaps even when sessions use different timeslot IDs but
+    overlapping clock ranges;
   - previews manual moves without mutating the original session list.
+- `AuraServiceTest`
+  - blocks concurrent generation runs for the same term;
+  - prevents non-draft versions from being published;
+  - prevents publishing while unresolved hard clashes remain.
+- `AuraModuleBeanWiringTest`
+  - verifies AURA controller, service, repository, readiness, solver, and clash
+    beans are registered together under the production-default enabled flag.
+- `AuraDefaultProfileStartupIntegrationTest`
+  - Docker/Testcontainers-gated default-profile startup regression test for
+    Flyway, HTTP startup, health response, and AURA bean loading.
 - `AuraAuthorizationServiceTest`
   - requires admin permissions for AURA management;
   - accepts existing admin-upload authorization fallback.
