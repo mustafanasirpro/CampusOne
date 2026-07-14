@@ -5,7 +5,9 @@ import static org.mockito.Mockito.when;
 
 import com.campusone.aura.dto.AuraDtos.ReadinessResponse;
 import com.campusone.aura.repository.AuraJdbcRepository;
+import com.campusone.aura.repository.AuraJdbcRepository.RequirementCandidateIssue;
 import com.campusone.aura.repository.AuraJdbcRepository.TermCounts;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +27,8 @@ class AuraReadinessValidatorTest {
     void validate_missingSetup_returnsActionableIssues() {
         when(repository.countsForTerm(TERM_ID))
                 .thenReturn(new TermCounts(0, 0, 0, 0, 0));
+        when(repository.requirementsWithoutCandidates(TERM_ID))
+                .thenReturn(List.of());
 
         ReadinessResponse response =
                 new AuraReadinessValidator(repository).validate(TERM_ID);
@@ -44,11 +48,39 @@ class AuraReadinessValidatorTest {
     void validate_completeSmallDataset_isReady() {
         when(repository.countsForTerm(TERM_ID))
                 .thenReturn(new TermCounts(3, 6, 2, 2, 4));
+        when(repository.requirementsWithoutCandidates(TERM_ID))
+                .thenReturn(List.of());
 
         ReadinessResponse response =
                 new AuraReadinessValidator(repository).validate(TERM_ID);
 
         assertThat(response.ready()).isTrue();
         assertThat(response.issues()).isEmpty();
+    }
+
+    @Test
+    void validate_requirementWithoutAvailableCandidate_blocksGeneration() {
+        UUID requirementId = UUID.fromString(
+                "10000000-0000-4000-8000-000000000002");
+        when(repository.countsForTerm(TERM_ID))
+                .thenReturn(new TermCounts(3, 6, 2, 2, 4));
+        when(repository.requirementsWithoutCandidates(TERM_ID))
+                .thenReturn(List.of(new RequirementCandidateIssue(
+                        requirementId,
+                        "CSC275",
+                        "Data Structures")));
+
+        ReadinessResponse response =
+                new AuraReadinessValidator(repository).validate(TERM_ID);
+
+        assertThat(response.ready()).isFalse();
+        assertThat(response.issues())
+                .anySatisfy(issue -> {
+                    assertThat(issue.code())
+                            .isEqualTo("AURA_NO_VALID_ROOM_TIME_CANDIDATE");
+                    assertThat(issue.targetType())
+                            .isEqualTo("MEETING_REQUIREMENT");
+                    assertThat(issue.targetId()).isEqualTo(requirementId);
+                });
     }
 }
