@@ -15,6 +15,7 @@ import type {
   AuraTimetableVersion,
   CreateAuraInstructorAvailabilityRequest,
   CreateAuraRoomAvailabilityRequest,
+  CreateAuraSectionAvailabilityRequest,
   CreateAuraTermRequest,
   PageResponse,
 } from "@/types/aura";
@@ -172,6 +173,28 @@ export function listAuraRoomAvailability(
 ) {
   return apiRequest<AuraAvailability[]>(
     `${adminAuraPath}/rooms/${roomId}/availability`,
+    { signal },
+  );
+}
+
+export function upsertAuraSectionAvailability(
+  request: CreateAuraSectionAvailabilityRequest,
+) {
+  return apiRequest<AuraAvailability>(
+    `${adminAuraPath}/section-availability`,
+    {
+      body: JSON.stringify(request),
+      method: "POST",
+    },
+  );
+}
+
+export function listAuraSectionAvailability(
+  sectionId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<AuraAvailability[]>(
+    `${adminAuraPath}/sections/${sectionId}/availability`,
     { signal },
   );
 }
