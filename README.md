@@ -330,6 +330,7 @@ Production password reset email uses Resend over HTTPS. Do not use
 | `APP_CORS_ALLOWED_ORIGINS` | Production | Comma-separated exact frontend origins |
 | `CORS_ALLOWED_ORIGINS` | No | Legacy alias for exact-origin CORS |
 | `OPENAPI_ENABLED` | No | Defaults to `true` |
+| `AURA_ENABLED` | No | Enables the AURA timetable module; defaults to `true`. Set to `false` only for diagnostics or intentionally narrow tests |
 | `FLYWAY_URL` | No | Migration JDBC URL; falls back to `DB_URL` |
 | `FLYWAY_USERNAME` | No | Migration user; falls back to `DB_USERNAME` |
 | `FLYWAY_PASSWORD` | No | Migration password; falls back to `DB_PASSWORD` |
@@ -407,6 +408,16 @@ When the backend is running:
 
 For authenticated endpoints, log in through `POST /api/v1/auth/login`, then
 use the returned bearer token in Swagger UI.
+
+### AURA status
+
+AURA currently ships as an admin timetable-generation workbench with normalized
+setup records, readiness checks, Timefold-powered draft generation, timetable
+versions, hard-clash detection, manual move preview/apply, metrics, and
+publication controls. Import mapping for CSV/XLSX/PDF files, complete setup
+CRUD screens, student-specific clash-resolution cases, and localized repair are
+tracked as follow-up work and should not be treated as production-complete until
+their APIs, UI, and fixtures are implemented and verified.
 
 ## Quality Checks
 
