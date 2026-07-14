@@ -5,11 +5,15 @@ import ai.timefold.solver.core.config.solver.SolverConfig;
 import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import ai.timefold.solver.core.config.score.director.ScoreDirectorFactoryConfig;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverAssignment;
+import com.campusone.aura.repository.AuraJdbcRepository.SolverInstructorAvailability;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverRequirement;
+import com.campusone.aura.repository.AuraJdbcRepository.SolverRoomAvailability;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverRoom;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverTimeslot;
 import com.campusone.aura.solver.AuraConstraintProvider;
+import com.campusone.aura.solver.AuraInstructorAvailabilityFact;
 import com.campusone.aura.solver.AuraPlanningLesson;
+import com.campusone.aura.solver.AuraRoomAvailabilityFact;
 import com.campusone.aura.solver.AuraRoomFact;
 import com.campusone.aura.solver.AuraTimeslotFact;
 import com.campusone.aura.solver.AuraTimetableSolution;
@@ -26,6 +30,8 @@ public class AuraSolverService {
             List<SolverRequirement> requirements,
             List<SolverRoom> rooms,
             List<SolverTimeslot> timeslots,
+            List<SolverInstructorAvailability> instructorAvailability,
+            List<SolverRoomAvailability> roomAvailability,
             int terminationSeconds) {
         List<AuraRoomFact> roomFacts = rooms.stream()
                 .map(room -> new AuraRoomFact(
@@ -41,10 +47,29 @@ public class AuraSolverService {
                         timeslot.startsAt(),
                         timeslot.endsAt()))
                 .toList();
+        List<AuraInstructorAvailabilityFact> instructorAvailabilityFacts =
+                instructorAvailability.stream()
+                        .map(availability -> new AuraInstructorAvailabilityFact(
+                                availability.instructorId(),
+                                availability.timeslotId(),
+                                availability.availability()))
+                        .toList();
+        List<AuraRoomAvailabilityFact> roomAvailabilityFacts =
+                roomAvailability.stream()
+                        .map(availability -> new AuraRoomAvailabilityFact(
+                                availability.roomId(),
+                                availability.timeslotId(),
+                                availability.availability()))
+                        .toList();
         List<AuraPlanningLesson> lessons = expandLessons(requirements);
 
         AuraTimetableSolution problem =
-                new AuraTimetableSolution(roomFacts, timeslotFacts, lessons);
+                new AuraTimetableSolution(
+                        roomFacts,
+                        timeslotFacts,
+                        instructorAvailabilityFacts,
+                        roomAvailabilityFacts,
+                        lessons);
         SolverConfig solverConfig = new SolverConfig()
                 .withSolutionClass(AuraTimetableSolution.class)
                 .withEntityClasses(AuraPlanningLesson.class)
