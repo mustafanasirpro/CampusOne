@@ -205,6 +205,51 @@ public class AuraService {
         return repository.listTimeslots(universityId);
     }
 
+    public AuraDtos.AvailabilityResponse upsertInstructorAvailability(
+            UUID userId,
+            AuraDtos.CreateInstructorAvailabilityRequest request) {
+        authorizationService.requireAdmin(userId);
+        String availability = normalizeAvailability(request.availability());
+        UUID id = repository.upsertInstructorAvailability(
+                UUID.randomUUID(),
+                request,
+                availability);
+        return repository.listInstructorAvailability(request.instructorId())
+                .stream()
+                .filter(entry -> entry.id().equals(id))
+                .findFirst()
+                .orElseThrow(() -> notFound("Instructor availability was not found."));
+    }
+
+    public List<AuraDtos.AvailabilityResponse> listInstructorAvailability(
+            UUID userId,
+            UUID instructorId) {
+        authorizationService.requireAdmin(userId);
+        return repository.listInstructorAvailability(instructorId);
+    }
+
+    public AuraDtos.AvailabilityResponse upsertRoomAvailability(
+            UUID userId,
+            AuraDtos.CreateRoomAvailabilityRequest request) {
+        authorizationService.requireAdmin(userId);
+        String availability = normalizeAvailability(request.availability());
+        UUID id = repository.upsertRoomAvailability(
+                UUID.randomUUID(),
+                request,
+                availability);
+        return repository.listRoomAvailability(request.roomId()).stream()
+                .filter(entry -> entry.id().equals(id))
+                .findFirst()
+                .orElseThrow(() -> notFound("Room availability was not found."));
+    }
+
+    public List<AuraDtos.AvailabilityResponse> listRoomAvailability(
+            UUID userId,
+            UUID roomId) {
+        authorizationService.requireAdmin(userId);
+        return repository.listRoomAvailability(roomId);
+    }
+
     public OfferingResponse createOffering(
             UUID userId,
             AuraDtos.CreateOfferingRequest request) {
@@ -419,6 +464,8 @@ public class AuraService {
                     repository.solverRequirements(termId),
                     repository.solverRooms(termId),
                     repository.solverTimeslots(termId),
+                    repository.solverInstructorAvailability(termId),
+                    repository.solverRoomAvailability(termId),
                     terminationSeconds);
             UUID versionId = repository.insertVersion(
                     UUID.randomUUID(),
@@ -489,6 +536,18 @@ public class AuraService {
 
     private ResourceNotFoundException notFound(String message) {
         return new ResourceNotFoundException(message);
+    }
+
+    private String normalizeAvailability(String value) {
+        String normalized = value == null
+                ? ""
+                : value.trim().toUpperCase().replace('-', '_');
+        if (!List.of("UNAVAILABLE", "AVOID", "PREFERRED", "AVAILABLE")
+                .contains(normalized)) {
+            throw new AuraStateException(
+                    "Availability must be UNAVAILABLE, AVOID, or PREFERRED.");
+        }
+        return normalized;
     }
 
     private String checksum(String value) {
