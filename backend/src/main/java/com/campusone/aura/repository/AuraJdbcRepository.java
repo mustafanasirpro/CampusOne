@@ -439,6 +439,16 @@ public class AuraJdbcRepository {
         return id;
     }
 
+    public boolean hasActiveGenerationRun(UUID termId) {
+        Long count = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM aura_generation_runs
+                WHERE term_id = :termId
+                  AND status IN ('QUEUED', 'RUNNING')
+                """, params().addValue("termId", termId), Long.class);
+        return count != null && count > 0;
+    }
+
     public void markRunRunning(UUID runId, Instant startedAt) {
         jdbc.update("""
                 UPDATE aura_generation_runs
@@ -578,6 +588,16 @@ public class AuraJdbcRepository {
                 SET status = 'PUBLISHED', updated_at = CURRENT_TIMESTAMP
                 WHERE id = :termId
                 """, params().addValue("termId", termId));
+    }
+
+    public long countOpenHardClashes(UUID versionId) {
+        return count("""
+                SELECT COUNT(*)
+                FROM aura_clashes
+                WHERE version_id = :versionId
+                  AND severity = 'HARD'
+                  AND resolved_at IS NULL
+                """, params().addValue("versionId", versionId));
     }
 
     public List<SessionResponse> listSessions(UUID versionId) {
