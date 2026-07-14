@@ -147,6 +147,32 @@ public final class AuraDtos {
             boolean active) {
     }
 
+    public record CreateInstructorAvailabilityRequest(
+            @NotNull UUID instructorId,
+            @NotNull UUID timeslotId,
+            @NotBlank @Size(max = 20) String availability,
+            @Size(max = 300) String reason) {
+    }
+
+    public record CreateRoomAvailabilityRequest(
+            @NotNull UUID roomId,
+            @NotNull UUID timeslotId,
+            @NotBlank @Size(max = 20) String availability,
+            @Size(max = 300) String reason) {
+    }
+
+    public record AvailabilityResponse(
+            UUID id,
+            UUID targetId,
+            UUID timeslotId,
+            int dayOfWeek,
+            LocalTime startsAt,
+            LocalTime endsAt,
+            String label,
+            String availability,
+            String reason) {
+    }
+
     public record CreateOfferingRequest(
             @NotNull UUID termId,
             @NotNull UUID courseId,
