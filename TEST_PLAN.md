@@ -88,7 +88,8 @@ Focused backend tests added:
   - accepts existing admin-upload authorization fallback.
 - `AuraSolverServiceTest`
   - verifies the Timefold solver assigns sessions without hard clashes for a small fixture;
-  - verifies instructor `UNAVAILABLE` timeslots are treated as hard constraints.
+  - verifies instructor `UNAVAILABLE` timeslots are treated as hard constraints;
+  - verifies section `UNAVAILABLE` timeslots are treated as hard constraints.
 
 ## Manual AURA Regression Checklist
 
@@ -97,7 +98,7 @@ Run these in a local or staging environment as an admin:
 1. Open `/admin/aura`.
 2. Create an academic term.
 3. Add or seed rooms, timeslots, instructors, sections, offerings, and meeting requirements through the admin API.
-4. Add instructor or room availability where needed and confirm readiness catches impossible unavailable combinations.
+4. Add instructor, room, or section availability where needed and confirm readiness catches impossible unavailable combinations.
 5. Confirm readiness changes from blocked to ready.
 6. Start a generation run and watch it move from queued/running to completed.
 7. Open the generated timetable version and inspect scheduled sessions.
