@@ -344,6 +344,76 @@ public class AuraJdbcRepository {
                 availabilityMapper());
     }
 
+    public boolean sectionAndTimeslotShareUniversity(
+            UUID sectionId,
+            UUID timeslotId) {
+        Long count = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                FROM aura_sections s
+                JOIN aura_batches b ON b.id = s.batch_id
+                JOIN aura_programs p ON p.id = b.program_id
+                JOIN aura_timeslots ts ON ts.university_id = p.university_id
+                WHERE s.id = :sectionId
+                  AND ts.id = :timeslotId
+                """, params()
+                .addValue("sectionId", sectionId)
+                .addValue("timeslotId", timeslotId), Long.class);
+        return count != null && count > 0;
+    }
+
+    public UUID upsertSectionAvailability(
+            UUID id,
+            AuraDtos.CreateSectionAvailabilityRequest request,
+            String availability) {
+        Optional<UUID> existing = optionalUuid("""
+                SELECT id
+                FROM aura_section_availability
+                WHERE section_id = :sectionId
+                  AND timeslot_id = :timeslotId
+                """, params()
+                .addValue("sectionId", request.sectionId())
+                .addValue("timeslotId", request.timeslotId()));
+        if (existing.isPresent()) {
+            jdbc.update("""
+                    UPDATE aura_section_availability
+                    SET availability = :availability,
+                        reason = :reason,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :id
+                    """, params()
+                    .addValue("id", existing.get())
+                    .addValue("availability", availability)
+                    .addValue("reason", blankToNull(request.reason())));
+            return existing.get();
+        }
+        jdbc.update("""
+                INSERT INTO aura_section_availability (
+                    id, section_id, timeslot_id, availability, reason
+                ) VALUES (
+                    :id, :sectionId, :timeslotId, :availability, :reason
+                )
+                """, params()
+                .addValue("id", id)
+                .addValue("sectionId", request.sectionId())
+                .addValue("timeslotId", request.timeslotId())
+                .addValue("availability", availability)
+                .addValue("reason", blankToNull(request.reason())));
+        return id;
+    }
+
+    public List<AvailabilityResponse> listSectionAvailability(UUID sectionId) {
+        return jdbc.query("""
+                SELECT a.id, a.section_id AS target_id, a.timeslot_id,
+                    ts.day_of_week, ts.starts_at, ts.ends_at, ts.label,
+                    a.availability, a.reason
+                FROM aura_section_availability a
+                JOIN aura_timeslots ts ON ts.id = a.timeslot_id
+                WHERE a.section_id = :sectionId
+                ORDER BY ts.day_of_week ASC, ts.starts_at ASC
+                """, params().addValue("sectionId", sectionId),
+                availabilityMapper());
+    }
+
     public UUID insertOffering(
             UUID id,
             AuraDtos.CreateOfferingRequest request) {
@@ -475,6 +545,13 @@ public class AuraJdbcRepository {
                           AND ra.timeslot_id = slot.id
                           AND ra.availability = 'UNAVAILABLE'
                       )
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM aura_section_availability sa
+                        WHERE sa.section_id = o.section_id
+                          AND sa.timeslot_id = slot.id
+                          AND sa.availability = 'UNAVAILABLE'
+                      )
                   )
                 ORDER BY c.course_code ASC, r.id ASC
                 """, params().addValue("termId", termId), (rs, rowNum) ->
@@ -546,6 +623,27 @@ public class AuraJdbcRepository {
                 """, params().addValue("termId", termId), (rs, rowNum) ->
                 new SolverRoomAvailability(
                         uuid(rs, "room_id"),
+                        uuid(rs, "timeslot_id"),
+                        rs.getString("availability")));
+    }
+
+    public List<SolverSectionAvailability> solverSectionAvailability(
+            UUID termId) {
+        return jdbc.query("""
+                SELECT sa.section_id, sa.timeslot_id, sa.availability
+                FROM aura_section_availability sa
+                JOIN aura_sections s ON s.id = sa.section_id
+                JOIN aura_batches b ON b.id = s.batch_id
+                JOIN aura_programs p ON p.id = b.program_id
+                JOIN aura_timeslots ts ON ts.id = sa.timeslot_id
+                JOIN aura_academic_terms t
+                    ON t.university_id = p.university_id
+                    AND t.university_id = ts.university_id
+                WHERE t.id = :termId
+                  AND sa.availability IN ('UNAVAILABLE', 'AVOID', 'PREFERRED')
+                """, params().addValue("termId", termId), (rs, rowNum) ->
+                new SolverSectionAvailability(
+                        uuid(rs, "section_id"),
                         uuid(rs, "timeslot_id"),
                         rs.getString("availability")));
     }
@@ -1179,6 +1277,12 @@ public class AuraJdbcRepository {
 
     public record SolverRoomAvailability(
             UUID roomId,
+            UUID timeslotId,
+            String availability) {
+    }
+
+    public record SolverSectionAvailability(
+            UUID sectionId,
             UUID timeslotId,
             String availability) {
     }
