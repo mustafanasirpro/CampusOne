@@ -1,6 +1,7 @@
 package com.campusone.aura.repository;
 
 import com.campusone.aura.dto.AuraDtos;
+import com.campusone.aura.dto.AuraDtos.AvailabilityResponse;
 import com.campusone.aura.dto.AuraDtos.BatchResponse;
 import com.campusone.aura.dto.AuraDtos.ClashResponse;
 import com.campusone.aura.dto.AuraDtos.GenerationRunResponse;
@@ -240,6 +241,109 @@ public class AuraJdbcRepository {
                 timeslotMapper());
     }
 
+    public UUID upsertInstructorAvailability(
+            UUID id,
+            AuraDtos.CreateInstructorAvailabilityRequest request,
+            String availability) {
+        Optional<UUID> existing = optionalUuid("""
+                SELECT id
+                FROM aura_instructor_availability
+                WHERE instructor_id = :instructorId
+                  AND timeslot_id = :timeslotId
+                """, params()
+                .addValue("instructorId", request.instructorId())
+                .addValue("timeslotId", request.timeslotId()));
+        if (existing.isPresent()) {
+            jdbc.update("""
+                    UPDATE aura_instructor_availability
+                    SET availability = :availability, reason = :reason
+                    WHERE id = :id
+                    """, params()
+                    .addValue("id", existing.get())
+                    .addValue("availability", availability)
+                    .addValue("reason", blankToNull(request.reason())));
+            return existing.get();
+        }
+        jdbc.update("""
+                INSERT INTO aura_instructor_availability (
+                    id, instructor_id, timeslot_id, availability, reason
+                ) VALUES (
+                    :id, :instructorId, :timeslotId, :availability, :reason
+                )
+                """, params()
+                .addValue("id", id)
+                .addValue("instructorId", request.instructorId())
+                .addValue("timeslotId", request.timeslotId())
+                .addValue("availability", availability)
+                .addValue("reason", blankToNull(request.reason())));
+        return id;
+    }
+
+    public List<AvailabilityResponse> listInstructorAvailability(
+            UUID instructorId) {
+        return jdbc.query("""
+                SELECT a.id, a.instructor_id AS target_id, a.timeslot_id,
+                    ts.day_of_week, ts.starts_at, ts.ends_at, ts.label,
+                    a.availability, a.reason
+                FROM aura_instructor_availability a
+                JOIN aura_timeslots ts ON ts.id = a.timeslot_id
+                WHERE a.instructor_id = :instructorId
+                ORDER BY ts.day_of_week ASC, ts.starts_at ASC
+                """, params().addValue("instructorId", instructorId),
+                availabilityMapper());
+    }
+
+    public UUID upsertRoomAvailability(
+            UUID id,
+            AuraDtos.CreateRoomAvailabilityRequest request,
+            String availability) {
+        Optional<UUID> existing = optionalUuid("""
+                SELECT id
+                FROM aura_room_availability
+                WHERE room_id = :roomId
+                  AND timeslot_id = :timeslotId
+                """, params()
+                .addValue("roomId", request.roomId())
+                .addValue("timeslotId", request.timeslotId()));
+        if (existing.isPresent()) {
+            jdbc.update("""
+                    UPDATE aura_room_availability
+                    SET availability = :availability, reason = :reason
+                    WHERE id = :id
+                    """, params()
+                    .addValue("id", existing.get())
+                    .addValue("availability", availability)
+                    .addValue("reason", blankToNull(request.reason())));
+            return existing.get();
+        }
+        jdbc.update("""
+                INSERT INTO aura_room_availability (
+                    id, room_id, timeslot_id, availability, reason
+                ) VALUES (
+                    :id, :roomId, :timeslotId, :availability, :reason
+                )
+                """, params()
+                .addValue("id", id)
+                .addValue("roomId", request.roomId())
+                .addValue("timeslotId", request.timeslotId())
+                .addValue("availability", availability)
+                .addValue("reason", blankToNull(request.reason())));
+        return id;
+    }
+
+    public List<AvailabilityResponse> listRoomAvailability(UUID roomId) {
+        return jdbc.query("""
+                SELECT a.id, a.room_id AS target_id, a.timeslot_id,
+                    ts.day_of_week, ts.starts_at, ts.ends_at, ts.label,
+                    a.availability, a.reason
+                FROM aura_room_availability a
+                JOIN aura_timeslots ts ON ts.id = a.timeslot_id
+                WHERE a.room_id = :roomId
+                ORDER BY ts.day_of_week ASC, ts.starts_at ASC
+                """, params().addValue("roomId", roomId),
+                availabilityMapper());
+    }
+
     public UUID insertOffering(
             UUID id,
             AuraDtos.CreateOfferingRequest request) {
@@ -334,6 +438,52 @@ public class AuraJdbcRepository {
                         rs.getInt("requirements")));
     }
 
+    public List<RequirementCandidateIssue> requirementsWithoutCandidates(
+            UUID termId) {
+        return jdbc.query("""
+                SELECT r.id AS requirement_id,
+                    c.course_code,
+                    c.title AS course_title
+                FROM aura_meeting_requirements r
+                JOIN aura_course_offerings o ON o.id = r.offering_id
+                JOIN courses c ON c.id = o.course_id
+                WHERE o.term_id = :termId
+                  AND o.status = 'ACTIVE'
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM aura_rooms room
+                    JOIN aura_academic_terms term
+                        ON term.university_id = room.university_id
+                    JOIN aura_timeslots slot
+                        ON slot.university_id = term.university_id
+                    WHERE term.id = :termId
+                      AND room.active = TRUE
+                      AND slot.active = TRUE
+                      AND room.capacity >= r.required_capacity
+                      AND room.room_type = r.room_type
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM aura_instructor_availability ia
+                        WHERE ia.instructor_id = o.instructor_id
+                          AND ia.timeslot_id = slot.id
+                          AND ia.availability = 'UNAVAILABLE'
+                      )
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM aura_room_availability ra
+                        WHERE ra.room_id = room.id
+                          AND ra.timeslot_id = slot.id
+                          AND ra.availability = 'UNAVAILABLE'
+                      )
+                  )
+                ORDER BY c.course_code ASC, r.id ASC
+                """, params().addValue("termId", termId), (rs, rowNum) ->
+                new RequirementCandidateIssue(
+                        uuid(rs, "requirement_id"),
+                        rs.getString("course_code"),
+                        rs.getString("course_title")));
+    }
+
     public List<SolverRoom> solverRooms(UUID termId) {
         return jdbc.query("""
                 SELECT r.id, r.capacity, r.room_type
@@ -361,6 +511,43 @@ public class AuraJdbcRepository {
                         rs.getInt("day_of_week"),
                         rs.getObject("starts_at", LocalTime.class),
                         rs.getObject("ends_at", LocalTime.class)));
+    }
+
+    public List<SolverInstructorAvailability> solverInstructorAvailability(
+            UUID termId) {
+        return jdbc.query("""
+                SELECT ia.instructor_id, ia.timeslot_id, ia.availability
+                FROM aura_instructor_availability ia
+                JOIN aura_instructors i ON i.id = ia.instructor_id
+                JOIN aura_timeslots ts ON ts.id = ia.timeslot_id
+                JOIN aura_academic_terms t
+                    ON t.university_id = i.university_id
+                    AND t.university_id = ts.university_id
+                WHERE t.id = :termId
+                  AND ia.availability IN ('UNAVAILABLE', 'AVOID', 'PREFERRED')
+                """, params().addValue("termId", termId), (rs, rowNum) ->
+                new SolverInstructorAvailability(
+                        uuid(rs, "instructor_id"),
+                        uuid(rs, "timeslot_id"),
+                        rs.getString("availability")));
+    }
+
+    public List<SolverRoomAvailability> solverRoomAvailability(UUID termId) {
+        return jdbc.query("""
+                SELECT ra.room_id, ra.timeslot_id, ra.availability
+                FROM aura_room_availability ra
+                JOIN aura_rooms r ON r.id = ra.room_id
+                JOIN aura_timeslots ts ON ts.id = ra.timeslot_id
+                JOIN aura_academic_terms t
+                    ON t.university_id = r.university_id
+                    AND t.university_id = ts.university_id
+                WHERE t.id = :termId
+                  AND ra.availability IN ('UNAVAILABLE', 'AVOID', 'PREFERRED')
+                """, params().addValue("termId", termId), (rs, rowNum) ->
+                new SolverRoomAvailability(
+                        uuid(rs, "room_id"),
+                        uuid(rs, "timeslot_id"),
+                        rs.getString("availability")));
     }
 
     public List<SolverRequirement> solverRequirements(UUID termId) {
@@ -741,6 +928,16 @@ public class AuraJdbcRepository {
         return results.stream().findFirst();
     }
 
+    private Optional<UUID> optionalUuid(
+            String sql,
+            MapSqlParameterSource params) {
+        List<UUID> results = jdbc.query(
+                sql,
+                params,
+                (rs, rowNum) -> uuid(rs, "id"));
+        return results.stream().findFirst();
+    }
+
     private MapSqlParameterSource params() {
         return new MapSqlParameterSource();
     }
@@ -846,6 +1043,19 @@ public class AuraJdbcRepository {
                 rs.getBoolean("active"));
     }
 
+    private RowMapper<AvailabilityResponse> availabilityMapper() {
+        return (rs, rowNum) -> new AvailabilityResponse(
+                uuid(rs, "id"),
+                uuid(rs, "target_id"),
+                uuid(rs, "timeslot_id"),
+                rs.getInt("day_of_week"),
+                rs.getObject("starts_at", LocalTime.class),
+                rs.getObject("ends_at", LocalTime.class),
+                rs.getString("label"),
+                rs.getString("availability"),
+                rs.getString("reason"));
+    }
+
     private RowMapper<OfferingResponse> offeringMapper() {
         return (rs, rowNum) -> new OfferingResponse(
                 uuid(rs, "id"),
@@ -945,6 +1155,12 @@ public class AuraJdbcRepository {
             int requirements) {
     }
 
+    public record RequirementCandidateIssue(
+            UUID requirementId,
+            String courseCode,
+            String courseTitle) {
+    }
+
     public record SolverRoom(UUID id, int capacity, String roomType) {
     }
 
@@ -953,6 +1169,18 @@ public class AuraJdbcRepository {
             int dayOfWeek,
             LocalTime startsAt,
             LocalTime endsAt) {
+    }
+
+    public record SolverInstructorAvailability(
+            UUID instructorId,
+            UUID timeslotId,
+            String availability) {
+    }
+
+    public record SolverRoomAvailability(
+            UUID roomId,
+            UUID timeslotId,
+            String availability) {
     }
 
     public record SolverRequirement(
