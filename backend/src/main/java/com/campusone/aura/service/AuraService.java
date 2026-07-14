@@ -35,13 +35,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
-@Profile("!test")
-@ConditionalOnBean(AuraJdbcRepository.class)
+@ConditionalOnProperty(
+        prefix = "campusone.aura",
+        name = "enabled",
+        havingValue = "true",
+        matchIfMissing = true)
 public class AuraService {
 
     private final AuraAuthorizationService authorizationService;
