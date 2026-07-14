@@ -27,8 +27,7 @@ import jakarta.validation.constraints.Min;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
@@ -46,8 +45,11 @@ import org.springframework.web.bind.annotation.RestController;
 @Validated
 @Tag(name = "AURA")
 @SecurityRequirement(name = "bearerAuth")
-@Profile("!test")
-@ConditionalOnBean(AuraService.class)
+@ConditionalOnProperty(
+        prefix = "campusone.aura",
+        name = "enabled",
+        havingValue = "true",
+        matchIfMissing = true)
 public class AuraAdminController {
 
     private final AuraService auraService;
