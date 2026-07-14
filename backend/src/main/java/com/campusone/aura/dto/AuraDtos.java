@@ -161,6 +161,13 @@ public final class AuraDtos {
             @Size(max = 300) String reason) {
     }
 
+    public record CreateSectionAvailabilityRequest(
+            @NotNull UUID sectionId,
+            @NotNull UUID timeslotId,
+            @NotBlank @Size(max = 20) String availability,
+            @Size(max = 300) String reason) {
+    }
+
     public record AvailabilityResponse(
             UUID id,
             UUID targetId,
