@@ -40,6 +40,24 @@ export interface AuraTimeslot {
   universityId: string;
 }
 
+export type AuraAvailabilityType =
+  | "AVAILABLE"
+  | "UNAVAILABLE"
+  | "AVOID"
+  | "PREFERRED";
+
+export interface AuraAvailability {
+  availability: AuraAvailabilityType;
+  dayOfWeek: number;
+  endsAt: string;
+  id: string;
+  label: string;
+  reason: string | null;
+  startsAt: string;
+  targetId: string;
+  timeslotId: string;
+}
+
 export interface AuraInstructor {
   active: boolean;
   displayName: string;
@@ -163,4 +181,18 @@ export interface CreateAuraTermRequest {
   name: string;
   startsOn: string;
   universityId: string;
+}
+
+export interface CreateAuraInstructorAvailabilityRequest {
+  availability: AuraAvailabilityType;
+  instructorId: string;
+  reason?: string;
+  timeslotId: string;
+}
+
+export interface CreateAuraRoomAvailabilityRequest {
+  availability: AuraAvailabilityType;
+  reason?: string;
+  roomId: string;
+  timeslotId: string;
 }
