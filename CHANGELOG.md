@@ -35,6 +35,10 @@
   - draft versions with unresolved hard clashes cannot be published;
   - independent clash detection now checks actual overlapping time ranges, not
     only identical timeslot IDs.
+- AURA availability support now includes instructor and room availability API
+  endpoints, `AVOID` availability values, solver hard constraints for
+  unavailable room/timeslot and instructor/timeslot pairs, and readiness checks
+  for meeting requirements with no valid room-time candidate.
 
 ### Notes
 
