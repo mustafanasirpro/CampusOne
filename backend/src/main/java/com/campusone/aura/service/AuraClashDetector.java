@@ -16,7 +16,7 @@ public class AuraClashDetector {
             SessionResponse left = sessions.get(leftIndex);
             for (int rightIndex = leftIndex + 1; rightIndex < sessions.size(); rightIndex++) {
                 SessionResponse right = sessions.get(rightIndex);
-                if (!left.timeslotId().equals(right.timeslotId())) {
+                if (!overlaps(left, right)) {
                     continue;
                 }
                 if (left.roomId().equals(right.roomId())) {
@@ -85,6 +85,21 @@ public class AuraClashDetector {
                 session.endsAt(),
                 session.locked(),
                 session.source());
+    }
+
+    private boolean overlaps(SessionResponse left, SessionResponse right) {
+        if (left.dayOfWeek() != right.dayOfWeek()) {
+            return false;
+        }
+        if (left.timeslotId().equals(right.timeslotId())) {
+            return true;
+        }
+        if (left.startsAt() == null || left.endsAt() == null
+                || right.startsAt() == null || right.endsAt() == null) {
+            return false;
+        }
+        return left.startsAt().isBefore(right.endsAt())
+                && right.startsAt().isBefore(left.endsAt());
     }
 
     private DetectedClash clash(
