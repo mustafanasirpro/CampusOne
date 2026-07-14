@@ -66,9 +66,39 @@ class AuraClashDetectorTest {
                         ROOM_ID,
                         OTHER_TIMESLOT_ID,
                         INSTRUCTOR_ID,
-                        SECTION_ID)));
+                        SECTION_ID,
+                        LocalTime.of(10, 0),
+                        LocalTime.of(11, 0))));
 
         assertThat(clashes).isEmpty();
+    }
+
+    @Test
+    void detect_differentTimeslotIdsWithOverlappingRanges_reportsClashes() {
+        List<DetectedClash> clashes = detector.detect(List.of(
+                session(
+                        UUID.fromString("70000000-0000-4000-8000-000000000001"),
+                        ROOM_ID,
+                        TIMESLOT_ID,
+                        INSTRUCTOR_ID,
+                        SECTION_ID,
+                        LocalTime.of(9, 0),
+                        LocalTime.of(10, 30)),
+                session(
+                        UUID.fromString("70000000-0000-4000-8000-000000000002"),
+                        ROOM_ID,
+                        OTHER_TIMESLOT_ID,
+                        INSTRUCTOR_ID,
+                        SECTION_ID,
+                        LocalTime.of(10, 0),
+                        LocalTime.of(11, 0))));
+
+        assertThat(clashes)
+                .extracting(DetectedClash::clashType)
+                .containsExactlyInAnyOrder(
+                        "ROOM_DOUBLE_BOOKED",
+                        "INSTRUCTOR_DOUBLE_BOOKED",
+                        "SECTION_DOUBLE_BOOKED");
     }
 
     @Test
@@ -104,6 +134,24 @@ class AuraClashDetectorTest {
             UUID timeslotId,
             UUID instructorId,
             UUID sectionId) {
+        return session(
+                sessionId,
+                roomId,
+                timeslotId,
+                instructorId,
+                sectionId,
+                LocalTime.of(9, 0),
+                LocalTime.of(10, 0));
+    }
+
+    private SessionResponse session(
+            UUID sessionId,
+            UUID roomId,
+            UUID timeslotId,
+            UUID instructorId,
+            UUID sectionId,
+            LocalTime startsAt,
+            LocalTime endsAt) {
         return new SessionResponse(
                 sessionId,
                 VERSION_ID,
@@ -120,8 +168,8 @@ class AuraClashDetectorTest {
                 "CLASSROOM",
                 timeslotId,
                 1,
-                LocalTime.of(9, 0),
-                LocalTime.of(10, 0),
+                startsAt,
+                endsAt,
                 false,
                 "SOLVER");
     }
