@@ -17,6 +17,10 @@ springdoc:
   swagger-ui:
     enabled: true
 
+campusone:
+  aura:
+    enabled: false
+
 app:
   jwt:
     secret: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
