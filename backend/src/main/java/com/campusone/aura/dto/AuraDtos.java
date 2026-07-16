@@ -116,7 +116,8 @@ public final class AuraDtos {
             @Size(max = 120) String building,
             @NotBlank @Size(max = 120) String name,
             @Min(1) @Max(2000) int capacity,
-            @NotBlank @Size(max = 32) String roomType) {
+            @NotBlank @Size(max = 32) String roomType,
+            @Size(max = 10) List<@NotBlank @Size(max = 40) String> facilities) {
     }
 
     public record RoomResponse(
@@ -126,6 +127,7 @@ public final class AuraDtos {
             String name,
             int capacity,
             String roomType,
+            List<String> facilities,
             boolean active) {
     }
 
@@ -180,6 +182,20 @@ public final class AuraDtos {
             String reason) {
     }
 
+    public record SetupReferenceOption(
+            UUID id,
+            UUID parentId,
+            String code,
+            String name) {
+    }
+
+    public record SetupReferencesResponse(
+            UUID universityId,
+            List<SetupReferenceOption> departments,
+            List<SetupReferenceOption> courses,
+            List<SetupReferenceOption> students) {
+    }
+
     public record CreateOfferingRequest(
             @NotNull UUID termId,
             @NotNull UUID courseId,
@@ -209,7 +225,8 @@ public final class AuraDtos {
             @Min(1) @Max(4) int durationSlots,
             @NotBlank @Size(max = 32) String roomType,
             @Min(1) @Max(2000) int requiredCapacity,
-            @Size(max = 300) String notes) {
+            @Size(max = 300) String notes,
+            @Size(max = 10) List<@NotBlank @Size(max = 40) String> requiredFacilities) {
     }
 
     public record MeetingRequirementResponse(
@@ -220,7 +237,62 @@ public final class AuraDtos {
             int durationSlots,
             String roomType,
             int requiredCapacity,
-            String notes) {
+            String notes,
+            List<String> requiredFacilities) {
+    }
+
+    public record ReplaceFacilitiesRequest(
+            @NotNull @Size(max = 10)
+            List<@NotBlank @Size(max = 40) String> facilities) {
+    }
+
+    public record FacilitySetResponse(
+            UUID targetId,
+            List<String> facilities) {
+    }
+
+    public record CreateCalendarExceptionRequest(
+            @NotNull UUID termId,
+            @NotBlank @Size(max = 32) String exceptionType,
+            @NotNull LocalDate startsOn,
+            @NotNull LocalDate endsOn,
+            UUID instructorId,
+            UUID roomId,
+            UUID sectionId,
+            UUID timeslotId,
+            @Size(max = 40) String facility,
+            @NotBlank @Size(max = 300) String reason) {
+    }
+
+    public record UpdateCalendarExceptionRequest(
+            @NotBlank @Size(max = 32) String exceptionType,
+            @NotNull LocalDate startsOn,
+            @NotNull LocalDate endsOn,
+            UUID instructorId,
+            UUID roomId,
+            UUID sectionId,
+            UUID timeslotId,
+            @Size(max = 40) String facility,
+            @NotBlank @Size(max = 300) String reason,
+            @Min(0) long version) {
+    }
+
+    public record CalendarExceptionResponse(
+            UUID id,
+            UUID termId,
+            String exceptionType,
+            LocalDate startsOn,
+            LocalDate endsOn,
+            UUID instructorId,
+            UUID roomId,
+            UUID sectionId,
+            UUID timeslotId,
+            String facility,
+            String reason,
+            boolean active,
+            long version,
+            Instant createdAt,
+            Instant updatedAt) {
     }
 
     public record ReadinessIssue(
@@ -292,7 +364,70 @@ public final class AuraDtos {
             LocalTime startsAt,
             LocalTime endsAt,
             boolean locked,
-            String source) {
+            String source,
+            int occurrenceIndex,
+            int sessionsPerWeek,
+            int durationSlots,
+            int contiguousSlotsAvailable,
+            int requiredCapacity,
+            String requiredRoomType,
+            int roomCapacity,
+            List<String> requiredFacilities,
+            List<String> roomFacilities,
+            String timeslotType,
+            boolean roomActive,
+            boolean instructorActive,
+            boolean sectionActive,
+            UUID fixedRoomId,
+            UUID fixedTimeslotId,
+            String weekPattern,
+            List<Integer> customWeeks,
+            List<UUID> hardConflictOfferingIds,
+            boolean instructorUnavailable,
+            boolean roomUnavailable,
+            boolean sectionUnavailable,
+            boolean calendarException) {
+
+        public SessionResponse {
+            requiredFacilities = requiredFacilities == null
+                    ? List.of() : List.copyOf(requiredFacilities);
+            roomFacilities = roomFacilities == null
+                    ? List.of() : List.copyOf(roomFacilities);
+            customWeeks = customWeeks == null ? List.of() : List.copyOf(customWeeks);
+            hardConflictOfferingIds = hardConflictOfferingIds == null
+                    ? List.of() : List.copyOf(hardConflictOfferingIds);
+        }
+
+        public SessionResponse(
+                UUID id,
+                UUID versionId,
+                UUID offeringId,
+                UUID meetingRequirementId,
+                String courseCode,
+                String courseTitle,
+                UUID sectionId,
+                String sectionName,
+                UUID instructorId,
+                String instructorName,
+                UUID roomId,
+                String roomName,
+                String roomType,
+                UUID timeslotId,
+                int dayOfWeek,
+                LocalTime startsAt,
+                LocalTime endsAt,
+                boolean locked,
+                String source) {
+            this(
+                    id, versionId, offeringId, meetingRequirementId,
+                    courseCode, courseTitle, sectionId, sectionName,
+                    instructorId, instructorName, roomId, roomName, roomType,
+                    timeslotId, dayOfWeek, startsAt, endsAt, locked, source,
+                    1, 1, 1, 1, 1, roomType, Integer.MAX_VALUE,
+                    List.of(), List.of(), "INSTRUCTIONAL", true, true, true,
+                    null, null, "EVERY_WEEK", List.of(), List.of(),
+                    false, false, false, false);
+        }
     }
 
     public record ClashResponse(
@@ -322,6 +457,46 @@ public final class AuraDtos {
             boolean allowed,
             String message,
             List<ClashResponse> clashes) {
+    }
+
+    public record CloneVersionRequest(
+            @Size(max = 500) String notes) {
+    }
+
+    public record SessionSwapPreviewRequest(
+            @NotNull UUID otherSessionId) {
+    }
+
+    public record SessionSwapRequest(
+            @NotNull UUID otherSessionId,
+            @NotBlank @Size(max = 500) String reason) {
+    }
+
+    public record SessionPinRequest(
+            boolean pinned,
+            @Size(max = 300) String reason) {
+    }
+
+    public record VersionSessionChange(
+            UUID meetingRequirementId,
+            int occurrenceIndex,
+            UUID beforeSessionId,
+            UUID afterSessionId,
+            UUID beforeRoomId,
+            UUID afterRoomId,
+            UUID beforeTimeslotId,
+            UUID afterTimeslotId,
+            boolean assignmentChanged) {
+    }
+
+    public record VersionComparisonResponse(
+            UUID baseVersionId,
+            UUID comparedVersionId,
+            int totalOccurrences,
+            int changedOccurrences,
+            int addedOccurrences,
+            int removedOccurrences,
+            List<VersionSessionChange> changes) {
     }
 
     public record AuraMetricsResponse(
