@@ -18,8 +18,10 @@ import com.campusone.aura.dto.AuraDtos.TimetableVersionResponse;
 import com.campusone.aura.dto.AuraDtos.TimeslotResponse;
 import com.campusone.aura.exception.AuraStateException;
 import com.campusone.aura.repository.AuraJdbcRepository;
+import com.campusone.aura.repository.AuraJdbcRepository.ScopedResource;
 import com.campusone.aura.repository.AuraJdbcRepository.DetectedClash;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverAssignment;
+import com.campusone.aura.repository.AuraJdbcRepository.VersionSessionSnapshot;
 import com.campusone.common.exception.ResourceNotFoundException;
 import jakarta.annotation.PreDestroy;
 import java.nio.charset.StandardCharsets;
@@ -28,8 +30,12 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -37,6 +43,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @ConditionalOnProperty(
@@ -45,6 +54,29 @@ import org.springframework.stereotype.Service;
         havingValue = "true",
         matchIfMissing = true)
 public class AuraService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AuraService.class);
+
+    private static final Set<String> FACILITIES = Set.of(
+            "PROJECTOR",
+            "SMART_BOARD",
+            "COMPUTERS",
+            "INTERNET",
+            "LAB_EQUIPMENT",
+            "ACCESSIBLE",
+            "AIR_CONDITIONING",
+            "VIDEO_CONFERENCING",
+            "SPECIALIZED_SOFTWARE",
+            "OTHER");
+    private static final Set<String> CALENDAR_EXCEPTION_TYPES = Set.of(
+            "HOLIDAY",
+            "NON_TEACHING_DAY",
+            "UNIVERSITY_EVENT",
+            "INSTRUCTOR_ABSENCE",
+            "ROOM_CLOSURE",
+            "SECTION_RESTRICTION",
+            "TIMESLOT_CANCELLATION",
+            "FACILITY_OUTAGE");
 
     private final AuraAuthorizationService authorizationService;
     private final AuraJdbcRepository repository;
@@ -83,7 +115,8 @@ public class AuraService {
     public TermResponse createTerm(
             UUID userId,
             AuraDtos.CreateTermRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireRequestedUniversity(request.universityId(), universityId);
         if (request.startsOn().isAfter(request.endsOn())) {
             throw new AuraStateException("Term start date must be before the end date.");
         }
@@ -93,18 +126,27 @@ public class AuraService {
     }
 
     public PageResponse<TermResponse> listTerms(UUID userId, int page, int size) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
         int safePage = Math.max(0, page);
         int safeSize = Math.max(1, Math.min(size, 100));
-        long total = repository.countTerms();
-        List<TermResponse> content = repository.listTerms(safePage, safeSize);
+        long total = repository.countTerms(universityId);
+        List<TermResponse> content = repository.listTerms(
+                universityId,
+                safePage,
+                safeSize);
         return page(content, safePage, safeSize, total);
     }
 
     public ProgramResponse createProgram(
             UUID userId,
             AuraDtos.CreateProgramRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireRequestedUniversity(request.universityId(), universityId);
+        if (!repository.departmentBelongsToUniversity(
+                request.departmentId(),
+                universityId)) {
+            throw notFound("Department was not found.");
+        }
         UUID id = repository.insertProgram(UUID.randomUUID(), request);
         return repository.listPrograms(request.universityId()).stream()
                 .filter(program -> program.id().equals(id))
@@ -113,46 +155,78 @@ public class AuraService {
     }
 
     public List<ProgramResponse> listPrograms(UUID userId, UUID universityId) {
-        authorizationService.requireAdmin(userId);
-        return repository.listPrograms(universityId);
+        UUID adminUniversityId = authorizationService.requireAdminUniversity(userId);
+        requireOptionalRequestedUniversity(universityId, adminUniversityId);
+        return repository.listPrograms(adminUniversityId);
     }
 
     public BatchResponse createBatch(
             UUID userId,
             AuraDtos.CreateBatchRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.PROGRAM,
+                request.programId(),
+                universityId,
+                "Program was not found.");
         UUID id = repository.insertBatch(UUID.randomUUID(), request);
-        return repository.listBatches(request.programId()).stream()
+        return repository.listBatches(universityId, request.programId()).stream()
                 .filter(batch -> batch.id().equals(id))
                 .findFirst()
                 .orElseThrow(() -> notFound("Batch was not found."));
     }
 
     public List<BatchResponse> listBatches(UUID userId, UUID programId) {
-        authorizationService.requireAdmin(userId);
-        return repository.listBatches(programId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        if (programId != null) {
+            requireScopedResource(
+                    ScopedResource.PROGRAM,
+                    programId,
+                    universityId,
+                    "Program was not found.");
+        }
+        return repository.listBatches(universityId, programId);
     }
 
     public SectionResponse createSection(
             UUID userId,
             AuraDtos.CreateSectionRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.BATCH,
+                request.batchId(),
+                universityId,
+                "Batch was not found.");
         UUID id = repository.insertSection(UUID.randomUUID(), request);
-        return repository.listSections(request.batchId()).stream()
+        return repository.listSections(universityId, request.batchId()).stream()
                 .filter(section -> section.id().equals(id))
                 .findFirst()
                 .orElseThrow(() -> notFound("Section was not found."));
     }
 
     public List<SectionResponse> listSections(UUID userId, UUID batchId) {
-        authorizationService.requireAdmin(userId);
-        return repository.listSections(batchId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        if (batchId != null) {
+            requireScopedResource(
+                    ScopedResource.BATCH,
+                    batchId,
+                    universityId,
+                    "Batch was not found.");
+        }
+        return repository.listSections(universityId, batchId);
     }
 
     public InstructorResponse createInstructor(
             UUID userId,
             AuraDtos.CreateInstructorRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireRequestedUniversity(request.universityId(), universityId);
+        if (request.userId() != null
+                && !repository.userBelongsToUniversity(
+                        request.userId(),
+                        universityId)) {
+            throw notFound("Linked instructor account was not found.");
+        }
         UUID id = repository.insertInstructor(UUID.randomUUID(), request);
         return repository.listInstructors(request.universityId()).stream()
                 .filter(instructor -> instructor.id().equals(id))
@@ -163,18 +237,24 @@ public class AuraService {
     public List<InstructorResponse> listInstructors(
             UUID userId,
             UUID universityId) {
-        authorizationService.requireAdmin(userId);
-        return repository.listInstructors(universityId);
+        UUID adminUniversityId = authorizationService.requireAdminUniversity(userId);
+        requireOptionalRequestedUniversity(universityId, adminUniversityId);
+        return repository.listInstructors(adminUniversityId);
     }
 
+    @Transactional
     public RoomResponse createRoom(
             UUID userId,
             AuraDtos.CreateRoomRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireRequestedUniversity(request.universityId(), universityId);
         if (request.capacity() <= 0) {
             throw new AuraStateException("Room capacity must be greater than zero.");
         }
         UUID id = repository.insertRoom(UUID.randomUUID(), request);
+        repository.replaceRoomFacilities(
+                id,
+                normalizeFacilities(request.facilities()));
         return repository.listRooms(request.universityId()).stream()
                 .filter(room -> room.id().equals(id))
                 .findFirst()
@@ -182,14 +262,16 @@ public class AuraService {
     }
 
     public List<RoomResponse> listRooms(UUID userId, UUID universityId) {
-        authorizationService.requireAdmin(userId);
-        return repository.listRooms(universityId);
+        UUID adminUniversityId = authorizationService.requireAdminUniversity(userId);
+        requireOptionalRequestedUniversity(universityId, adminUniversityId);
+        return repository.listRooms(adminUniversityId);
     }
 
     public TimeslotResponse createTimeslot(
             UUID userId,
             AuraDtos.CreateTimeslotRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireRequestedUniversity(request.universityId(), universityId);
         if (!request.startsAt().isBefore(request.endsAt())) {
             throw new AuraStateException("Timeslot start time must be before the end time.");
         }
@@ -201,14 +283,25 @@ public class AuraService {
     }
 
     public List<TimeslotResponse> listTimeslots(UUID userId, UUID universityId) {
-        authorizationService.requireAdmin(userId);
-        return repository.listTimeslots(universityId);
+        UUID adminUniversityId = authorizationService.requireAdminUniversity(userId);
+        requireOptionalRequestedUniversity(universityId, adminUniversityId);
+        return repository.listTimeslots(adminUniversityId);
     }
 
     public AuraDtos.AvailabilityResponse upsertInstructorAvailability(
             UUID userId,
             AuraDtos.CreateInstructorAvailabilityRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.INSTRUCTOR,
+                request.instructorId(),
+                universityId,
+                "Instructor was not found.");
+        requireScopedResource(
+                ScopedResource.TIMESLOT,
+                request.timeslotId(),
+                universityId,
+                "Timeslot was not found.");
         String availability = normalizeAvailability(request.availability());
         UUID id = repository.upsertInstructorAvailability(
                 UUID.randomUUID(),
@@ -224,14 +317,29 @@ public class AuraService {
     public List<AuraDtos.AvailabilityResponse> listInstructorAvailability(
             UUID userId,
             UUID instructorId) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.INSTRUCTOR,
+                instructorId,
+                universityId,
+                "Instructor was not found.");
         return repository.listInstructorAvailability(instructorId);
     }
 
     public AuraDtos.AvailabilityResponse upsertRoomAvailability(
             UUID userId,
             AuraDtos.CreateRoomAvailabilityRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.ROOM,
+                request.roomId(),
+                universityId,
+                "Room was not found.");
+        requireScopedResource(
+                ScopedResource.TIMESLOT,
+                request.timeslotId(),
+                universityId,
+                "Timeslot was not found.");
         String availability = normalizeAvailability(request.availability());
         UUID id = repository.upsertRoomAvailability(
                 UUID.randomUUID(),
@@ -246,14 +354,29 @@ public class AuraService {
     public List<AuraDtos.AvailabilityResponse> listRoomAvailability(
             UUID userId,
             UUID roomId) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.ROOM,
+                roomId,
+                universityId,
+                "Room was not found.");
         return repository.listRoomAvailability(roomId);
     }
 
     public AuraDtos.AvailabilityResponse upsertSectionAvailability(
             UUID userId,
             AuraDtos.CreateSectionAvailabilityRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.SECTION,
+                request.sectionId(),
+                universityId,
+                "Section was not found.");
+        requireScopedResource(
+                ScopedResource.TIMESLOT,
+                request.timeslotId(),
+                universityId,
+                "Timeslot was not found.");
         if (!repository.sectionAndTimeslotShareUniversity(
                 request.sectionId(),
                 request.timeslotId())) {
@@ -274,14 +397,48 @@ public class AuraService {
     public List<AuraDtos.AvailabilityResponse> listSectionAvailability(
             UUID userId,
             UUID sectionId) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.SECTION,
+                sectionId,
+                universityId,
+                "Section was not found.");
         return repository.listSectionAvailability(sectionId);
+    }
+
+    public AuraDtos.SetupReferencesResponse setupReferences(UUID userId) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        return new AuraDtos.SetupReferencesResponse(
+                universityId,
+                repository.listDepartmentReferences(universityId),
+                repository.listCourseReferences(universityId),
+                repository.listStudentReferences(universityId));
     }
 
     public OfferingResponse createOffering(
             UUID userId,
             AuraDtos.CreateOfferingRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.TERM,
+                request.termId(),
+                universityId,
+                "AURA term was not found.");
+        requireScopedResource(
+                ScopedResource.SECTION,
+                request.sectionId(),
+                universityId,
+                "Section was not found.");
+        requireScopedResource(
+                ScopedResource.INSTRUCTOR,
+                request.instructorId(),
+                universityId,
+                "Instructor was not found.");
+        if (!repository.courseBelongsToUniversity(
+                request.courseId(),
+                universityId)) {
+            throw notFound("Course was not found.");
+        }
         UUID id = repository.insertOffering(UUID.randomUUID(), request);
         return repository.listOfferings(request.termId()).stream()
                 .filter(offering -> offering.id().equals(id))
@@ -290,16 +447,29 @@ public class AuraService {
     }
 
     public List<OfferingResponse> listOfferings(UUID userId, UUID termId) {
-        authorizationService.requireAdmin(userId);
-        ensureTerm(termId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.TERM,
+                termId,
+                universityId,
+                "AURA term was not found.");
         return repository.listOfferings(termId);
     }
 
+    @Transactional
     public MeetingRequirementResponse createMeetingRequirement(
             UUID userId,
             AuraDtos.CreateMeetingRequirementRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.OFFERING,
+                request.offeringId(),
+                universityId,
+                "Course offering was not found.");
         UUID id = repository.insertMeetingRequirement(UUID.randomUUID(), request);
+        repository.replaceRequirementFacilities(
+                id,
+                normalizeFacilities(request.requiredFacilities()));
         return repository.listMeetingRequirements(request.offeringId()).stream()
                 .filter(requirement -> requirement.id().equals(id))
                 .findFirst()
@@ -309,13 +479,148 @@ public class AuraService {
     public List<MeetingRequirementResponse> listMeetingRequirements(
             UUID userId,
             UUID offeringId) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.OFFERING,
+                offeringId,
+                universityId,
+                "Course offering was not found.");
         return repository.listMeetingRequirements(offeringId);
     }
 
+    @Transactional
+    public AuraDtos.FacilitySetResponse replaceRoomFacilities(
+            UUID userId,
+            UUID roomId,
+            AuraDtos.ReplaceFacilitiesRequest request) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.ROOM,
+                roomId,
+                universityId,
+                "Room was not found.");
+        Set<String> facilities = normalizeFacilities(request.facilities());
+        repository.replaceRoomFacilities(roomId, facilities);
+        return new AuraDtos.FacilitySetResponse(
+                roomId,
+                repository.listRoomFacilities(roomId));
+    }
+
+    @Transactional
+    public AuraDtos.FacilitySetResponse replaceRequirementFacilities(
+            UUID userId,
+            UUID requirementId,
+            AuraDtos.ReplaceFacilitiesRequest request) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.REQUIREMENT,
+                requirementId,
+                universityId,
+                "Meeting requirement was not found.");
+        Set<String> facilities = normalizeFacilities(request.facilities());
+        repository.replaceRequirementFacilities(requirementId, facilities);
+        return new AuraDtos.FacilitySetResponse(
+                requirementId,
+                repository.listRequirementFacilities(requirementId));
+    }
+
+    @Transactional
+    public AuraDtos.CalendarExceptionResponse createCalendarException(
+            UUID userId,
+            AuraDtos.CreateCalendarExceptionRequest request) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.TERM,
+                request.termId(),
+                universityId,
+                "AURA term was not found.");
+        String type = validateCalendarException(request, universityId);
+        String facility = normalizeOptionalFacility(request.facility());
+        UUID id = repository.insertCalendarException(
+                UUID.randomUUID(),
+                userId,
+                request,
+                type,
+                facility);
+        return repository.findCalendarException(id)
+                .orElseThrow(() -> notFound("Calendar exception was not found."));
+    }
+
+    public List<AuraDtos.CalendarExceptionResponse> listCalendarExceptions(
+            UUID userId,
+            UUID termId) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.TERM,
+                termId,
+                universityId,
+                "AURA term was not found.");
+        return repository.listCalendarExceptions(termId);
+    }
+
+    @Transactional
+    public AuraDtos.CalendarExceptionResponse updateCalendarException(
+            UUID userId,
+            UUID exceptionId,
+            AuraDtos.UpdateCalendarExceptionRequest request) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.CALENDAR_EXCEPTION,
+                exceptionId,
+                universityId,
+                "Calendar exception was not found.");
+        AuraDtos.CalendarExceptionResponse existing = repository
+                .findCalendarException(exceptionId)
+                .orElseThrow(() -> notFound("Calendar exception was not found."));
+        AuraDtos.CreateCalendarExceptionRequest validationRequest =
+                new AuraDtos.CreateCalendarExceptionRequest(
+                        existing.termId(),
+                        request.exceptionType(),
+                        request.startsOn(),
+                        request.endsOn(),
+                        request.instructorId(),
+                        request.roomId(),
+                        request.sectionId(),
+                        request.timeslotId(),
+                        request.facility(),
+                        request.reason());
+        String type = validateCalendarException(validationRequest, universityId);
+        if (!repository.updateCalendarException(
+                exceptionId,
+                request,
+                type,
+                normalizeOptionalFacility(request.facility()))) {
+            throw new AuraStateException(
+                    "This calendar exception changed while you were editing it. Refresh and try again.");
+        }
+        return repository.findCalendarException(exceptionId)
+                .orElseThrow(() -> notFound("Calendar exception was not found."));
+    }
+
+    @Transactional
+    public void deactivateCalendarException(
+            UUID userId,
+            UUID exceptionId,
+            long version) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.CALENDAR_EXCEPTION,
+                exceptionId,
+                universityId,
+                "Calendar exception was not found.");
+        if (!repository.deactivateCalendarException(exceptionId, version)) {
+            throw new AuraStateException(
+                    "This calendar exception changed while you were editing it. Refresh and try again.");
+        }
+    }
+
     public ReadinessResponse readiness(UUID userId, UUID termId) {
-        authorizationService.requireAdmin(userId);
-        ensureTerm(termId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.TERM,
+                termId,
+                universityId,
+                "AURA term was not found.");
         return readinessValidator.validate(termId);
     }
 
@@ -323,8 +628,12 @@ public class AuraService {
             UUID userId,
             UUID termId,
             AuraDtos.GenerateTimetableRequest request) {
-        authorizationService.requireAdmin(userId);
-        ensureTerm(termId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.TERM,
+                termId,
+                universityId,
+                "AURA term was not found.");
         ReadinessResponse readiness = readinessValidator.validate(termId);
         if (!readiness.ready()) {
             throw new AuraStateException(
@@ -364,13 +673,23 @@ public class AuraService {
     }
 
     public GenerationRunResponse getRun(UUID userId, UUID runId) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.RUN,
+                runId,
+                universityId,
+                "AURA generation run was not found.");
         return repository.findRun(runId)
                 .orElseThrow(() -> notFound("AURA generation run was not found."));
     }
 
     public GenerationRunResponse cancelRun(UUID userId, UUID runId) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.RUN,
+                runId,
+                universityId,
+                "AURA generation run was not found.");
         Future<?> future = runningRuns.remove(runId);
         if (future != null) {
             future.cancel(true);
@@ -382,25 +701,45 @@ public class AuraService {
     public List<TimetableVersionResponse> listVersions(
             UUID userId,
             UUID termId) {
-        authorizationService.requireAdmin(userId);
-        ensureTerm(termId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.TERM,
+                termId,
+                universityId,
+                "AURA term was not found.");
         return repository.listVersions(termId);
     }
 
     public TimetableVersionResponse getVersion(UUID userId, UUID versionId) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.VERSION,
+                versionId,
+                universityId,
+                "AURA timetable version was not found.");
         return repository.findVersion(versionId)
                 .orElseThrow(() -> notFound("AURA timetable version was not found."));
     }
 
+    @Transactional
     public TimetableVersionResponse publishVersion(
             UUID userId,
             UUID versionId) {
-        authorizationService.requireAdmin(userId);
         TimetableVersionResponse version = getVersion(userId, versionId);
         if (!"DRAFT".equals(version.status())) {
             throw new AuraStateException(
                     "Only draft timetable versions can be published.");
+        }
+        if (repository.isVersionStale(versionId)) {
+            throw new AuraStateException(
+                    "This timetable was created from older scheduling data. Clone or regenerate it before publishing.");
+        }
+        long expectedOccurrences = repository.countExpectedOccurrences(
+                version.termId());
+        long scheduledOccurrences = repository.countScheduledSessions(versionId);
+        if (scheduledOccurrences != expectedOccurrences) {
+            throw new AuraStateException(
+                    "Schedule every required session before publishing this timetable.");
         }
         long openHardClashes = repository.countOpenHardClashes(versionId);
         if (openHardClashes > 0) {
@@ -408,18 +747,90 @@ public class AuraService {
                     "Resolve all hard timetable clashes before publishing.");
         }
         repository.publishVersion(versionId, version.termId());
+        repository.insertVersionAudit(
+                versionId,
+                userId,
+                "TIMETABLE_PUBLISHED",
+                "Published timetable version " + version.versionNumber() + ".");
         return getVersion(userId, versionId);
     }
 
+    @Transactional
+    public TimetableVersionResponse cloneVersion(
+            UUID userId,
+            UUID sourceVersionId,
+            AuraDtos.CloneVersionRequest request) {
+        TimetableVersionResponse source = getVersion(userId, sourceVersionId);
+        UUID cloneId = repository.cloneVersion(
+                UUID.randomUUID(),
+                sourceVersionId,
+                repository.nextVersionNumber(source.termId()),
+                request.notes(),
+                userId,
+                "MANUAL");
+        refreshClashes(cloneId);
+        repository.insertVersionAudit(
+                cloneId,
+                userId,
+                "TIMETABLE_CLONED",
+                "Created an editable timetable draft from version "
+                        + source.versionNumber() + ".");
+        return getVersion(userId, cloneId);
+    }
+
+    public AuraDtos.VersionComparisonResponse compareVersions(
+            UUID userId,
+            UUID baseVersionId,
+            UUID comparedVersionId) {
+        TimetableVersionResponse base = getVersion(userId, baseVersionId);
+        TimetableVersionResponse compared = getVersion(userId, comparedVersionId);
+        if (!base.termId().equals(compared.termId())) {
+            throw new AuraStateException(
+                    "Timetable versions can only be compared within the same academic term.");
+        }
+        Map<String, VersionSessionSnapshot> before = snapshotsByOccurrence(
+                repository.versionSessionSnapshots(baseVersionId));
+        Map<String, VersionSessionSnapshot> after = snapshotsByOccurrence(
+                repository.versionSessionSnapshots(comparedVersionId));
+        Set<String> keys = new LinkedHashSet<>(before.keySet());
+        keys.addAll(after.keySet());
+        List<AuraDtos.VersionSessionChange> changes = keys.stream()
+                .map(key -> toVersionChange(before.get(key), after.get(key)))
+                .filter(AuraDtos.VersionSessionChange::assignmentChanged)
+                .toList();
+        int added = (int) changes.stream()
+                .filter(change -> change.beforeSessionId() == null)
+                .count();
+        int removed = (int) changes.stream()
+                .filter(change -> change.afterSessionId() == null)
+                .count();
+        return new AuraDtos.VersionComparisonResponse(
+                baseVersionId,
+                comparedVersionId,
+                keys.size(),
+                changes.size(),
+                added,
+                removed,
+                changes);
+    }
+
     public List<SessionResponse> listSessions(UUID userId, UUID versionId) {
-        authorizationService.requireAdmin(userId);
-        ensureVersion(versionId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.VERSION,
+                versionId,
+                universityId,
+                "AURA timetable version was not found.");
         return repository.listSessions(versionId);
     }
 
     public List<ClashResponse> listClashes(UUID userId, UUID versionId) {
-        authorizationService.requireAdmin(userId);
-        ensureVersion(versionId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.VERSION,
+                versionId,
+                universityId,
+                "AURA timetable version was not found.");
         return repository.listClashes(versionId);
     }
 
@@ -427,14 +838,58 @@ public class AuraService {
             UUID userId,
             UUID sessionId,
             AuraDtos.ManualMovePreviewRequest request) {
-        authorizationService.requireAdmin(userId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.SESSION,
+                sessionId,
+                universityId,
+                "AURA session was not found.");
+        requireScopedResource(
+                ScopedResource.ROOM,
+                request.roomId(),
+                universityId,
+                "Room was not found.");
+        requireScopedResource(
+                ScopedResource.TIMESLOT,
+                request.timeslotId(),
+                universityId,
+                "Timeslot was not found.");
         SessionResponse session = repository.findSession(sessionId)
                 .orElseThrow(() -> notFound("AURA session was not found."));
+        TimetableVersionResponse version = repository
+                .findVersion(session.versionId())
+                .orElseThrow(() -> notFound("AURA timetable version was not found."));
+        if (!"DRAFT".equals(version.status())) {
+            throw new AuraStateException(
+                    "Published and archived timetable versions cannot be changed.");
+        }
+        if (session.locked()) {
+            throw new AuraStateException(
+                    "Unlock this session before changing its assignment.");
+        }
+        if (!repository.roomMeetsRequirement(
+                request.roomId(),
+                session.meetingRequirementId())) {
+            return new AuraDtos.ManualMovePreviewResponse(
+                    false,
+                    "The selected room does not meet this session's capacity, type, or facility requirements.",
+                    List.of());
+        }
+        if (!repository.assignmentMeetsHardRestrictions(
+                sessionId, request.roomId(), request.timeslotId())) {
+            return new AuraDtos.ManualMovePreviewResponse(
+                    false,
+                    "The selected assignment conflicts with a fixed rule, availability, or contiguous-duration requirement.",
+                    List.of());
+        }
+        RoomResponse room = repository.findRoom(request.roomId())
+                .orElseThrow(() -> notFound("Room was not found."));
+        TimeslotResponse timeslot = repository.findTimeslot(request.timeslotId())
+                .orElseThrow(() -> notFound("Timeslot was not found."));
+        SessionResponse replacement = withAssignment(session, room, timeslot);
         List<DetectedClash> detected = clashDetector.previewMove(
                 repository.listSessions(session.versionId()),
-                sessionId,
-                request.roomId(),
-                request.timeslotId());
+                replacement);
         List<ClashResponse> clashes =
                 toPreviewClashes(session.versionId(), detected);
         boolean allowed = clashes.isEmpty();
@@ -450,7 +905,6 @@ public class AuraService {
             UUID userId,
             UUID sessionId,
             AuraDtos.ManualMoveRequest request) {
-        authorizationService.requireAdmin(userId);
         AuraDtos.ManualMovePreviewResponse preview = previewMove(
                 userId,
                 sessionId,
@@ -470,13 +924,165 @@ public class AuraService {
                 userId,
                 request.reason());
         refreshClashes(before.versionId());
+        repository.insertVersionAudit(
+                before.versionId(),
+                userId,
+                "SESSION_MOVED",
+                "Moved one scheduled session after a clash-safe preview.");
         return repository.findSession(sessionId)
                 .orElseThrow(() -> notFound("AURA session was not found."));
     }
 
+    public AuraDtos.ManualMovePreviewResponse previewSwap(
+            UUID userId,
+            UUID sessionId,
+            AuraDtos.SessionSwapPreviewRequest request) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(ScopedResource.SESSION, sessionId, universityId,
+                "AURA session was not found.");
+        requireScopedResource(ScopedResource.SESSION, request.otherSessionId(),
+                universityId, "AURA session was not found.");
+        if (sessionId.equals(request.otherSessionId())) {
+            throw new AuraStateException("Choose two different sessions to swap.");
+        }
+        SessionResponse first = repository.findSession(sessionId)
+                .orElseThrow(() -> notFound("AURA session was not found."));
+        SessionResponse second = repository.findSession(request.otherSessionId())
+                .orElseThrow(() -> notFound("AURA session was not found."));
+        if (!first.versionId().equals(second.versionId())) {
+            throw new AuraStateException(
+                    "Sessions can only be swapped within the same timetable draft.");
+        }
+        TimetableVersionResponse version = repository.findVersion(first.versionId())
+                .orElseThrow(() -> notFound("AURA timetable version was not found."));
+        if (!"DRAFT".equals(version.status())) {
+            throw new AuraStateException(
+                    "Published and archived timetable versions cannot be changed.");
+        }
+        if (first.locked() || second.locked()) {
+            throw new AuraStateException("Unlock both sessions before swapping them.");
+        }
+        if (!repository.roomMeetsRequirement(
+                second.roomId(), first.meetingRequirementId())
+                || !repository.roomMeetsRequirement(
+                        first.roomId(), second.meetingRequirementId())) {
+            return new AuraDtos.ManualMovePreviewResponse(
+                    false,
+                    "One of the rooms does not meet the swapped session's requirements.",
+                    List.of());
+        }
+        if (!repository.assignmentMeetsHardRestrictions(
+                first.id(), second.roomId(), second.timeslotId())
+                || !repository.assignmentMeetsHardRestrictions(
+                        second.id(), first.roomId(), first.timeslotId())) {
+            return new AuraDtos.ManualMovePreviewResponse(
+                    false,
+                    "The swap conflicts with a fixed rule, availability, or contiguous-duration requirement.",
+                    List.of());
+        }
+        List<SessionResponse> sessions = repository.listSessions(first.versionId());
+        List<DetectedClash> baseline = clashDetector.detect(sessions);
+        SessionResponse movedFirst = withAssignment(first, second);
+        SessionResponse movedSecond = withAssignment(second, first);
+        List<SessionResponse> swapped = sessions.stream()
+                .map(session -> session.id().equals(first.id())
+                        ? movedFirst
+                        : session.id().equals(second.id()) ? movedSecond : session)
+                .toList();
+        Set<String> baselineKeys = baseline.stream()
+                .map(this::clashKey)
+                .collect(java.util.stream.Collectors.toSet());
+        List<DetectedClash> newClashes = clashDetector.detect(swapped).stream()
+                .filter(clash -> !baselineKeys.contains(clashKey(clash)))
+                .toList();
+        return new AuraDtos.ManualMovePreviewResponse(
+                newClashes.isEmpty(),
+                newClashes.isEmpty()
+                        ? "This swap does not create a new hard clash."
+                        : "This swap would create a new clash.",
+                toPreviewClashes(first.versionId(), newClashes));
+    }
+
+    @Transactional
+    public List<SessionResponse> applySwap(
+            UUID userId,
+            UUID sessionId,
+            AuraDtos.SessionSwapRequest request) {
+        AuraDtos.ManualMovePreviewResponse preview = previewSwap(
+                userId,
+                sessionId,
+                new AuraDtos.SessionSwapPreviewRequest(request.otherSessionId()));
+        if (!preview.allowed()) {
+            throw new AuraStateException(
+                    "The requested swap would create a timetable clash.");
+        }
+        SessionResponse first = repository.findSession(sessionId)
+                .orElseThrow(() -> notFound("AURA session was not found."));
+        repository.swapSessionAssignments(
+                sessionId, request.otherSessionId(), userId, request.reason());
+        refreshClashes(first.versionId());
+        repository.insertVersionAudit(
+                first.versionId(), userId, "SESSIONS_SWAPPED",
+                "Swapped two scheduled sessions after a clash-safe preview.");
+        return List.of(
+                repository.findSession(sessionId).orElseThrow(),
+                repository.findSession(request.otherSessionId()).orElseThrow());
+    }
+
+    @Transactional
+    public SessionResponse setSessionPinned(
+            UUID userId,
+            UUID sessionId,
+            AuraDtos.SessionPinRequest request) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(ScopedResource.SESSION, sessionId, universityId,
+                "AURA session was not found.");
+        SessionResponse session = repository.findSession(sessionId)
+                .orElseThrow(() -> notFound("AURA session was not found."));
+        TimetableVersionResponse version = repository.findVersion(session.versionId())
+                .orElseThrow(() -> notFound("AURA timetable version was not found."));
+        if (!"DRAFT".equals(version.status())) {
+            throw new AuraStateException(
+                    "Only sessions in draft timetable versions can be pinned or unpinned.");
+        }
+        if (request.pinned()
+                && (request.reason() == null || request.reason().isBlank())) {
+            throw new AuraStateException("Add a reason before pinning this session.");
+        }
+        repository.setSessionPinned(sessionId, request.pinned(), request.reason());
+        repository.insertVersionAudit(
+                session.versionId(),
+                userId,
+                request.pinned() ? "SESSION_PINNED" : "SESSION_UNPINNED",
+                request.pinned()
+                        ? "Pinned one scheduled session."
+                        : "Unpinned one scheduled session.");
+        return repository.findSession(sessionId)
+                .orElseThrow(() -> notFound("AURA session was not found."));
+    }
+
+    @Transactional
+    public TimetableVersionResponse archiveVersion(UUID userId, UUID versionId) {
+        TimetableVersionResponse version = getVersion(userId, versionId);
+        if (!"DRAFT".equals(version.status())) {
+            throw new AuraStateException("Only draft timetable versions can be archived.");
+        }
+        repository.archiveVersion(versionId);
+        repository.insertVersionAudit(
+                versionId,
+                userId,
+                "TIMETABLE_ARCHIVED",
+                "Archived timetable version " + version.versionNumber() + ".");
+        return getVersion(userId, versionId);
+    }
+
     public AuraDtos.AuraMetricsResponse metrics(UUID userId, UUID termId) {
-        authorizationService.requireAdmin(userId);
-        ensureTerm(termId);
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.TERM,
+                termId,
+                universityId,
+                "AURA term was not found.");
         return repository.metrics(termId);
     }
 
@@ -486,8 +1092,8 @@ public class AuraService {
             UUID userId,
             int terminationSeconds,
             String notes) {
-        repository.markRunRunning(runId, clock.instant());
         try {
+            repository.markRunRunning(runId, clock.instant());
             AuraSolverService.SolverResult result = solverService.solve(
                     repository.solverRequirements(termId),
                     repository.solverRooms(termId),
@@ -495,6 +1101,8 @@ public class AuraService {
                     repository.solverInstructorAvailability(termId),
                     repository.solverRoomAvailability(termId),
                     repository.solverSectionAvailability(termId),
+                    repository.solverStudentAvailability(termId),
+                    repository.solverTravelRules(termId),
                     terminationSeconds);
             UUID versionId = repository.insertVersion(
                     UUID.randomUUID(),
@@ -519,9 +1127,21 @@ public class AuraService {
                             + result.assignments().size()
                             + " scheduled sessions.");
         } catch (RuntimeException exception) {
-            repository.markRunFailed(
+            LOG.error(
+                    "AURA generation run {} failed safely: {}",
                     runId,
-                    "Generation failed before a valid timetable could be saved.");
+                    exception.getMessage(),
+                    exception);
+            try {
+                repository.markRunFailed(
+                        runId,
+                        "Generation failed before a valid timetable could be saved.");
+            } catch (RuntimeException statusException) {
+                LOG.error(
+                        "AURA generation run {} status could not be updated: {}",
+                        runId,
+                        statusException.getMessage());
+            }
         } finally {
             runningRuns.remove(runId);
         }
@@ -533,16 +1153,264 @@ public class AuraService {
         repository.replaceClashes(versionId, detected);
     }
 
-    private void ensureTerm(UUID termId) {
-        if (repository.findTerm(termId).isEmpty()) {
-            throw notFound("AURA term was not found.");
+    private Map<String, VersionSessionSnapshot> snapshotsByOccurrence(
+            List<VersionSessionSnapshot> snapshots) {
+        Map<String, VersionSessionSnapshot> indexed = new LinkedHashMap<>();
+        snapshots.forEach(snapshot -> indexed.put(
+                snapshot.meetingRequirementId() + ":" + snapshot.occurrenceIndex(),
+                snapshot));
+        return indexed;
+    }
+
+    private AuraDtos.VersionSessionChange toVersionChange(
+            VersionSessionSnapshot before,
+            VersionSessionSnapshot after) {
+        VersionSessionSnapshot available = before == null ? after : before;
+        boolean changed = before == null
+                || after == null
+                || !before.roomId().equals(after.roomId())
+                || !before.timeslotId().equals(after.timeslotId())
+                || !before.instructorId().equals(after.instructorId())
+                || !before.sectionId().equals(after.sectionId());
+        return new AuraDtos.VersionSessionChange(
+                available.meetingRequirementId(),
+                available.occurrenceIndex(),
+                before == null ? null : before.sessionId(),
+                after == null ? null : after.sessionId(),
+                before == null ? null : before.roomId(),
+                after == null ? null : after.roomId(),
+                before == null ? null : before.timeslotId(),
+                after == null ? null : after.timeslotId(),
+                changed);
+    }
+
+    private SessionResponse withAssignment(
+            SessionResponse session,
+            SessionResponse assignmentSource) {
+        return new SessionResponse(
+                session.id(),
+                session.versionId(),
+                session.offeringId(),
+                session.meetingRequirementId(),
+                session.courseCode(),
+                session.courseTitle(),
+                session.sectionId(),
+                session.sectionName(),
+                session.instructorId(),
+                session.instructorName(),
+                assignmentSource.roomId(),
+                assignmentSource.roomName(),
+                assignmentSource.roomType(),
+                assignmentSource.timeslotId(),
+                assignmentSource.dayOfWeek(),
+                assignmentSource.startsAt(),
+                repository.assignmentEndTime(
+                        assignmentSource.timeslotId(), session.durationSlots()),
+                session.locked(),
+                "MANUAL",
+                session.occurrenceIndex(),
+                session.sessionsPerWeek(),
+                session.durationSlots(),
+                session.durationSlots(),
+                session.requiredCapacity(),
+                session.requiredRoomType(),
+                assignmentSource.roomCapacity(),
+                session.requiredFacilities(),
+                assignmentSource.roomFacilities(),
+                assignmentSource.timeslotType(),
+                assignmentSource.roomActive(),
+                session.instructorActive(),
+                session.sectionActive(),
+                session.fixedRoomId(),
+                session.fixedTimeslotId(),
+                session.weekPattern(),
+                session.customWeeks(),
+                session.hardConflictOfferingIds(),
+                false,
+                false,
+                false,
+                false);
+    }
+
+    private SessionResponse withAssignment(
+            SessionResponse session,
+            RoomResponse room,
+            TimeslotResponse timeslot) {
+        return new SessionResponse(
+                session.id(), session.versionId(), session.offeringId(),
+                session.meetingRequirementId(), session.courseCode(),
+                session.courseTitle(), session.sectionId(), session.sectionName(),
+                session.instructorId(), session.instructorName(), room.id(),
+                room.name(), room.roomType(), timeslot.id(), timeslot.dayOfWeek(),
+                timeslot.startsAt(), repository.assignmentEndTime(
+                        timeslot.id(), session.durationSlots()), false, "MANUAL",
+                session.occurrenceIndex(), session.sessionsPerWeek(),
+                session.durationSlots(), session.durationSlots(),
+                session.requiredCapacity(), session.requiredRoomType(), room.capacity(),
+                session.requiredFacilities(), room.facilities(), "INSTRUCTIONAL",
+                room.active(), session.instructorActive(), session.sectionActive(),
+                session.fixedRoomId(), session.fixedTimeslotId(),
+                session.weekPattern(), session.customWeeks(),
+                session.hardConflictOfferingIds(), false, false, false, false);
+    }
+
+    private String clashKey(DetectedClash clash) {
+        String first = String.valueOf(clash.primarySessionId());
+        String second = String.valueOf(clash.secondarySessionId());
+        return first.compareTo(second) <= 0
+                ? clash.clashType() + ":" + first + ":" + second
+                : clash.clashType() + ":" + second + ":" + first;
+    }
+
+    private void requireRequestedUniversity(
+            UUID requestedUniversityId,
+            UUID adminUniversityId) {
+        if (!adminUniversityId.equals(requestedUniversityId)) {
+            throw notFound("University scheduling data was not found.");
         }
     }
 
-    private void ensureVersion(UUID versionId) {
-        if (repository.findVersion(versionId).isEmpty()) {
-            throw notFound("AURA timetable version was not found.");
+    private void requireOptionalRequestedUniversity(
+            UUID requestedUniversityId,
+            UUID adminUniversityId) {
+        if (requestedUniversityId != null) {
+            requireRequestedUniversity(requestedUniversityId, adminUniversityId);
         }
+    }
+
+    private void requireScopedResource(
+            ScopedResource resource,
+            UUID resourceId,
+            UUID universityId,
+            String notFoundMessage) {
+        if (!repository.resourceBelongsToUniversity(
+                resource,
+                resourceId,
+                universityId)) {
+            throw notFound(notFoundMessage);
+        }
+    }
+
+    private Set<String> normalizeFacilities(List<String> facilities) {
+        if (facilities == null || facilities.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> normalized = new LinkedHashSet<>();
+        facilities.forEach(value -> {
+            String facility = normalizeEnumValue(value);
+            if (!FACILITIES.contains(facility)) {
+                throw new AuraStateException(
+                        "Choose a supported room facility.");
+            }
+            normalized.add(facility);
+        });
+        return normalized;
+    }
+
+    private String normalizeOptionalFacility(String facility) {
+        if (facility == null || facility.isBlank()) {
+            return null;
+        }
+        String normalized = normalizeEnumValue(facility);
+        if (!FACILITIES.contains(normalized)) {
+            throw new AuraStateException("Choose a supported room facility.");
+        }
+        return normalized;
+    }
+
+    private String validateCalendarException(
+            AuraDtos.CreateCalendarExceptionRequest request,
+            UUID universityId) {
+        String type = normalizeEnumValue(request.exceptionType());
+        if (!CALENDAR_EXCEPTION_TYPES.contains(type)) {
+            throw new AuraStateException("Choose a supported calendar exception type.");
+        }
+        if (request.startsOn().isAfter(request.endsOn())) {
+            throw new AuraStateException(
+                    "Calendar exception start date must be before the end date.");
+        }
+        TermResponse term = repository.findTerm(request.termId())
+                .orElseThrow(() -> notFound("AURA term was not found."));
+        if (request.startsOn().isBefore(term.startsOn())
+                || request.endsOn().isAfter(term.endsOn())) {
+            throw new AuraStateException(
+                    "Calendar exception dates must fall within the academic term.");
+        }
+        if (request.instructorId() != null) {
+            requireScopedResource(
+                    ScopedResource.INSTRUCTOR,
+                    request.instructorId(),
+                    universityId,
+                    "Instructor was not found.");
+        }
+        if (request.roomId() != null) {
+            requireScopedResource(
+                    ScopedResource.ROOM,
+                    request.roomId(),
+                    universityId,
+                    "Room was not found.");
+        }
+        if (request.sectionId() != null) {
+            requireScopedResource(
+                    ScopedResource.SECTION,
+                    request.sectionId(),
+                    universityId,
+                    "Section was not found.");
+        }
+        if (request.timeslotId() != null) {
+            requireScopedResource(
+                    ScopedResource.TIMESLOT,
+                    request.timeslotId(),
+                    universityId,
+                    "Timeslot was not found.");
+        }
+        validateCalendarExceptionTarget(type, request);
+        return type;
+    }
+
+    private void validateCalendarExceptionTarget(
+            String type,
+            AuraDtos.CreateCalendarExceptionRequest request) {
+        boolean valid = switch (type) {
+            case "HOLIDAY", "NON_TEACHING_DAY", "UNIVERSITY_EVENT" ->
+                    request.instructorId() == null
+                            && request.roomId() == null
+                            && request.sectionId() == null
+                            && request.facility() == null;
+            case "INSTRUCTOR_ABSENCE" -> request.instructorId() != null
+                    && request.roomId() == null
+                    && request.sectionId() == null
+                    && request.facility() == null;
+            case "ROOM_CLOSURE" -> request.roomId() != null
+                    && request.instructorId() == null
+                    && request.sectionId() == null
+                    && request.facility() == null;
+            case "SECTION_RESTRICTION" -> request.sectionId() != null
+                    && request.instructorId() == null
+                    && request.roomId() == null
+                    && request.facility() == null;
+            case "TIMESLOT_CANCELLATION" -> request.timeslotId() != null
+                    && request.instructorId() == null
+                    && request.roomId() == null
+                    && request.sectionId() == null
+                    && request.facility() == null;
+            case "FACILITY_OUTAGE" -> request.roomId() != null
+                    && request.facility() != null
+                    && !request.facility().isBlank()
+                    && request.instructorId() == null
+                    && request.sectionId() == null;
+            default -> false;
+        };
+        if (!valid) {
+            throw new AuraStateException(
+                    "Choose the resource that matches this calendar exception type.");
+        }
+    }
+
+    private String normalizeEnumValue(String value) {
+        return value == null
+                ? ""
+                : value.trim().toUpperCase(Locale.ROOT).replace('-', '_');
     }
 
     private List<ClashResponse> toPreviewClashes(
@@ -564,7 +1432,11 @@ public class AuraService {
     }
 
     private ResourceNotFoundException notFound(String message) {
-        return new ResourceNotFoundException(message);
+        String suffix = " was not found.";
+        String resourceName = message.endsWith(suffix)
+                ? message.substring(0, message.length() - suffix.length())
+                : message;
+        return new ResourceNotFoundException(resourceName);
     }
 
     private String normalizeAvailability(String value) {
