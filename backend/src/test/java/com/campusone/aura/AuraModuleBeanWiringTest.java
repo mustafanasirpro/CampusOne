@@ -11,7 +11,10 @@ import com.campusone.aura.service.AuraReadinessValidator;
 import com.campusone.aura.service.AuraService;
 import com.campusone.aura.service.AuraSolverService;
 import com.campusone.note.service.NoteAdminAuthorizationService;
+import com.campusone.moderation.repository.ModeratorRepository;
+import com.campusone.notification.service.NotificationService;
 import com.campusone.user.repository.UserRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -29,6 +32,11 @@ class AuraModuleBeanWiringTest {
                             () -> mock(UserRepository.class))
                     .withBean(NoteAdminAuthorizationService.class,
                             () -> mock(NoteAdminAuthorizationService.class))
+                    .withBean(ModeratorRepository.class,
+                            () -> mock(ModeratorRepository.class))
+                    .withBean(NotificationService.class,
+                            () -> mock(NotificationService.class))
+                    .withBean(ObjectMapper.class, ObjectMapper::new)
                     .withBean(Clock.class, Clock::systemUTC)
                     .withUserConfiguration(AuraModuleTestConfiguration.class);
 
