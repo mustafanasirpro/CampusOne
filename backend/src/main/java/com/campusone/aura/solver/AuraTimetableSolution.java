@@ -32,6 +32,10 @@ public class AuraTimetableSolution {
     private List<AuraSectionAvailabilityFact> sectionAvailability =
             new ArrayList<>();
 
+    @ProblemFactCollectionProperty
+    private List<AuraStudentAvailabilityFact> studentAvailability =
+            new ArrayList<>();
+
     @PlanningEntityCollectionProperty
     private List<AuraPlanningLesson> lessons = new ArrayList<>();
 
@@ -48,11 +52,30 @@ public class AuraTimetableSolution {
             List<AuraRoomAvailabilityFact> roomAvailability,
             List<AuraSectionAvailabilityFact> sectionAvailability,
             List<AuraPlanningLesson> lessons) {
+        this(
+                rooms,
+                timeslots,
+                instructorAvailability,
+                roomAvailability,
+                sectionAvailability,
+                List.of(),
+                lessons);
+    }
+
+    public AuraTimetableSolution(
+            List<AuraRoomFact> rooms,
+            List<AuraTimeslotFact> timeslots,
+            List<AuraInstructorAvailabilityFact> instructorAvailability,
+            List<AuraRoomAvailabilityFact> roomAvailability,
+            List<AuraSectionAvailabilityFact> sectionAvailability,
+            List<AuraStudentAvailabilityFact> studentAvailability,
+            List<AuraPlanningLesson> lessons) {
         this.rooms = new ArrayList<>(rooms);
         this.timeslots = new ArrayList<>(timeslots);
         this.instructorAvailability = new ArrayList<>(instructorAvailability);
         this.roomAvailability = new ArrayList<>(roomAvailability);
         this.sectionAvailability = new ArrayList<>(sectionAvailability);
+        this.studentAvailability = new ArrayList<>(studentAvailability);
         this.lessons = new ArrayList<>(lessons);
     }
 
@@ -74,6 +97,10 @@ public class AuraTimetableSolution {
 
     public List<AuraSectionAvailabilityFact> getSectionAvailability() {
         return sectionAvailability;
+    }
+
+    public List<AuraStudentAvailabilityFact> getStudentAvailability() {
+        return studentAvailability;
     }
 
     public List<AuraPlanningLesson> getLessons() {
