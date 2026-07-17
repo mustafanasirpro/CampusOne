@@ -11,5 +11,7 @@ public enum NotificationTargetType {
     INTERNSHIP,
     LOST_FOUND_ITEM,
     LOST_FOUND_CLAIM,
-    LOST_FOUND_MATCH
+    LOST_FOUND_MATCH,
+    AURA_TIMETABLE,
+    AURA_RESOLUTION
 }
