@@ -1,6 +1,12 @@
 package com.campusone.aura.controller;
 
 import com.campusone.aura.dto.AuraDtos;
+import com.campusone.aura.dto.AuraRegistrationDtos;
+import com.campusone.aura.dto.AuraResolutionDtos;
+import com.campusone.aura.dto.AuraResolutionDtos.ResolutionCaseResponse;
+import com.campusone.aura.dto.AuraScenarioDtos;
+import com.campusone.aura.dto.AuraRegistrationDtos.PersonalTimetableResponse;
+import com.campusone.aura.dto.AuraRegistrationDtos.StudentRegistrationResponse;
 import com.campusone.aura.dto.AuraDtos.AvailabilityResponse;
 import com.campusone.aura.dto.AuraDtos.BatchResponse;
 import com.campusone.aura.dto.AuraDtos.ClashResponse;
@@ -18,6 +24,10 @@ import com.campusone.aura.dto.AuraDtos.TermResponse;
 import com.campusone.aura.dto.AuraDtos.TimetableVersionResponse;
 import com.campusone.aura.dto.AuraDtos.TimeslotResponse;
 import com.campusone.aura.service.AuraService;
+import com.campusone.aura.service.AuraRegistrationService;
+import com.campusone.aura.service.AuraExportService;
+import com.campusone.aura.service.AuraResolutionService;
+import com.campusone.aura.service.AuraScenarioService;
 import com.campusone.security.CampusOneUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -30,12 +40,17 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -54,9 +69,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuraAdminController {
 
     private final AuraService auraService;
+    private final AuraRegistrationService registrationService;
+    private final AuraExportService exportService;
+    private final AuraResolutionService resolutionService;
+    private final AuraScenarioService scenarioService;
 
-    public AuraAdminController(AuraService auraService) {
+    public AuraAdminController(
+            AuraService auraService,
+            AuraRegistrationService registrationService,
+            AuraExportService exportService,
+            AuraResolutionService resolutionService,
+            AuraScenarioService scenarioService) {
         this.auraService = auraService;
+        this.registrationService = registrationService;
+        this.exportService = exportService;
+        this.resolutionService = resolutionService;
+        this.scenarioService = scenarioService;
     }
 
     @PostMapping("/terms")
@@ -92,6 +120,13 @@ public class AuraAdminController {
         return ResponseEntity.ok(auraService.createProgram(
                 principal.getUserId(),
                 request));
+    }
+
+    @GetMapping("/setup-references")
+    @Operation(summary = "List university-scoped setup reference data")
+    public ResponseEntity<AuraDtos.SetupReferencesResponse> setupReferences(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal) {
+        return ResponseEntity.ok(auraService.setupReferences(principal.getUserId()));
     }
 
     @GetMapping("/programs")
@@ -182,6 +217,18 @@ public class AuraAdminController {
         return ResponseEntity.ok(auraService.listRooms(
                 principal.getUserId(),
                 universityId));
+    }
+
+    @PutMapping("/rooms/{roomId}/facilities")
+    @Operation(summary = "Replace room facilities")
+    public ResponseEntity<AuraDtos.FacilitySetResponse> replaceRoomFacilities(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID roomId,
+            @Valid @RequestBody AuraDtos.ReplaceFacilitiesRequest request) {
+        return ResponseEntity.ok(auraService.replaceRoomFacilities(
+                principal.getUserId(),
+                roomId,
+                request));
     }
 
     @PostMapping("/timeslots")
@@ -309,6 +356,71 @@ public class AuraAdminController {
                 offeringId));
     }
 
+    @PutMapping("/meeting-requirements/{requirementId}/facilities")
+    @Operation(summary = "Replace meeting requirement facilities")
+    public ResponseEntity<AuraDtos.FacilitySetResponse>
+            replaceMeetingRequirementFacilities(
+                    @AuthenticationPrincipal CampusOneUserPrincipal principal,
+                    @PathVariable UUID requirementId,
+                    @Valid @RequestBody AuraDtos.ReplaceFacilitiesRequest request) {
+        return ResponseEntity.ok(auraService.replaceRequirementFacilities(
+                principal.getUserId(),
+                requirementId,
+                request));
+    }
+
+    @PostMapping("/calendar-exceptions")
+    @Operation(summary = "Create a term calendar exception")
+    public ResponseEntity<AuraDtos.CalendarExceptionResponse>
+            createCalendarException(
+                    @AuthenticationPrincipal CampusOneUserPrincipal principal,
+                    @Valid @RequestBody AuraDtos.CreateCalendarExceptionRequest request) {
+        AuraDtos.CalendarExceptionResponse created =
+                auraService.createCalendarException(
+                        principal.getUserId(),
+                        request);
+        return ResponseEntity.created(URI.create(
+                "/api/v1/admin/aura/calendar-exceptions/" + created.id()))
+                .body(created);
+    }
+
+    @GetMapping("/terms/{termId}/calendar-exceptions")
+    @Operation(summary = "List term calendar exceptions")
+    public ResponseEntity<List<AuraDtos.CalendarExceptionResponse>>
+            listCalendarExceptions(
+                    @AuthenticationPrincipal CampusOneUserPrincipal principal,
+                    @PathVariable UUID termId) {
+        return ResponseEntity.ok(auraService.listCalendarExceptions(
+                principal.getUserId(),
+                termId));
+    }
+
+    @PatchMapping("/calendar-exceptions/{exceptionId}")
+    @Operation(summary = "Update a term calendar exception")
+    public ResponseEntity<AuraDtos.CalendarExceptionResponse>
+            updateCalendarException(
+                    @AuthenticationPrincipal CampusOneUserPrincipal principal,
+                    @PathVariable UUID exceptionId,
+                    @Valid @RequestBody AuraDtos.UpdateCalendarExceptionRequest request) {
+        return ResponseEntity.ok(auraService.updateCalendarException(
+                principal.getUserId(),
+                exceptionId,
+                request));
+    }
+
+    @DeleteMapping("/calendar-exceptions/{exceptionId}")
+    @Operation(summary = "Deactivate a term calendar exception")
+    public ResponseEntity<Void> deactivateCalendarException(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID exceptionId,
+            @RequestParam @Min(0) long version) {
+        auraService.deactivateCalendarException(
+                principal.getUserId(),
+                exceptionId,
+                version);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/terms/{termId}/readiness")
     @Operation(summary = "Validate whether a term is ready for generation")
     public ResponseEntity<ReadinessResponse> readiness(
@@ -381,6 +493,35 @@ public class AuraAdminController {
                 versionId));
     }
 
+    @PostMapping("/versions/{versionId}/clone")
+    @Operation(summary = "Clone a timetable version into a new editable draft")
+    public ResponseEntity<TimetableVersionResponse> cloneVersion(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID versionId,
+            @Valid @RequestBody AuraDtos.CloneVersionRequest request) {
+        return ResponseEntity.ok(auraService.cloneVersion(
+                principal.getUserId(), versionId, request));
+    }
+
+    @GetMapping("/versions/{versionId}/compare/{otherVersionId}")
+    @Operation(summary = "Compare two timetable versions from the same term")
+    public ResponseEntity<AuraDtos.VersionComparisonResponse> compareVersions(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID versionId,
+            @PathVariable UUID otherVersionId) {
+        return ResponseEntity.ok(auraService.compareVersions(
+                principal.getUserId(), versionId, otherVersionId));
+    }
+
+    @PostMapping("/versions/{versionId}/archive")
+    @Operation(summary = "Archive an editable timetable draft")
+    public ResponseEntity<TimetableVersionResponse> archiveVersion(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID versionId) {
+        return ResponseEntity.ok(auraService.archiveVersion(
+                principal.getUserId(), versionId));
+    }
+
     @GetMapping("/versions/{versionId}/sessions")
     @Operation(summary = "List scheduled sessions for a timetable version")
     public ResponseEntity<List<SessionResponse>> listSessions(
@@ -389,6 +530,22 @@ public class AuraAdminController {
         return ResponseEntity.ok(auraService.listSessions(
                 principal.getUserId(),
                 versionId));
+    }
+
+    @GetMapping("/versions/{versionId}/export")
+    @Operation(summary = "Export a timetable version")
+    public ResponseEntity<byte[]> exportVersion(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID versionId,
+            @RequestParam(defaultValue = "CSV") String format) {
+        AuraExportService.ExportPayload export = exportService.export(
+                principal.getUserId(), versionId, format);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(export.contentType()));
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename(export.filename())
+                .build());
+        return ResponseEntity.ok().headers(headers).body(export.bytes());
     }
 
     @GetMapping("/versions/{versionId}/clashes")
@@ -425,6 +582,36 @@ public class AuraAdminController {
                 request));
     }
 
+    @PostMapping("/sessions/{sessionId}/swap-preview")
+    @Operation(summary = "Preview a safe swap between two draft sessions")
+    public ResponseEntity<AuraDtos.ManualMovePreviewResponse> previewSwap(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID sessionId,
+            @Valid @RequestBody AuraDtos.SessionSwapPreviewRequest request) {
+        return ResponseEntity.ok(auraService.previewSwap(
+                principal.getUserId(), sessionId, request));
+    }
+
+    @PatchMapping("/sessions/{sessionId}/swap")
+    @Operation(summary = "Apply a clash-safe swap between two draft sessions")
+    public ResponseEntity<List<SessionResponse>> applySwap(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID sessionId,
+            @Valid @RequestBody AuraDtos.SessionSwapRequest request) {
+        return ResponseEntity.ok(auraService.applySwap(
+                principal.getUserId(), sessionId, request));
+    }
+
+    @PatchMapping("/sessions/{sessionId}/pin")
+    @Operation(summary = "Pin or unpin a session in an editable draft")
+    public ResponseEntity<SessionResponse> setSessionPinned(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID sessionId,
+            @Valid @RequestBody AuraDtos.SessionPinRequest request) {
+        return ResponseEntity.ok(auraService.setSessionPinned(
+                principal.getUserId(), sessionId, request));
+    }
+
     @GetMapping("/terms/{termId}/metrics")
     @Operation(summary = "Get AURA timetable metrics")
     public ResponseEntity<AuraDtos.AuraMetricsResponse> metrics(
@@ -433,5 +620,135 @@ public class AuraAdminController {
         return ResponseEntity.ok(auraService.metrics(
                 principal.getUserId(),
                 termId));
+    }
+
+    @PostMapping("/registrations")
+    @Operation(summary = "Create an individual student course registration")
+    public ResponseEntity<StudentRegistrationResponse> createRegistration(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @Valid @RequestBody AuraRegistrationDtos.CreateRegistrationRequest request) {
+        StudentRegistrationResponse response = registrationService.createRegistration(
+                principal.getUserId(), request);
+        return ResponseEntity.created(
+                        URI.create("/api/v1/admin/aura/registrations/" + response.id()))
+                .body(response);
+    }
+
+    @GetMapping("/terms/{termId}/registrations")
+    @Operation(summary = "List student registrations for a term")
+    public ResponseEntity<List<StudentRegistrationResponse>> listRegistrations(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID termId,
+            @RequestParam(required = false) UUID studentUserId) {
+        return ResponseEntity.ok(registrationService.listRegistrations(
+                principal.getUserId(), termId, studentUserId));
+    }
+
+    @PatchMapping("/registrations/{registrationId}")
+    @Operation(summary = "Update a student registration with optimistic locking")
+    public ResponseEntity<StudentRegistrationResponse> updateRegistration(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID registrationId,
+            @Valid @RequestBody AuraRegistrationDtos.UpdateRegistrationRequest request) {
+        return ResponseEntity.ok(registrationService.updateRegistration(
+                principal.getUserId(), registrationId, request));
+    }
+
+    @GetMapping("/terms/{termId}/students/{studentUserId}/timetable")
+    @Operation(summary = "Inspect a student's personal timetable")
+    public ResponseEntity<PersonalTimetableResponse> studentTimetable(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID termId,
+            @PathVariable UUID studentUserId) {
+        return ResponseEntity.ok(registrationService.adminPersonalTimetable(
+                principal.getUserId(), termId, studentUserId));
+    }
+
+    @GetMapping("/terms/{termId}/resolution-cases")
+    @Operation(summary = "List timetable resolution cases for a term")
+    public ResponseEntity<List<ResolutionCaseResponse>> listResolutionCases(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID termId) {
+        return ResponseEntity.ok(resolutionService.listAdminCases(
+                principal.getUserId(), termId));
+    }
+
+    @PostMapping("/resolution-cases/{caseId}/analyze")
+    @Operation(summary = "Generate ranked student-only resolution suggestions")
+    public ResponseEntity<ResolutionCaseResponse> analyzeResolutionCase(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID caseId) {
+        return ResponseEntity.ok(resolutionService.analyze(
+                principal.getUserId(), caseId));
+    }
+
+    @PostMapping("/resolution-cases/{caseId}/approve")
+    @Operation(summary = "Approve a safe timetable resolution suggestion")
+    public ResponseEntity<ResolutionCaseResponse> approveResolutionCase(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID caseId,
+            @Valid @RequestBody AuraResolutionDtos.ResolutionDecisionRequest request) {
+        return ResponseEntity.ok(resolutionService.approve(
+                principal.getUserId(), caseId, request));
+    }
+
+    @PostMapping("/resolution-cases/{caseId}/reject")
+    @Operation(summary = "Reject a timetable resolution case")
+    public ResponseEntity<ResolutionCaseResponse> rejectResolutionCase(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID caseId,
+            @Valid @RequestBody AuraResolutionDtos.ResolutionDecisionRequest request) {
+        return ResponseEntity.ok(resolutionService.reject(
+                principal.getUserId(), caseId, request));
+    }
+
+    @PostMapping("/resolution-cases/{caseId}/apply")
+    @Operation(summary = "Apply an approved student-only timetable resolution")
+    public ResponseEntity<ResolutionCaseResponse> applyResolutionCase(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID caseId,
+            @Valid @RequestBody AuraResolutionDtos.ResolutionDecisionRequest request) {
+        return ResponseEntity.ok(resolutionService.apply(
+                principal.getUserId(), caseId, request));
+    }
+
+    @PostMapping("/terms/{termId}/what-if")
+    @Operation(summary = "Run a non-destructive timetable what-if analysis")
+    public ResponseEntity<AuraScenarioDtos.WhatIfResponse> runWhatIf(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID termId,
+            @Valid @RequestBody AuraScenarioDtos.WhatIfRequest request) {
+        return ResponseEntity.ok(scenarioService.runWhatIf(
+                principal.getUserId(), termId, request));
+    }
+
+    @GetMapping("/terms/{termId}/what-if")
+    @Operation(summary = "List timetable what-if analyses")
+    public ResponseEntity<List<AuraScenarioDtos.WhatIfResponse>> listWhatIf(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID termId) {
+        return ResponseEntity.ok(scenarioService.listWhatIf(
+                principal.getUserId(), termId));
+    }
+
+    @PostMapping("/terms/{termId}/emergency-repairs")
+    @Operation(summary = "Create a minimally scoped emergency repair draft")
+    public ResponseEntity<AuraScenarioDtos.EmergencyRepairResponse>
+            createEmergencyRepair(
+                    @AuthenticationPrincipal CampusOneUserPrincipal principal,
+                    @PathVariable UUID termId,
+                    @Valid @RequestBody AuraScenarioDtos.EmergencyRepairRequest request) {
+        return ResponseEntity.accepted().body(scenarioService.createEmergencyDraft(
+                principal.getUserId(), termId, request));
+    }
+
+    @GetMapping("/terms/{termId}/emergency-repairs")
+    @Operation(summary = "List emergency repair requests")
+    public ResponseEntity<List<AuraScenarioDtos.EmergencyRepairResponse>>
+            listEmergencyRepairs(
+                    @AuthenticationPrincipal CampusOneUserPrincipal principal,
+                    @PathVariable UUID termId) {
+        return ResponseEntity.ok(scenarioService.listEmergencies(
+                principal.getUserId(), termId));
     }
 }
