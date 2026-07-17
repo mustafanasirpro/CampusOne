@@ -11,5 +11,6 @@ public enum NotificationType {
     INTERNSHIP_POSTED,
     NOTE_ACTIVITY,
     LOST_FOUND_UPDATE,
+    AURA_UPDATE,
     ADMIN_MESSAGE
 }
