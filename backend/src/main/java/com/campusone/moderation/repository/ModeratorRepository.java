@@ -30,4 +30,12 @@ public interface ModeratorRepository
             where moderator.active = true
             """)
     List<UUID> findActiveModeratorUserIds();
+
+    @Query("""
+            select moderator.userId
+            from Moderator moderator
+            where moderator.active = true
+              and moderator.role = com.campusone.moderation.entity.ModeratorRole.ADMIN
+            """)
+    List<UUID> findActiveAdminUserIds();
 }
