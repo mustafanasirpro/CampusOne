@@ -20,7 +20,6 @@ import com.campusone.aura.exception.AuraStateException;
 import com.campusone.aura.repository.AuraJdbcRepository;
 import com.campusone.aura.repository.AuraJdbcRepository.ScopedResource;
 import com.campusone.aura.repository.AuraJdbcRepository.DetectedClash;
-import com.campusone.aura.repository.AuraJdbcRepository.SolverAssignment;
 import com.campusone.aura.repository.AuraJdbcRepository.VersionSessionSnapshot;
 import com.campusone.common.exception.ResourceNotFoundException;
 import jakarta.annotation.PreDestroy;
@@ -28,6 +27,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -41,7 +41,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
@@ -83,6 +85,8 @@ public class AuraService {
     private final AuraReadinessValidator readinessValidator;
     private final AuraSolverService solverService;
     private final AuraClashDetector clashDetector;
+    private final AuraGenerationPersistenceService generationPersistenceService;
+    private final AuraNotificationService notificationService;
     private final Clock clock;
     private final ExecutorService generationExecutor =
             Executors.newSingleThreadExecutor(runnable -> {
@@ -98,12 +102,16 @@ public class AuraService {
             AuraReadinessValidator readinessValidator,
             AuraSolverService solverService,
             AuraClashDetector clashDetector,
+            AuraGenerationPersistenceService generationPersistenceService,
+            AuraNotificationService notificationService,
             Clock clock) {
         this.authorizationService = authorizationService;
         this.repository = repository;
         this.readinessValidator = readinessValidator;
         this.solverService = solverService;
         this.clashDetector = clashDetector;
+        this.generationPersistenceService = generationPersistenceService;
+        this.notificationService = notificationService;
         this.clock = clock;
     }
 
@@ -639,6 +647,8 @@ public class AuraService {
             throw new AuraStateException(
                     "AURA is not ready to generate this timetable yet.");
         }
+        repository.expireAbandonedGenerationRuns(
+                clock.instant().minus(Duration.ofMinutes(10)));
         if (repository.hasActiveGenerationRun(termId)) {
             throw new AuraStateException(
                     "A generation run is already active for this term.");
@@ -646,29 +656,34 @@ public class AuraService {
         int terminationSeconds = request.terminationSeconds() == null
                 ? 30
                 : Math.max(1, Math.min(request.terminationSeconds(), 300));
-        UUID revisionId = repository.insertRevision(
-                UUID.randomUUID(),
-                termId,
-                repository.nextRevisionNumber(termId),
-                checksum(readiness.toString()),
-                "AURA readiness snapshot: "
-                        + readiness.meetingRequirements()
-                        + " meeting requirements.",
-                userId);
-        UUID runId = repository.insertRun(
-                UUID.randomUUID(),
-                termId,
-                revisionId,
-                userId,
-                terminationSeconds);
-        Future<?> future = generationExecutor.submit(() ->
-                executeGeneration(
-                        runId,
-                        termId,
-                        userId,
-                        terminationSeconds,
-                        request.notes()));
-        runningRuns.put(runId, future);
+        UUID revisionId = UUID.randomUUID();
+        UUID runId = UUID.randomUUID();
+        try {
+            repository.createGenerationRun(
+                    runId,
+                    revisionId,
+                    termId,
+                    checksum(readiness.toString()),
+                    "AURA readiness snapshot: "
+                            + readiness.meetingRequirements()
+                            + " meeting requirements.",
+                    userId,
+                    terminationSeconds);
+        } catch (DataIntegrityViolationException exception) {
+            throw new AuraStateException(
+                    "A generation run is already active for this term.");
+        }
+        FutureTask<Void> task = new FutureTask<>(() -> {
+            executeGeneration(
+                    runId,
+                    termId,
+                    userId,
+                    terminationSeconds,
+                    request.notes());
+            return null;
+        });
+        runningRuns.put(runId, task);
+        generationExecutor.execute(task);
         return getRun(userId, runId);
     }
 
@@ -741,17 +756,28 @@ public class AuraService {
             throw new AuraStateException(
                     "Schedule every required session before publishing this timetable.");
         }
+        if (repository.countOccurrenceIntegrityViolations(versionId) > 0) {
+            throw new AuraStateException(
+                    "Each meeting requirement must contain exactly its required weekly occurrences before publishing.");
+        }
         long openHardClashes = repository.countOpenHardClashes(versionId);
         if (openHardClashes > 0) {
             throw new AuraStateException(
                     "Resolve all hard timetable clashes before publishing.");
         }
-        repository.publishVersion(versionId, version.termId());
+        if (!repository.publishVersion(versionId, version.termId())) {
+            throw new AuraStateException(
+                    "This timetable changed while it was being published. Refresh and try again.");
+        }
         repository.insertVersionAudit(
                 versionId,
                 userId,
                 "TIMETABLE_PUBLISHED",
                 "Published timetable version " + version.versionNumber() + ".");
+        notificationService.notifyTimetablePublished(
+                repository.activeStudentUserIds(version.termId()),
+                userId,
+                versionId);
         return getVersion(userId, versionId);
     }
 
@@ -901,6 +927,7 @@ public class AuraService {
                 clashes);
     }
 
+    @Transactional
     public SessionResponse applyMove(
             UUID userId,
             UUID sessionId,
@@ -917,12 +944,16 @@ public class AuraService {
         }
         SessionResponse before = repository.findSession(sessionId)
                 .orElseThrow(() -> notFound("AURA session was not found."));
-        repository.moveSession(
+        boolean moved = repository.moveSession(
                 sessionId,
                 request.roomId(),
                 request.timeslotId(),
                 userId,
                 request.reason());
+        if (!moved) {
+            throw new AuraStateException(
+                    "This draft changed while the move was being applied. Refresh and try again.");
+        }
         refreshClashes(before.versionId());
         repository.insertVersionAudit(
                 before.versionId(),
@@ -1018,8 +1049,11 @@ public class AuraService {
         }
         SessionResponse first = repository.findSession(sessionId)
                 .orElseThrow(() -> notFound("AURA session was not found."));
-        repository.swapSessionAssignments(
-                sessionId, request.otherSessionId(), userId, request.reason());
+        if (!repository.swapSessionAssignments(
+                sessionId, request.otherSessionId(), userId, request.reason())) {
+            throw new AuraStateException(
+                    "This draft changed while the swap was being applied. Refresh and try again.");
+        }
         refreshClashes(first.versionId());
         repository.insertVersionAudit(
                 first.versionId(), userId, "SESSIONS_SWAPPED",
@@ -1049,7 +1083,11 @@ public class AuraService {
                 && (request.reason() == null || request.reason().isBlank())) {
             throw new AuraStateException("Add a reason before pinning this session.");
         }
-        repository.setSessionPinned(sessionId, request.pinned(), request.reason());
+        if (!repository.setSessionPinned(
+                sessionId, request.pinned(), request.reason())) {
+            throw new AuraStateException(
+                    "This draft changed while the session was being updated. Refresh and try again.");
+        }
         repository.insertVersionAudit(
                 session.versionId(),
                 userId,
@@ -1067,7 +1105,10 @@ public class AuraService {
         if (!"DRAFT".equals(version.status())) {
             throw new AuraStateException("Only draft timetable versions can be archived.");
         }
-        repository.archiveVersion(versionId);
+        if (!repository.archiveVersion(versionId)) {
+            throw new AuraStateException(
+                    "This timetable changed while it was being archived. Refresh and try again.");
+        }
         repository.insertVersionAudit(
                 versionId,
                 userId,
@@ -1093,7 +1134,9 @@ public class AuraService {
             int terminationSeconds,
             String notes) {
         try {
-            repository.markRunRunning(runId, clock.instant());
+            if (!repository.markRunRunning(runId, clock.instant())) {
+                return;
+            }
             AuraSolverService.SolverResult result = solverService.solve(
                     repository.solverRequirements(termId),
                     repository.solverRooms(termId),
@@ -1104,28 +1147,13 @@ public class AuraService {
                     repository.solverStudentAvailability(termId),
                     repository.solverTravelRules(termId),
                     terminationSeconds);
-            UUID versionId = repository.insertVersion(
-                    UUID.randomUUID(),
-                    termId,
+            generationPersistenceService.persistCompletedRun(
                     runId,
-                    repository.nextVersionNumber(termId),
+                    termId,
+                    userId,
                     result.score(),
                     notes,
-                    userId);
-            for (SolverAssignment assignment : result.assignments()) {
-                repository.insertSession(
-                        UUID.randomUUID(),
-                        versionId,
-                        assignment,
-                        "SOLVER");
-            }
-            refreshClashes(versionId);
-            repository.markRunCompleted(
-                    runId,
-                    result.score(),
-                    "Timetable generated with "
-                            + result.assignments().size()
-                            + " scheduled sessions.");
+                    result.assignments());
         } catch (RuntimeException exception) {
             LOG.error(
                     "AURA generation run {} failed safely: {}",
