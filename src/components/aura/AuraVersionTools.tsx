@@ -1,20 +1,26 @@
-import { Archive, Copy, Download, GitCompare, Lock, Repeat2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Archive, Copy, Download, GitCompare, Lock, MoveRight, Repeat2, Unlock } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { ApiError } from "@/api/apiClient";
 import {
+  applyAuraSessionMove,
   applyAuraSessionSwap,
   archiveAuraVersion,
   cloneAuraVersion,
   compareAuraVersions,
   downloadAuraVersion,
+  listAuraRooms,
+  listAuraTimeslots,
+  previewAuraSessionMove,
   previewAuraSessionSwap,
   setAuraSessionPinned,
 } from "@/api/auraApi";
 import { Button, Card, CardContent, CardHeader, CardTitle, ErrorMessage } from "@/components/common";
 import type {
   AuraMovePreview,
+  AuraRoom,
   AuraSession,
+  AuraTimeslot,
   AuraTimetableVersion,
   AuraVersionComparison,
 } from "@/types/aura";
@@ -42,6 +48,13 @@ export function AuraVersionTools({
   const [reason, setReason] = useState("");
   const [comparison, setComparison] = useState<AuraVersionComparison | null>(null);
   const [swapPreview, setSwapPreview] = useState<AuraMovePreview | null>(null);
+  const [moveSessionId, setMoveSessionId] = useState("");
+  const [moveRoomId, setMoveRoomId] = useState("");
+  const [moveTimeslotId, setMoveTimeslotId] = useState("");
+  const [movePreview, setMovePreview] = useState<AuraMovePreview | null>(null);
+  const [moveReason, setMoveReason] = useState("");
+  const [rooms, setRooms] = useState<AuraRoom[]>([]);
+  const [timeslots, setTimeslots] = useState<AuraTimeslot[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
 
@@ -50,6 +63,26 @@ export function AuraVersionTools({
     [selectedVersionId, versions],
   );
   const draft = selectedVersion?.status === "DRAFT";
+  const firstSession = sessions.find((session) => session.id === firstSessionId);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    if (!draft) return () => controller.abort();
+    void Promise.all([
+      listAuraRooms("", controller.signal),
+      listAuraTimeslots("", controller.signal),
+    ])
+      .then(([roomOptions, timeslotOptions]) => {
+        setRooms(roomOptions.filter((room) => room.active));
+        setTimeslots(timeslotOptions.filter((timeslot) => timeslot.active));
+      })
+      .catch((requestError: unknown) => {
+        if (!controller.signal.aborted) {
+          setError(message(requestError, "Room and timeslot options could not be loaded."));
+        }
+      });
+    return () => controller.abort();
+  }, [draft]);
 
   const run = async (action: string, task: () => Promise<void>) => {
     setPendingAction(action);
@@ -141,6 +174,111 @@ export function AuraVersionTools({
         </div>
 
         <div className="grid gap-3 rounded-2xl border border-slate-200 p-4 lg:grid-cols-2">
+          <p className="font-semibold text-slate-950 lg:col-span-2">Safe session move</p>
+          <label className="grid gap-1 text-sm font-medium text-slate-700">
+            Session
+            <select
+              className="rounded-xl border border-slate-300 px-3 py-2"
+              disabled={!draft}
+              onChange={(event) => {
+                setMoveSessionId(event.target.value);
+                setMovePreview(null);
+              }}
+              value={moveSessionId}
+            >
+              <option value="">Choose a session</option>
+              {sessions.map((session) => (
+                <option key={session.id} value={session.id}>
+                  {session.courseCode} · {session.sectionName} · {session.roomName}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-slate-700">
+            New room
+            <select
+              className="rounded-xl border border-slate-300 px-3 py-2"
+              disabled={!draft}
+              onChange={(event) => {
+                setMoveRoomId(event.target.value);
+                setMovePreview(null);
+              }}
+              value={moveRoomId}
+            >
+              <option value="">Choose a room</option>
+              {rooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.name} · {room.capacity} seats
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-slate-700">
+            New timeslot
+            <select
+              className="rounded-xl border border-slate-300 px-3 py-2"
+              disabled={!draft}
+              onChange={(event) => {
+                setMoveTimeslotId(event.target.value);
+                setMovePreview(null);
+              }}
+              value={moveTimeslotId}
+            >
+              <option value="">Choose a timeslot</option>
+              {timeslots.map((timeslot) => (
+                <option key={timeslot.id} value={timeslot.id}>
+                  {timeslot.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-slate-700">
+            Change reason
+            <input
+              className="rounded-xl border border-slate-300 px-3 py-2"
+              disabled={!draft}
+              maxLength={500}
+              onChange={(event) => setMoveReason(event.target.value)}
+              placeholder="Explain why this move is needed"
+              value={moveReason}
+            />
+          </label>
+          <div className="flex flex-wrap items-end gap-2">
+            <Button
+              disabled={!draft || !moveSessionId || !moveRoomId || !moveTimeslotId}
+              loading={pendingAction === "preview-move"}
+              onClick={() => void run("preview-move", async () => {
+                setMovePreview(await previewAuraSessionMove(
+                  moveSessionId, moveRoomId, moveTimeslotId,
+                ));
+              })}
+              variant="outline"
+            >
+              <MoveRight className="size-4" /> Preview move
+            </Button>
+            <Button
+              disabled={!draft || !movePreview?.allowed || !moveReason.trim()}
+              loading={pendingAction === "apply-move"}
+              onClick={() => void run("apply-move", async () => {
+                await applyAuraSessionMove(
+                  moveSessionId, moveRoomId, moveTimeslotId, moveReason.trim(),
+                );
+                setMovePreview(null);
+                setMoveReason("");
+                await onChanged();
+              })}
+            >
+              Apply safe move
+            </Button>
+          </div>
+          {movePreview ? (
+            <p className={movePreview.allowed ? "text-sm text-emerald-700 lg:col-span-2" : "text-sm text-red-700 lg:col-span-2"}>
+              {movePreview.message}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="grid gap-3 rounded-2xl border border-slate-200 p-4 lg:grid-cols-2">
           <p className="font-semibold text-slate-950 lg:col-span-2">Safe session swap</p>
           {[firstSessionId, secondSessionId].map((value, index) => (
             <label className="grid gap-1 text-sm font-medium text-slate-700" key={index}>
@@ -148,9 +286,11 @@ export function AuraVersionTools({
               <select
                 className="rounded-xl border border-slate-300 px-3 py-2"
                 disabled={!draft}
-                onChange={(event) => index === 0
-                  ? setFirstSessionId(event.target.value)
-                  : setSecondSessionId(event.target.value)}
+                onChange={(event) => {
+                  if (index === 0) setFirstSessionId(event.target.value);
+                  else setSecondSessionId(event.target.value);
+                  setSwapPreview(null);
+                }}
                 value={value}
               >
                 <option value="">Choose a session</option>
@@ -200,12 +340,19 @@ export function AuraVersionTools({
               disabled={!draft || !firstSessionId}
               loading={pendingAction === "pin"}
               onClick={() => void run("pin", async () => {
-                await setAuraSessionPinned(firstSessionId, true, reason.trim() || "Pinned by timetable administrator");
+                await setAuraSessionPinned(
+                  firstSessionId,
+                  !firstSession?.locked,
+                  firstSession?.locked
+                    ? undefined
+                    : reason.trim() || "Pinned by timetable administrator",
+                );
                 await onChanged();
               })}
               variant="outline"
             >
-              <Lock className="size-4" /> Pin first session
+              {firstSession?.locked ? <Unlock className="size-4" /> : <Lock className="size-4" />}
+              {firstSession?.locked ? "Unpin first session" : "Pin first session"}
             </Button>
           </div>
           {swapPreview ? (
