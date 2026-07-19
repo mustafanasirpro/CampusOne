@@ -81,6 +81,23 @@ public class AuraNotificationService {
                 "/timetable");
     }
 
+    public void notifyTimetablePublished(
+            Iterable<UUID> studentUserIds,
+            UUID actorUserId,
+            UUID versionId) {
+        LinkedHashSet<UUID> recipients = new LinkedHashSet<>();
+        studentUserIds.forEach(recipients::add);
+        recipients.remove(actorUserId);
+        notificationService.createBulkNotifications(
+                recipients,
+                NotificationType.AURA_UPDATE,
+                "A new timetable is available",
+                "Your latest university timetable is ready to view.",
+                NotificationTargetType.AURA_TIMETABLE,
+                versionId,
+                "/timetable");
+    }
+
     private boolean hasUniversity(
             com.campusone.user.entity.User user,
             UUID universityId) {
