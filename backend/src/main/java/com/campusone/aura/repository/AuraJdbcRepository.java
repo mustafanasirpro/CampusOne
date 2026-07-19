@@ -35,6 +35,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @ConditionalOnProperty(
@@ -1060,7 +1061,8 @@ public class AuraJdbcRepository {
                         WHERE t.id = :termId AND r.active = TRUE) AS rooms,
                     (SELECT COUNT(*) FROM aura_timeslots ts
                         JOIN aura_academic_terms t ON t.university_id = ts.university_id
-                        WHERE t.id = :termId AND ts.active = TRUE) AS timeslots,
+                        WHERE t.id = :termId AND ts.active = TRUE
+                          AND ts.slot_type = 'INSTRUCTIONAL') AS timeslots,
                     (SELECT COUNT(*) FROM aura_instructors i
                         JOIN aura_academic_terms t ON t.university_id = i.university_id
                         WHERE t.id = :termId AND i.active = TRUE) AS instructors,
@@ -1068,14 +1070,21 @@ public class AuraJdbcRepository {
                         WHERE o.term_id = :termId AND o.status = 'ACTIVE') AS offerings,
                     (SELECT COUNT(*) FROM aura_meeting_requirements r
                         JOIN aura_course_offerings o ON o.id = r.offering_id
-                        WHERE o.term_id = :termId AND o.status = 'ACTIVE') AS requirements
+                        WHERE o.term_id = :termId AND o.status = 'ACTIVE'
+                          AND r.active = TRUE) AS requirements,
+                    (SELECT COALESCE(SUM(r.sessions_per_week), 0)
+                        FROM aura_meeting_requirements r
+                        JOIN aura_course_offerings o ON o.id = r.offering_id
+                        WHERE o.term_id = :termId AND o.status = 'ACTIVE'
+                          AND r.active = TRUE) AS required_occurrences
                 """, params().addValue("termId", termId), (rs, rowNum) ->
                 new TermCounts(
                         rs.getInt("rooms"),
                         rs.getInt("timeslots"),
                         rs.getInt("instructors"),
                         rs.getInt("offerings"),
-                        rs.getInt("requirements")));
+                        rs.getInt("requirements"),
+                        rs.getInt("required_occurrences")));
     }
 
     public List<RequirementCandidateIssue> requirementsWithoutCandidates(
@@ -1089,6 +1098,7 @@ public class AuraJdbcRepository {
                 JOIN courses c ON c.id = o.course_id
                 WHERE o.term_id = :termId
                   AND o.status = 'ACTIVE'
+                  AND r.active = TRUE
                   AND NOT EXISTS (
                     SELECT 1
                     FROM aura_rooms room
@@ -1099,6 +1109,32 @@ public class AuraJdbcRepository {
                     WHERE term.id = :termId
                       AND room.active = TRUE
                       AND slot.active = TRUE
+                      AND slot.slot_type = 'INSTRUCTIONAL'
+                      AND EXISTS (
+                        SELECT 1 FROM aura_instructors instructor
+                        WHERE instructor.id = o.instructor_id
+                          AND instructor.university_id = term.university_id
+                          AND instructor.active = TRUE
+                      )
+                      AND EXISTS (
+                        SELECT 1
+                        FROM aura_sections primary_section
+                        JOIN aura_batches primary_batch
+                          ON primary_batch.id = primary_section.batch_id
+                        JOIN aura_programs primary_program
+                          ON primary_program.id = primary_batch.program_id
+                        WHERE primary_section.id = o.section_id
+                          AND primary_program.university_id = term.university_id
+                          AND primary_program.active = TRUE
+                          AND primary_batch.active = TRUE
+                          AND primary_section.active = TRUE
+                      )
+                      AND (r.fixed_room_id IS NULL OR room.id = r.fixed_room_id)
+                      AND (r.fixed_timeslot_id IS NULL OR slot.id = r.fixed_timeslot_id)
+                      AND (COALESCE(CARDINALITY(r.allowed_days), 0) = 0
+                        OR slot.day_of_week = ANY(r.allowed_days))
+                      AND (COALESCE(CARDINALITY(r.prohibited_days), 0) = 0
+                        OR NOT slot.day_of_week = ANY(r.prohibited_days))
                       AND room.capacity >= r.required_capacity
                       AND room.room_type = r.room_type
                       AND NOT EXISTS (
@@ -1132,6 +1168,40 @@ public class AuraJdbcRepository {
                         WHERE sa.section_id = o.section_id
                           AND sa.timeslot_id = slot.id
                           AND sa.availability = 'UNAVAILABLE'
+                      )
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM aura_offering_sections linked
+                        JOIN aura_sections linked_section
+                          ON linked_section.id = linked.section_id
+                        JOIN aura_batches linked_batch
+                          ON linked_batch.id = linked_section.batch_id
+                        JOIN aura_programs linked_program
+                          ON linked_program.id = linked_batch.program_id
+                        WHERE linked.offering_id = o.id
+                          AND (linked_program.university_id <> term.university_id
+                            OR linked_program.active = FALSE
+                            OR linked_batch.active = FALSE
+                            OR linked_section.active = FALSE
+                            OR EXISTS (
+                              SELECT 1
+                              FROM aura_section_availability linked_availability
+                              WHERE linked_availability.section_id = linked.section_id
+                                AND linked_availability.timeslot_id = slot.id
+                                AND linked_availability.availability = 'UNAVAILABLE'
+                            ))
+                      )
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM aura_student_course_registrations registration
+                        JOIN aura_student_availability student_availability
+                          ON student_availability.term_id = registration.term_id
+                         AND student_availability.student_user_id = registration.student_user_id
+                         AND student_availability.timeslot_id = slot.id
+                        WHERE registration.term_id = :termId
+                          AND registration.offering_id = o.id
+                          AND registration.status = 'ACTIVE'
+                          AND student_availability.availability = 'UNAVAILABLE'
                       )
                   )
                 ORDER BY c.course_code ASC, r.id ASC
@@ -1410,6 +1480,30 @@ public class AuraJdbcRepository {
         return id;
     }
 
+    @Transactional
+    public void createGenerationRun(
+            UUID runId,
+            UUID revisionId,
+            UUID termId,
+            String checksum,
+            String summary,
+            UUID userId,
+            int terminationSeconds) {
+        insertRevision(
+                revisionId,
+                termId,
+                nextRevisionNumber(termId),
+                checksum,
+                summary,
+                userId);
+        insertRun(
+                runId,
+                termId,
+                revisionId,
+                userId,
+                terminationSeconds);
+    }
+
     public int nextRevisionNumber(UUID termId) {
         Integer value = jdbc.queryForObject("""
                 SELECT COALESCE(MAX(revision_number), 0) + 1
@@ -1453,37 +1547,66 @@ public class AuraJdbcRepository {
         return count != null && count > 0;
     }
 
-    public void markRunRunning(UUID runId, Instant startedAt) {
-        jdbc.update("""
+    public int expireAbandonedGenerationRuns(Instant cutoff) {
+        return jdbc.update("""
+                UPDATE aura_generation_runs
+                SET status = 'FAILED', completed_at = CURRENT_TIMESTAMP,
+                    message = 'Generation was interrupted before completion.'
+                WHERE status IN ('QUEUED', 'RUNNING')
+                  AND COALESCE(started_at, created_at) < :cutoff
+                """, params().addValue("cutoff", Timestamp.from(cutoff)));
+    }
+
+    public boolean markRunRunning(UUID runId, Instant startedAt) {
+        return jdbc.update("""
                 UPDATE aura_generation_runs
                 SET status = 'RUNNING', started_at = :startedAt
                 WHERE id = :runId AND status = 'QUEUED'
                 """, params()
                 .addValue("runId", runId)
-                .addValue("startedAt", Timestamp.from(startedAt)));
+                .addValue("startedAt", Timestamp.from(startedAt))) == 1;
     }
 
-    public void markRunCompleted(UUID runId, String score, String message) {
-        jdbc.update("""
+    public boolean markRunCompleted(UUID runId, String score, String message) {
+        return jdbc.update("""
                 UPDATE aura_generation_runs
                 SET status = 'COMPLETED', score = :score, message = :message,
                     completed_at = CURRENT_TIMESTAMP
-                WHERE id = :runId
+                WHERE id = :runId AND status = 'RUNNING'
                 """, params()
                 .addValue("runId", runId)
                 .addValue("score", score)
-                .addValue("message", message));
+                .addValue("message", message)) == 1;
     }
 
-    public void markRunFailed(UUID runId, String message) {
-        jdbc.update("""
+    public boolean markRunFailed(UUID runId, String message) {
+        return jdbc.update("""
                 UPDATE aura_generation_runs
                 SET status = 'FAILED', message = :message,
                     completed_at = CURRENT_TIMESTAMP
-                WHERE id = :runId
+                WHERE id = :runId AND status IN ('QUEUED', 'RUNNING')
                 """, params()
                 .addValue("runId", runId)
-                .addValue("message", message));
+                .addValue("message", message)) == 1;
+    }
+
+    public RunPersistenceState lockRunForPersistence(UUID runId, UUID termId) {
+        return jdbc.queryForObject("""
+                SELECT generation_run.status,
+                    generation_run.input_revision = term_row.data_revision
+                        AS current_revision
+                FROM aura_generation_runs generation_run
+                JOIN aura_academic_terms term_row
+                  ON term_row.id = generation_run.term_id
+                WHERE generation_run.id = :runId
+                  AND generation_run.term_id = :termId
+                FOR UPDATE OF generation_run, term_row
+                """, params()
+                .addValue("runId", runId)
+                .addValue("termId", termId), (rs, rowNum) ->
+                new RunPersistenceState(
+                        rs.getString("status"),
+                        rs.getBoolean("current_revision")));
     }
 
     public void cancelRun(UUID runId) {
@@ -1576,6 +1699,16 @@ public class AuraJdbcRepository {
                 WHERE term_id = :termId
                 ORDER BY version_number DESC
                 """, params().addValue("termId", termId), versionMapper());
+    }
+
+    public List<UUID> activeStudentUserIds(UUID termId) {
+        return jdbc.queryForList("""
+                SELECT DISTINCT registration.student_user_id
+                FROM aura_student_course_registrations registration
+                WHERE registration.term_id = :termId
+                  AND registration.status = 'ACTIVE'
+                ORDER BY registration.student_user_id
+                """, params().addValue("termId", termId), UUID.class);
     }
 
     public Optional<TimetableVersionResponse> findVersion(UUID versionId) {
@@ -1677,23 +1810,26 @@ public class AuraJdbcRepository {
                         uuid(rs, "section_id")));
     }
 
-    public void swapSessionAssignments(
+    public boolean swapSessionAssignments(
             UUID firstSessionId,
             UUID secondSessionId,
             UUID userId,
             String reason) {
         SessionResponse first = findSession(firstSessionId).orElseThrow();
         SessionResponse second = findSession(secondSessionId).orElseThrow();
-        jdbc.update("""
-                UPDATE aura_scheduled_sessions
+        int updated = jdbc.update("""
+                UPDATE aura_scheduled_sessions session_row
                 SET room_id = CASE
-                        WHEN id = :firstId THEN :secondRoomId
+                        WHEN session_row.id = :firstId THEN :secondRoomId
                         ELSE :firstRoomId END,
                     timeslot_id = CASE
-                        WHEN id = :firstId THEN :secondTimeslotId
+                        WHEN session_row.id = :firstId THEN :secondTimeslotId
                         ELSE :firstTimeslotId END,
                     source = 'MANUAL', updated_at = CURRENT_TIMESTAMP
-                WHERE id IN (:firstId, :secondId)
+                FROM aura_timetable_versions timetable_version
+                WHERE session_row.id IN (:firstId, :secondId)
+                  AND timetable_version.id = session_row.version_id
+                  AND timetable_version.status = 'DRAFT'
                 """, params()
                 .addValue("firstId", firstSessionId)
                 .addValue("secondId", secondSessionId)
@@ -1701,30 +1837,37 @@ public class AuraJdbcRepository {
                 .addValue("firstTimeslotId", first.timeslotId())
                 .addValue("secondRoomId", second.roomId())
                 .addValue("secondTimeslotId", second.timeslotId()));
+        if (updated != 2) {
+            return false;
+        }
         insertManualMove(first, second.roomId(), second.timeslotId(), userId, reason);
         insertManualMove(second, first.roomId(), first.timeslotId(), userId, reason);
+        return true;
     }
 
-    public void setSessionPinned(UUID sessionId, boolean pinned, String reason) {
-        jdbc.update("""
-                UPDATE aura_scheduled_sessions
+    public boolean setSessionPinned(UUID sessionId, boolean pinned, String reason) {
+        return jdbc.update("""
+                UPDATE aura_scheduled_sessions session_row
                 SET pinned = :pinned, locked = :pinned,
                     lock_reason = CASE WHEN :pinned THEN :reason ELSE NULL END,
                     updated_at = CURRENT_TIMESTAMP,
-                    version = version + 1
-                WHERE id = :sessionId
+                    version = session_row.version + 1
+                FROM aura_timetable_versions timetable_version
+                WHERE session_row.id = :sessionId
+                  AND timetable_version.id = session_row.version_id
+                  AND timetable_version.status = 'DRAFT'
                 """, params()
                 .addValue("sessionId", sessionId)
                 .addValue("pinned", pinned)
-                .addValue("reason", blankToNull(reason)));
+                .addValue("reason", blankToNull(reason))) == 1;
     }
 
-    public void archiveVersion(UUID versionId) {
-        jdbc.update("""
+    public boolean archiveVersion(UUID versionId) {
+        return jdbc.update("""
                 UPDATE aura_timetable_versions
                 SET status = 'ARCHIVED', version = version + 1
                 WHERE id = :versionId AND status = 'DRAFT'
-                """, params().addValue("versionId", versionId));
+                """, params().addValue("versionId", versionId)) == 1;
     }
 
     public void insertVersionAudit(
@@ -1752,22 +1895,38 @@ public class AuraJdbcRepository {
                 .addValue("summary", summary));
     }
 
-    public void publishVersion(UUID versionId, UUID termId) {
+    public boolean publishVersion(UUID versionId, UUID termId) {
+        List<Boolean> publishable = jdbc.query("""
+                SELECT timetable_version.status = 'DRAFT'
+                    AND timetable_version.input_revision = term_row.data_revision
+                FROM aura_timetable_versions timetable_version
+                JOIN aura_academic_terms term_row
+                  ON term_row.id = timetable_version.term_id
+                WHERE timetable_version.id = :versionId
+                  AND timetable_version.term_id = :termId
+                FOR UPDATE OF timetable_version, term_row
+                """, params().addValue("versionId", versionId)
+                .addValue("termId", termId),
+                (rs, rowNum) -> rs.getBoolean(1));
+        if (publishable.isEmpty() || !publishable.getFirst()) {
+            return false;
+        }
         jdbc.update("""
                 UPDATE aura_timetable_versions
                 SET status = 'SUPERSEDED'
                 WHERE term_id = :termId AND status = 'PUBLISHED'
                 """, params().addValue("termId", termId));
-        jdbc.update("""
+        int published = jdbc.update("""
                 UPDATE aura_timetable_versions
                 SET status = 'PUBLISHED', published_at = CURRENT_TIMESTAMP
-                WHERE id = :versionId
+                WHERE id = :versionId AND status = 'DRAFT'
                 """, params().addValue("versionId", versionId));
         jdbc.update("""
                 UPDATE aura_academic_terms
                 SET status = 'PUBLISHED', updated_at = CURRENT_TIMESTAMP
                 WHERE id = :termId
                 """, params().addValue("termId", termId));
+        return published == 1;
     }
 
     public boolean isVersionStale(UUID versionId) {
@@ -1800,6 +1959,33 @@ public class AuraJdbcRepository {
                 """, params().addValue("versionId", versionId));
     }
 
+    public long countOccurrenceIntegrityViolations(UUID versionId) {
+        return count("""
+                SELECT COUNT(*)
+                FROM (
+                    SELECT requirement.id
+                    FROM aura_timetable_versions timetable_version
+                    JOIN aura_meeting_requirements requirement ON TRUE
+                    JOIN aura_course_offerings offering
+                      ON offering.id = requirement.offering_id
+                     AND offering.term_id = timetable_version.term_id
+                    LEFT JOIN aura_scheduled_sessions session_row
+                      ON session_row.version_id = timetable_version.id
+                     AND session_row.meeting_requirement_id = requirement.id
+                    WHERE timetable_version.id = :versionId
+                      AND offering.status = 'ACTIVE'
+                      AND requirement.active = TRUE
+                    GROUP BY requirement.id, requirement.sessions_per_week
+                    HAVING COUNT(session_row.id) <> requirement.sessions_per_week
+                       OR COUNT(DISTINCT session_row.occurrence_index)
+                            <> requirement.sessions_per_week
+                       OR COALESCE(MIN(session_row.occurrence_index), 0) <> 1
+                       OR COALESCE(MAX(session_row.occurrence_index), 0)
+                            <> requirement.sessions_per_week
+                ) invalid_requirement
+                """, params().addValue("versionId", versionId));
+    }
+
     public long countOpenHardClashes(UUID versionId) {
         return count("""
                 SELECT COUNT(*)
@@ -1825,7 +2011,7 @@ public class AuraJdbcRepository {
                 sessionMapper());
     }
 
-    public void moveSession(
+    public boolean moveSession(
             UUID sessionId,
             UUID roomId,
             UUID timeslotId,
@@ -1833,16 +2019,23 @@ public class AuraJdbcRepository {
             String reason) {
         SessionResponse before = findSession(sessionId)
                 .orElseThrow();
-        jdbc.update("""
-                UPDATE aura_scheduled_sessions
+        int updated = jdbc.update("""
+                UPDATE aura_scheduled_sessions session_row
                 SET room_id = :roomId, timeslot_id = :timeslotId,
                     source = 'MANUAL', updated_at = CURRENT_TIMESTAMP
-                WHERE id = :sessionId
+                FROM aura_timetable_versions timetable_version
+                WHERE session_row.id = :sessionId
+                  AND timetable_version.id = session_row.version_id
+                  AND timetable_version.status = 'DRAFT'
                 """, params()
                 .addValue("sessionId", sessionId)
                 .addValue("roomId", roomId)
                 .addValue("timeslotId", timeslotId));
+        if (updated != 1) {
+            return false;
+        }
         insertManualMove(before, roomId, timeslotId, userId, reason);
+        return true;
     }
 
     private void insertManualMove(
@@ -2408,13 +2601,19 @@ public class AuraJdbcRepository {
             int timeslots,
             int instructors,
             int offerings,
-            int requirements) {
+            int requirements,
+            int requiredOccurrences) {
     }
 
     public record RequirementCandidateIssue(
             UUID requirementId,
             String courseCode,
             String courseTitle) {
+    }
+
+    public record RunPersistenceState(
+            String status,
+            boolean currentRevision) {
     }
 
     public record SolverRoom(
