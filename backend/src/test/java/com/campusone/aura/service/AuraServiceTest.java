@@ -9,8 +9,10 @@ import com.campusone.aura.dto.AuraDtos;
 import com.campusone.aura.dto.AuraDtos.ReadinessResponse;
 import com.campusone.aura.dto.AuraDtos.TermResponse;
 import com.campusone.aura.dto.AuraDtos.TimetableVersionResponse;
+import com.campusone.aura.dto.AuraDtos.SessionResponse;
 import com.campusone.aura.exception.AuraStateException;
 import com.campusone.aura.repository.AuraJdbcRepository;
+import com.campusone.aura.repository.AuraJdbcRepository.ScopedResource;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -33,10 +35,18 @@ class AuraServiceTest {
             "20000000-0000-4000-8000-000000000001");
     private static final UUID VERSION_ID = UUID.fromString(
             "30000000-0000-4000-8000-000000000001");
+    private static final UUID UNIVERSITY_ID = UUID.fromString(
+            "40000000-0000-4000-8000-000000000001");
+    private static final UUID OTHER_UNIVERSITY_ID = UUID.fromString(
+            "40000000-0000-4000-8000-000000000002");
     private static final UUID SECTION_ID = UUID.fromString(
             "50000000-0000-4000-8000-000000000001");
     private static final UUID TIMESLOT_ID = UUID.fromString(
             "60000000-0000-4000-8000-000000000001");
+    private static final UUID ROOM_ID = UUID.fromString(
+            "70000000-0000-4000-8000-000000000001");
+    private static final UUID SESSION_ID = UUID.fromString(
+            "70000000-0000-4000-8000-000000000002");
     private static final Instant NOW = Instant.parse("2026-07-15T00:00:00Z");
 
     @Mock
@@ -65,11 +75,16 @@ class AuraServiceTest {
                 solverService,
                 clashDetector,
                 Clock.fixed(NOW, ZoneOffset.UTC));
+        when(authorizationService.requireAdminUniversity(USER_ID))
+                .thenReturn(UNIVERSITY_ID);
     }
 
     @Test
     void startGeneration_rejectsWhenRunAlreadyActiveForTerm() {
-        when(repository.findTerm(TERM_ID)).thenReturn(Optional.of(term()));
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.TERM,
+                TERM_ID,
+                UNIVERSITY_ID)).thenReturn(true);
         when(readinessValidator.validate(TERM_ID)).thenReturn(ready());
         when(repository.hasActiveGenerationRun(TERM_ID)).thenReturn(true);
 
@@ -89,7 +104,43 @@ class AuraServiceTest {
     }
 
     @Test
+    void createTerm_rejectsCrossUniversityRequest() {
+        AuraDtos.CreateTermRequest request = new AuraDtos.CreateTermRequest(
+                OTHER_UNIVERSITY_ID,
+                "FALL-2026",
+                "Fall 2026",
+                java.time.LocalDate.of(2026, 9, 1),
+                java.time.LocalDate.of(2026, 12, 31));
+
+        assertThatThrownBy(() -> service.createTerm(USER_ID, request))
+                .isInstanceOf(
+                        com.campusone.common.exception.ResourceNotFoundException.class)
+                .hasMessage("University scheduling data was not found.");
+
+        verify(repository, never()).insertTerm(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void listTerms_usesAuthenticatedAdminsUniversityScope() {
+        when(repository.countTerms(UNIVERSITY_ID)).thenReturn(0L);
+        when(repository.listTerms(UNIVERSITY_ID, 0, 20))
+                .thenReturn(List.of());
+
+        service.listTerms(USER_ID, 0, 20);
+
+        verify(repository).countTerms(UNIVERSITY_ID);
+        verify(repository).listTerms(UNIVERSITY_ID, 0, 20);
+    }
+
+    @Test
     void publishVersion_rejectsNonDraftVersion() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION,
+                VERSION_ID,
+                UNIVERSITY_ID)).thenReturn(true);
         when(repository.findVersion(VERSION_ID)).thenReturn(Optional.of(
                 version("PUBLISHED")));
 
@@ -104,6 +155,10 @@ class AuraServiceTest {
 
     @Test
     void publishVersion_rejectsOpenHardClashes() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION,
+                VERSION_ID,
+                UNIVERSITY_ID)).thenReturn(true);
         when(repository.findVersion(VERSION_ID)).thenReturn(Optional.of(
                 version("DRAFT")));
         when(repository.countOpenHardClashes(VERSION_ID)).thenReturn(2L);
@@ -118,7 +173,54 @@ class AuraServiceTest {
     }
 
     @Test
+    void publishVersion_rejectsStaleSchedulingData() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION,
+                VERSION_ID,
+                UNIVERSITY_ID)).thenReturn(true);
+        when(repository.findVersion(VERSION_ID)).thenReturn(Optional.of(
+                version("DRAFT")));
+        when(repository.isVersionStale(VERSION_ID)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.publishVersion(USER_ID, VERSION_ID))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessageContaining("older scheduling data");
+
+        verify(repository, never()).publishVersion(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void publishVersion_rejectsMissingOccurrences() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION,
+                VERSION_ID,
+                UNIVERSITY_ID)).thenReturn(true);
+        when(repository.findVersion(VERSION_ID)).thenReturn(Optional.of(
+                version("DRAFT")));
+        when(repository.countExpectedOccurrences(TERM_ID)).thenReturn(8L);
+        when(repository.countScheduledSessions(VERSION_ID)).thenReturn(7L);
+
+        assertThatThrownBy(() -> service.publishVersion(USER_ID, VERSION_ID))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessage("Schedule every required session before publishing this timetable.");
+
+        verify(repository, never()).publishVersion(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void upsertSectionAvailability_rejectsCrossUniversityTimeslot() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.SECTION,
+                SECTION_ID,
+                UNIVERSITY_ID)).thenReturn(true);
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.TIMESLOT,
+                TIMESLOT_ID,
+                UNIVERSITY_ID)).thenReturn(true);
         when(repository.sectionAndTimeslotShareUniversity(
                 SECTION_ID,
                 TIMESLOT_ID)).thenReturn(false);
@@ -139,17 +241,83 @@ class AuraServiceTest {
                 org.mockito.ArgumentMatchers.any());
     }
 
-    private TermResponse term() {
-        return new TermResponse(
+    @Test
+    void createCalendarException_rejectsDatesOutsideTerm() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.TERM,
                 TERM_ID,
-                UUID.fromString("40000000-0000-4000-8000-000000000001"),
-                "FALL-2026",
-                "Fall 2026",
-                LocalDate.of(2026, 9, 1),
-                LocalDate.of(2026, 12, 31),
-                "DRAFT",
-                NOW,
-                NOW);
+                UNIVERSITY_ID)).thenReturn(true);
+        when(repository.findTerm(TERM_ID)).thenReturn(Optional.of(term()));
+
+        AuraDtos.CreateCalendarExceptionRequest request =
+                new AuraDtos.CreateCalendarExceptionRequest(
+                        TERM_ID,
+                        "HOLIDAY",
+                        LocalDate.of(2026, 8, 31),
+                        LocalDate.of(2026, 9, 1),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        "University closure");
+
+        assertThatThrownBy(() -> service.createCalendarException(USER_ID, request))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessage("Calendar exception dates must fall within the academic term.");
+    }
+
+    @Test
+    void replaceRoomFacilities_rejectsUnknownFacility() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.ROOM,
+                ROOM_ID,
+                UNIVERSITY_ID)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.replaceRoomFacilities(
+                USER_ID,
+                ROOM_ID,
+                new AuraDtos.ReplaceFacilitiesRequest(List.of("SWIMMING_POOL"))))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessage("Choose a supported room facility.");
+
+        verify(repository, never()).replaceRoomFacilities(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void previewMove_rejectsPublishedVersionMutation() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.SESSION,
+                SESSION_ID,
+                UNIVERSITY_ID)).thenReturn(true);
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.ROOM,
+                ROOM_ID,
+                UNIVERSITY_ID)).thenReturn(true);
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.TIMESLOT,
+                TIMESLOT_ID,
+                UNIVERSITY_ID)).thenReturn(true);
+        when(repository.findSession(SESSION_ID))
+                .thenReturn(Optional.of(session()));
+        when(repository.findVersion(VERSION_ID))
+                .thenReturn(Optional.of(version("PUBLISHED")));
+
+        assertThatThrownBy(() -> service.previewMove(
+                USER_ID,
+                SESSION_ID,
+                new AuraDtos.ManualMovePreviewRequest(ROOM_ID, TIMESLOT_ID)))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessage("Published and archived timetable versions cannot be changed.");
+
+        verify(repository, never()).moveSession(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
     }
 
     private ReadinessResponse ready() {
@@ -164,6 +332,19 @@ class AuraServiceTest {
                 24);
     }
 
+    private TermResponse term() {
+        return new TermResponse(
+                TERM_ID,
+                UNIVERSITY_ID,
+                "FALL-2026",
+                "Fall 2026",
+                LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 12, 31),
+                "DRAFT",
+                NOW,
+                NOW);
+    }
+
     private TimetableVersionResponse version(String status) {
         return new TimetableVersionResponse(
                 VERSION_ID,
@@ -175,5 +356,28 @@ class AuraServiceTest {
                 null,
                 NOW,
                 null);
+    }
+
+    private SessionResponse session() {
+        return new SessionResponse(
+                SESSION_ID,
+                VERSION_ID,
+                UUID.fromString("71000000-0000-4000-8000-000000000001"),
+                UUID.fromString("71000000-0000-4000-8000-000000000002"),
+                "CS101",
+                "Programming Fundamentals",
+                SECTION_ID,
+                "BSCS-1A",
+                UUID.fromString("71000000-0000-4000-8000-000000000003"),
+                "Dr Ahmed",
+                ROOM_ID,
+                "Room 101",
+                "CLASSROOM",
+                TIMESLOT_ID,
+                1,
+                java.time.LocalTime.of(9, 0),
+                java.time.LocalTime.of(10, 0),
+                false,
+                "SOLVER");
     }
 }
