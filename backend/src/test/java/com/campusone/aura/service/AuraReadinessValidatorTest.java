@@ -26,7 +26,7 @@ class AuraReadinessValidatorTest {
     @Test
     void validate_missingSetup_returnsActionableIssues() {
         when(repository.countsForTerm(TERM_ID))
-                .thenReturn(new TermCounts(0, 0, 0, 0, 0));
+                .thenReturn(new TermCounts(0, 0, 0, 0, 0, 0));
         when(repository.requirementsWithoutCandidates(TERM_ID))
                 .thenReturn(List.of());
 
@@ -47,7 +47,7 @@ class AuraReadinessValidatorTest {
     @Test
     void validate_completeSmallDataset_isReady() {
         when(repository.countsForTerm(TERM_ID))
-                .thenReturn(new TermCounts(3, 6, 2, 2, 4));
+                .thenReturn(new TermCounts(3, 6, 2, 2, 4, 6));
         when(repository.requirementsWithoutCandidates(TERM_ID))
                 .thenReturn(List.of());
 
@@ -63,7 +63,7 @@ class AuraReadinessValidatorTest {
         UUID requirementId = UUID.fromString(
                 "10000000-0000-4000-8000-000000000002");
         when(repository.countsForTerm(TERM_ID))
-                .thenReturn(new TermCounts(3, 6, 2, 2, 4));
+                .thenReturn(new TermCounts(3, 6, 2, 2, 4, 6));
         when(repository.requirementsWithoutCandidates(TERM_ID))
                 .thenReturn(List.of(new RequirementCandidateIssue(
                         requirementId,
@@ -82,5 +82,21 @@ class AuraReadinessValidatorTest {
                             .isEqualTo("MEETING_REQUIREMENT");
                     assertThat(issue.targetId()).isEqualTo(requirementId);
                 });
+    }
+
+    @Test
+    void validate_usesWeeklyOccurrencesForCapacityCheck() {
+        when(repository.countsForTerm(TERM_ID))
+                .thenReturn(new TermCounts(1, 3, 2, 2, 2, 4));
+        when(repository.requirementsWithoutCandidates(TERM_ID))
+                .thenReturn(List.of());
+
+        ReadinessResponse response =
+                new AuraReadinessValidator(repository).validate(TERM_ID);
+
+        assertThat(response.ready()).isFalse();
+        assertThat(response.issues())
+                .extracting(issue -> issue.code())
+                .contains("AURA_CAPACITY_TOO_SMALL");
     }
 }
