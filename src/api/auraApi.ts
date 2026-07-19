@@ -263,6 +263,29 @@ export async function downloadAuraVersion(versionId: string, format: string) {
   URL.revokeObjectURL(url);
 }
 
+export function previewAuraSessionMove(
+  sessionId: string,
+  roomId: string,
+  timeslotId: string,
+) {
+  return apiRequest<AuraMovePreview>(
+    `${adminAuraPath}/sessions/${sessionId}/move-preview`,
+    { body: JSON.stringify({ roomId, timeslotId }), method: "POST" },
+  );
+}
+
+export function applyAuraSessionMove(
+  sessionId: string,
+  roomId: string,
+  timeslotId: string,
+  reason: string,
+) {
+  return apiRequest<AuraSession>(
+    `${adminAuraPath}/sessions/${sessionId}/move`,
+    { body: JSON.stringify({ roomId, timeslotId, reason }), method: "PATCH" },
+  );
+}
+
 export function previewAuraSessionSwap(
   sessionId: string,
   otherSessionId: string,
