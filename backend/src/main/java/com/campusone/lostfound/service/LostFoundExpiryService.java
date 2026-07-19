@@ -35,6 +35,7 @@ public class LostFoundExpiryService {
     @Scheduled(
             fixedDelayString = "${app.lost-found.expiry-archive-delay:1h}",
             initialDelayString = "${app.lost-found.expiry-archive-initial-delay:5m}")
+    @Transactional
     public void archiveExpiredPublishedItems() {
         int archived = archiveExpiredBatch();
         if (archived > 0) {
