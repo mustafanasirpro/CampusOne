@@ -59,11 +59,11 @@ public class AuraReadinessValidator {
                 "Each scheduled offering needs at least one meeting requirement.",
                 "MEETING_REQUIREMENT");
 
-        if (counts.requirements() > counts.rooms() * counts.timeslots()) {
+        if (counts.requiredOccurrences() > counts.rooms() * counts.timeslots()) {
             issues.add(new ReadinessIssue(
                     "AURA_CAPACITY_TOO_SMALL",
                     "ERROR",
-                    "There are more required sessions than available room-timeslot combinations.",
+                    "There are more required weekly sessions than available room-timeslot combinations.",
                     "TERM",
                     termId));
         }
