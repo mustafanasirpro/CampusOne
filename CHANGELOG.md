@@ -39,6 +39,25 @@
   endpoints, `AVOID` availability values, solver hard constraints for
   unavailable resource/timeslot pairs, and readiness checks
   for meeting requirements with no valid room-time candidate.
+- AURA setup is now available directly in the admin workbench for the existing
+  scheduling inputs, using university-scoped department/course references
+  rather than raw UUID entry.
+- AURA authorization now enforces the authenticated admin's university across
+  setup, generation, versions, sessions, moves, and metrics.
+- AURA room and meeting-requirement facilities are normalized and enforced by
+  readiness and Timefold hard constraints. Term calendar exceptions now have
+  scoped create/list/update/deactivate APIs and setup UI.
+- Timefold overlap constraints compare real clock ranges, and room type is now
+  enforced as a hard requirement.
+- AURA solver facts now include participating sections, active student
+  registrations, hard offering conflicts, student availability, week patterns,
+  linked requirements, and university building-travel rules. ConstraintVerifier
+  coverage verifies student clashes, offering clashes, lecture ordering, and
+  travel safety independently of the optimizer.
+- PostgreSQL-backed AURA startup verification fixed UUID projection mapping,
+  room display-name persistence, and generation-run timestamp binding; an
+  authenticated smoke test now covers setup, readiness, generation, version
+  sessions, and move preflight.
 
 ### Notes
 
