@@ -396,9 +396,13 @@ public class AuraResolutionRepository {
             UUID caseId,
             UUID registrationId,
             SuggestionTarget suggestion,
+            long caseVersion,
+            long registrationVersion,
             UUID actorUserId,
             String reason) {
-        jdbc.update("""
+        markSuggestionAndCaseApplied(
+                caseId, suggestion.id(), caseVersion);
+        int updated = jdbc.update("""
                 UPDATE aura_student_course_registrations
                 SET offering_id = :offeringId,
                     teaching_section_id = :sectionId,
@@ -406,19 +410,15 @@ public class AuraResolutionRepository {
                     updated_at = CURRENT_TIMESTAMP,
                     version = version + 1
                 WHERE id = :registrationId AND status = 'ACTIVE'
+                  AND version = :registrationVersion
                 """, params().addValue("registrationId", registrationId)
                 .addValue("offeringId", suggestion.offeringId())
-                .addValue("sectionId", suggestion.sectionId()));
-        jdbc.update("""
-                UPDATE aura_ranked_resolution_suggestions
-                SET applied_at = CURRENT_TIMESTAMP WHERE id = :suggestionId
-                """, params().addValue("suggestionId", suggestion.id()));
-        jdbc.update("""
-                UPDATE aura_resolution_cases
-                SET status = 'APPLIED', updated_at = CURRENT_TIMESTAMP,
-                    version = version + 1
-                WHERE id = :caseId AND status = 'APPROVED'
-                """, params().addValue("caseId", caseId));
+                .addValue("sectionId", suggestion.sectionId())
+                .addValue("registrationVersion", registrationVersion));
+        if (updated != 1) {
+            throw new org.springframework.dao.OptimisticLockingFailureException(
+                    "Registration changed before the approved resolution was applied");
+        }
         insertAction(caseId, suggestion.id(), actorUserId, "APPLIED", reason);
     }
 
@@ -445,6 +445,8 @@ public class AuraResolutionRepository {
             UUID registrationId,
             SuggestionTarget suggestion,
             String groupType,
+            long caseVersion,
+            long registrationVersion,
             UUID actorUserId,
             String reason) {
         String column = switch (groupType) {
@@ -457,28 +459,46 @@ public class AuraResolutionRepository {
                 SET %s = :groupId, updated_at = CURRENT_TIMESTAMP,
                     version = version + 1
                 WHERE id = :registrationId AND status = 'ACTIVE'
+                  AND version = :registrationVersion
                 """.formatted(column), params()
                 .addValue("registrationId", registrationId)
-                .addValue("groupId", suggestion.groupId()));
+                .addValue("groupId", suggestion.groupId())
+                .addValue("registrationVersion", registrationVersion));
         if (updated != 1) {
             throw new org.springframework.dao.OptimisticLockingFailureException(
                     "Registration is no longer active");
         }
-        markSuggestionAndCaseApplied(caseId, suggestion.id());
+        markSuggestionAndCaseApplied(caseId, suggestion.id(), caseVersion);
         insertAction(caseId, suggestion.id(), actorUserId, "APPLIED", reason);
     }
 
-    private void markSuggestionAndCaseApplied(UUID caseId, UUID suggestionId) {
-        jdbc.update("""
-                UPDATE aura_ranked_resolution_suggestions
-                SET applied_at = CURRENT_TIMESTAMP WHERE id = :suggestionId
-                """, params().addValue("suggestionId", suggestionId));
-        jdbc.update("""
+    private void markSuggestionAndCaseApplied(
+            UUID caseId,
+            UUID suggestionId,
+            long caseVersion) {
+        int caseUpdated = jdbc.update("""
                 UPDATE aura_resolution_cases
                 SET status = 'APPLIED', updated_at = CURRENT_TIMESTAMP,
                     version = version + 1
                 WHERE id = :caseId AND status = 'APPROVED'
-                """, params().addValue("caseId", caseId));
+                  AND version = :caseVersion
+                """, params().addValue("caseId", caseId)
+                .addValue("caseVersion", caseVersion));
+        if (caseUpdated != 1) {
+            throw new org.springframework.dao.OptimisticLockingFailureException(
+                    "Resolution case changed before it was applied");
+        }
+        int suggestionUpdated = jdbc.update("""
+                UPDATE aura_ranked_resolution_suggestions
+                SET applied_at = CURRENT_TIMESTAMP
+                WHERE id = :suggestionId AND case_id = :caseId
+                  AND applied_at IS NULL
+                """, params().addValue("suggestionId", suggestionId)
+                .addValue("caseId", caseId));
+        if (suggestionUpdated != 1) {
+            throw new org.springframework.dao.OptimisticLockingFailureException(
+                    "Resolution suggestion changed before it was applied");
+        }
     }
 
     private ResolutionCaseResponse withSuggestions(
