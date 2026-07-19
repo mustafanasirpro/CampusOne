@@ -39,6 +39,9 @@ The backend is a modular Spring Boot API for CampusOne:
 - S3-compatible note PDF upload/download
 - AURA academic term, room, instructor, section, offering, requirement,
   generation, clash, and timetable-version APIs
+- AURA import preview/validation/apply for CSV, XLSX, XLS, and text PDFs
+- AURA student registrations, personal timetables, ICS export, resolution
+  cases, safe moves/swaps, scenarios, comparison, and multi-format exports
 - Java 21 development environment
 - Maven build and test pipeline
 - JWT configuration validation
@@ -48,7 +51,7 @@ The backend is a modular Spring Boot API for CampusOne:
 
 - Multi-session management
 - Email Verification
-- AURA CSV import/export and richer manual repair workflow
+- AURA automatic localized repair, complete analytics, and browser backtesting
 
 ## Requirements
 
