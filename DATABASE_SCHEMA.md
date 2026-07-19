@@ -82,3 +82,19 @@ Tables:
 AURA uses Spring JDBC DTO mapping rather than Hibernate entities, so these
 tables are not part of JPA schema validation. Foreign keys point to existing
 university, department, course, and user records where appropriate.
+
+Additive AURA migrations:
+
+- `V26` extends availability values with `AVOID`.
+- `V27` adds section availability.
+- `V28` adds normalized room and meeting-requirement facilities plus
+  term-scoped calendar exceptions with typed targets and optimistic locking.
+- `V29` extends scheduling resources, requirements, offering sections,
+  registrations, student availability, travel rules, and solver configuration.
+- `V30` adds durable import jobs, mappings, previews, validation, and source
+  selection metadata.
+- `V31` hardens scheduling revisions, generation inputs, timetable version
+  sources, occurrence identity, and immutable version workflows.
+- `V32` adds resolution, what-if, and emergency-repair workflow persistence.
+- `V33` persists normalized import source rows and aligns expanded scheduling
+  enum domains used by setup and timetable imports.
