@@ -413,11 +413,13 @@ use the returned bearer token in Swagger UI.
 
 AURA currently ships as an admin timetable-generation workbench with normalized
 setup records, readiness checks, Timefold-powered draft generation, timetable
-versions, hard-clash detection, manual move preview/apply, metrics, and
-publication controls. Import mapping for CSV/XLSX/PDF files, complete setup
-CRUD screens, student-specific clash-resolution cases, and localized repair are
-tracked as follow-up work and should not be treated as production-complete until
-their APIs, UI, and fixtures are implemented and verified.
+versions, independent hard-clash detection, manual move/swap/pin controls,
+metrics, comparison, exports, and publication controls. CSV, XLSX, XLS, and
+text-PDF imports support preview, mapping, validation, and atomic apply.
+Authenticated students have scoped registrations, personal week timetables,
+ICS export, clash indicators, and resolution requests. The completion ledger
+tracks the remaining full CRUD, automatic repair, analytics, fixture,
+browser-E2E, and production-deployment gates without overstating them.
 
 ## Quality Checks
 
