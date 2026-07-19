@@ -36,6 +36,14 @@ import {
   PageHeader,
   useToast,
 } from "@/components/common";
+import {
+  AuraImportPanel,
+  AuraRegistrationPanel,
+  AuraResolutionPanel,
+  AuraScenarioPanel,
+  AuraSetupPanel,
+  AuraVersionTools,
+} from "@/components/aura";
 import type {
   AuraClash,
   AuraGenerationRun,
@@ -527,6 +535,25 @@ export function AuraWorkbenchPage() {
         </Card>
       </section>
 
+      {selectedTermId && currentUser?.university.id ? (
+        <AuraSetupPanel
+          onChanged={() => loadTermDetails(selectedTermId)}
+          termId={selectedTermId}
+          universityId={currentUser.university.id}
+        />
+      ) : null}
+
+      {selectedTermId ? (
+        <AuraRegistrationPanel
+          onChanged={() => loadTermDetails(selectedTermId)}
+          termId={selectedTermId}
+        />
+      ) : null}
+
+      {selectedTermId ? <AuraResolutionPanel termId={selectedTermId} /> : null}
+
+      {selectedTermId ? <AuraImportPanel termId={selectedTermId} /> : null}
+
       <section className="grid gap-4 xl:grid-cols-4">
         <MetricCard icon={Sparkles} label="Versions" value={metrics?.versions ?? 0} />
         <MetricCard
@@ -662,6 +689,23 @@ export function AuraWorkbenchPage() {
           </CardContent>
         </Card>
       </section>
+
+      <AuraVersionTools
+        onChanged={refreshAll}
+        selectedVersionId={selectedVersionId}
+        sessions={sessions}
+        versions={versions}
+      />
+
+      {selectedTermId ? (
+        <AuraScenarioPanel
+          onChanged={refreshAll}
+          selectedVersionId={selectedVersionId}
+          sessions={sessions}
+          termId={selectedTermId}
+          versions={versions}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>
