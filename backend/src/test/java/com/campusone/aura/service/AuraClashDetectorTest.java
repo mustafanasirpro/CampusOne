@@ -119,13 +119,42 @@ class AuraClashDetectorTest {
                                 TIMESLOT_ID,
                                 INSTRUCTOR_ID,
                                 SECTION_ID)),
-                movedSessionId,
-                ROOM_ID,
-                TIMESLOT_ID);
+                session(
+                        movedSessionId,
+                        ROOM_ID,
+                        TIMESLOT_ID,
+                        UUID.fromString("50000000-0000-4000-8000-000000000002"),
+                        UUID.fromString("60000000-0000-4000-8000-000000000002")));
 
         assertThat(clashes)
                 .extracting(DetectedClash::clashType)
                 .contains("ROOM_DOUBLE_BOOKED");
+    }
+
+    @Test
+    void detect_oddAndEvenWeekSessionsDoNotClash() {
+        SessionResponse odd = detailedSession(
+                UUID.randomUUID(), "ODD_WEEK", List.of(), 60, 60,
+                List.of(), List.of(), 1, 1);
+        SessionResponse even = detailedSession(
+                UUID.randomUUID(), "EVEN_WEEK", List.of(), 60, 60,
+                List.of(), List.of(), 1, 1);
+
+        assertThat(detector.detect(List.of(odd, even))).isEmpty();
+    }
+
+    @Test
+    void detect_capacityFacilitiesAndContiguousDurationAreIndependentlyChecked() {
+        SessionResponse invalid = detailedSession(
+                UUID.randomUUID(), "EVERY_WEEK", List.of(), 100, 40,
+                List.of("COMPUTERS"), List.of("PROJECTOR"), 2, 1);
+
+        assertThat(detector.detect(List.of(invalid)))
+                .extracting(DetectedClash::clashType)
+                .contains(
+                        "ROOM_CAPACITY",
+                        "MISSING_FACILITY",
+                        "INVALID_CONTIGUOUS_DURATION");
     }
 
     private SessionResponse session(
@@ -172,5 +201,27 @@ class AuraClashDetectorTest {
                 endsAt,
                 false,
                 "SOLVER");
+    }
+
+    private SessionResponse detailedSession(
+            UUID id,
+            String weekPattern,
+            List<Integer> customWeeks,
+            int requiredCapacity,
+            int roomCapacity,
+            List<String> requiredFacilities,
+            List<String> roomFacilities,
+            int duration,
+            int contiguous) {
+        return new SessionResponse(
+                id, VERSION_ID, UUID.randomUUID(), UUID.randomUUID(),
+                "CS101", "Programming Fundamentals", SECTION_ID, "BSCS-1A",
+                INSTRUCTOR_ID, "Dr Ahmed", ROOM_ID, "Room 101", "CLASSROOM",
+                TIMESLOT_ID, 1, LocalTime.of(9, 0), LocalTime.of(10, 0),
+                false, "SOLVER", 1, 1, duration, contiguous,
+                requiredCapacity, "CLASSROOM", roomCapacity,
+                requiredFacilities, roomFacilities, "INSTRUCTIONAL",
+                true, true, true, null, null, weekPattern, customWeeks,
+                List.of(), false, false, false, false);
     }
 }
