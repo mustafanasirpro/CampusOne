@@ -2,6 +2,7 @@ package com.campusone.aura.service;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -152,6 +153,8 @@ class AuraResolutionServiceTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
     }
@@ -185,13 +188,70 @@ class AuraResolutionServiceTest {
                 new SuggestionTarget(
                         SUGGESTION_ID, "ALTERNATE_LAB", null, null,
                         groupId, true),
-                "LAB", ADMIN_ID, "Use the safe lab group");
+                "LAB", 1, 0, ADMIN_ID, "Use the safe lab group");
         verify(repository, never()).applyOfferingTransfer(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void apply_returnsSafeConflictWhenCaseChangesConcurrently() {
+        when(authorizationService.requireAdminUniversity(ADMIN_ID))
+                .thenReturn(UNIVERSITY_ID);
+        when(repository.findCase(CASE_ID))
+                .thenReturn(Optional.of(caseResponse("APPROVED", 1)));
+        when(repository.findRegistrationScope(REGISTRATION_ID))
+                .thenReturn(Optional.of(registration(USER_ID)));
+        SuggestionTarget suggestion = new SuggestionTarget(
+                SUGGESTION_ID, TARGET_OFFERING_ID, UUID.randomUUID(), true);
+        when(repository.findSuggestion(CASE_ID, SUGGESTION_ID))
+                .thenReturn(Optional.of(suggestion));
+        when(repository.parallelOfferingCandidates(
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(
+                        new OfferingCandidate(TARGET_OFFERING_ID, "CS101-B",
+                                "Programming", UUID.randomUUID(), "BSCS-1B",
+                                5, true)));
+        doThrow(new org.springframework.dao.OptimisticLockingFailureException(
+                "concurrent update"))
+                .when(repository).applyOfferingTransfer(
+                        CASE_ID, REGISTRATION_ID, suggestion,
+                        1, 0, ADMIN_ID, "Apply transfer");
+
+        assertThatThrownBy(() -> service.apply(
+                ADMIN_ID, CASE_ID,
+                new AuraResolutionDtos.ResolutionDecisionRequest(
+                        SUGGESTION_ID, "Apply transfer", 1)))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessageContaining("changed while you were reviewing");
+    }
+
+    @Test
+    void reject_doesNotAttachUntrustedSuggestionIdToAuditAction() {
+        when(authorizationService.requireAdminUniversity(ADMIN_ID))
+                .thenReturn(UNIVERSITY_ID);
+        when(repository.findCase(CASE_ID))
+                .thenReturn(Optional.of(caseResponse("SUGGESTED", 1)),
+                        Optional.of(caseResponse("REJECTED", 2)));
+        when(repository.findRegistrationScope(REGISTRATION_ID))
+                .thenReturn(Optional.of(registration(USER_ID)));
+        when(repository.updateCaseStatus(
+                CASE_ID, 1, "SUGGESTED", "REJECTED", ADMIN_ID,
+                "Not academically suitable"))
+                .thenReturn(true);
+
+        service.reject(
+                ADMIN_ID, CASE_ID,
+                new AuraResolutionDtos.ResolutionDecisionRequest(
+                        SUGGESTION_ID, "Not academically suitable", 1));
+
+        verify(repository).insertAction(
+                CASE_ID, null, ADMIN_ID, "REJECTED",
+                "Not academically suitable");
     }
 
     private RegistrationScope registration(UUID studentId) {
