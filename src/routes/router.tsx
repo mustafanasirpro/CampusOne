@@ -180,6 +180,11 @@ const AuraWorkbenchPage = lazy(async () => {
   return { default: module.AuraWorkbenchPage };
 });
 
+const PersonalTimetablePage = lazy(async () => {
+  const module = await import("@/pages/PersonalTimetablePage");
+  return { default: module.PersonalTimetablePage };
+});
+
 const ForgotPasswordPage = lazy(async () => {
   const module = await import("@/pages/ForgotPasswordPage");
   return { default: module.ForgotPasswordPage };
@@ -407,6 +412,10 @@ export const router = createBrowserRouter([
           {
             path: paths.adminAura,
             element: lazyRoute(<AuraWorkbenchPage />, paths.adminAura),
+          },
+          {
+            path: paths.timetable,
+            element: lazyRoute(<PersonalTimetablePage />, paths.timetable),
           },
           {
             path: paths.settings,
