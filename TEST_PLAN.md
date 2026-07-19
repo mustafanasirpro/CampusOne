@@ -90,6 +90,17 @@ Focused backend tests added:
   - verifies the Timefold solver assigns sessions without hard clashes for a small fixture;
   - verifies instructor `UNAVAILABLE` timeslots are treated as hard constraints;
   - verifies section `UNAVAILABLE` timeslots are treated as hard constraints.
+  - verifies required facilities are hard constraints;
+  - verifies distinct timeslot IDs with overlapping clock ranges cannot
+    double-book an instructor.
+- `AuraConstraintProviderTest`
+  - independently scores active-registration student overlap, hard offering
+    conflicts, student unavailability, odd/even week compatibility,
+    insufficient building travel, and lecture-before-linked ordering.
+- `AuraServiceTest`
+  - verifies authenticated-admin university scoping;
+  - rejects cross-university term creation;
+  - validates calendar exception term dates and facility values.
 
 ## Manual AURA Regression Checklist
 
@@ -97,12 +108,17 @@ Run these in a local or staging environment as an admin:
 
 1. Open `/admin/aura`.
 2. Create an academic term.
-3. Add or seed rooms, timeslots, instructors, sections, offerings, and meeting requirements through the admin API.
+3. Add programs, batches, sections, instructors, rooms/facilities, timeslots,
+   offerings, meeting requirements/facilities, availability, and calendar
+   exceptions through the connected setup panel.
 4. Add instructor, room, or section availability where needed and confirm readiness catches impossible unavailable combinations.
 5. Confirm readiness changes from blocked to ready.
 6. Start a generation run and watch it move from queued/running to completed.
 7. Open the generated timetable version and inspect scheduled sessions.
 8. Confirm hard clashes are absent or listed with clear messages.
 9. Publish a generated version and verify only one version is published.
+10. Against PostgreSQL, confirm a generation run advances from queued to
+    completed and that session listing plus move preview execute without JDBC
+    mapping or timestamp-binding errors.
 10. Preview and apply a manual room/timeslot move.
 11. Confirm sessions and clash counts refresh after the move.
