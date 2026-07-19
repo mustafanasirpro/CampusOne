@@ -41,7 +41,8 @@ The backend is a modular Spring Boot API for CampusOne:
   generation, clash, and timetable-version APIs
 - AURA import preview/validation/apply for CSV, XLSX, XLS, and text PDFs
 - AURA student registrations, personal timetables, ICS export, resolution
-  cases, safe moves/swaps, scenarios, comparison, and multi-format exports
+  cases, stale-safe generation persistence/publication, safe moves/swaps,
+  scenarios, comparison, notifications, and multi-format exports
 - Java 21 development environment
 - Maven build and test pipeline
 - JWT configuration validation
