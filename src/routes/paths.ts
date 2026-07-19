@@ -40,6 +40,7 @@ export const paths = {
   search: "/search",
   leaderboard: "/leaderboard",
   assistant: "/ai",
+  timetable: "/timetable",
   admin: "/admin",
   adminAura: "/admin/aura",
   settings: "/settings",
