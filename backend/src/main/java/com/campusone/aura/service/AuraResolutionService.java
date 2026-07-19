@@ -17,6 +17,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -176,7 +177,7 @@ public class AuraResolutionService {
             throw conflict();
         }
         repository.insertAction(
-                caseId, request.suggestionId(), userId, "REJECTED", request.reason());
+                caseId, null, userId, "REJECTED", request.reason());
         notificationService.notifyStudent(
                 resolutionCase.studentUserId(),
                 "Timetable resolution reviewed",
@@ -200,32 +201,38 @@ public class AuraResolutionService {
                 .orElseThrow(() -> notFound("AURA registration was not found."));
         SuggestionTarget suggestion = requireSafeSuggestion(
                 caseId, request.suggestionId());
-        if (suggestion.offeringId() != null) {
-            OfferingCandidate currentCandidate = repository
-                    .parallelOfferingCandidates(registration).stream()
-                    .filter(candidate -> candidate.offeringId().equals(
-                            suggestion.offeringId()))
-                    .findFirst()
-                    .orElseThrow(() -> unavailableAlternative());
-            requireStillSafe(
-                    currentCandidate.clashFree(),
-                    currentCandidate.remainingCapacity());
-            repository.applyOfferingTransfer(
-                    caseId, resolutionCase.registrationId(), suggestion,
-                    userId, request.reason().trim());
-        } else {
-            GroupCandidate groupCandidate = repository
-                    .alternateGroupCandidates(registration).stream()
-                    .filter(candidate -> candidate.groupId().equals(
-                            suggestion.groupId()))
-                    .findFirst()
-                    .orElseThrow(() -> unavailableAlternative());
-            requireStillSafe(
-                    groupCandidate.clashFree(),
-                    groupCandidate.remainingCapacity());
-            repository.applyGroupTransfer(
-                    caseId, resolutionCase.registrationId(), suggestion,
-                    groupCandidate.groupType(), userId, request.reason().trim());
+        try {
+            if (suggestion.offeringId() != null) {
+                OfferingCandidate currentCandidate = repository
+                        .parallelOfferingCandidates(registration).stream()
+                        .filter(candidate -> candidate.offeringId().equals(
+                                suggestion.offeringId()))
+                        .findFirst()
+                        .orElseThrow(() -> unavailableAlternative());
+                requireStillSafe(
+                        currentCandidate.clashFree(),
+                        currentCandidate.remainingCapacity());
+                repository.applyOfferingTransfer(
+                        caseId, resolutionCase.registrationId(), suggestion,
+                        request.version(), registration.version(),
+                        userId, request.reason().trim());
+            } else {
+                GroupCandidate groupCandidate = repository
+                        .alternateGroupCandidates(registration).stream()
+                        .filter(candidate -> candidate.groupId().equals(
+                                suggestion.groupId()))
+                        .findFirst()
+                        .orElseThrow(() -> unavailableAlternative());
+                requireStillSafe(
+                        groupCandidate.clashFree(),
+                        groupCandidate.remainingCapacity());
+                repository.applyGroupTransfer(
+                        caseId, resolutionCase.registrationId(), suggestion,
+                        groupCandidate.groupType(), request.version(),
+                        registration.version(), userId, request.reason().trim());
+            }
+        } catch (OptimisticLockingFailureException exception) {
+            throw conflict();
         }
         notificationService.notifyStudent(
                 resolutionCase.studentUserId(),
