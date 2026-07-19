@@ -201,3 +201,49 @@ export async function apiRequest<T>(
 
   return body as T;
 }
+
+export async function apiDownload(
+  path: string,
+  retryOnUnauthorized = true,
+): Promise<{ blob: Blob; filename: string }> {
+  if (isBrowserOffline()) {
+    throw new ApiError(
+      "You appear to be offline. Check your internet connection and try again.",
+      0,
+      "OFFLINE",
+    );
+  }
+  const headers = new Headers({ Accept: "*/*" });
+  const accessToken = getStoredAccessToken();
+  if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
+  let response: Response;
+  try {
+    response = await fetch(endpoint(path), {
+      credentials: "include",
+      headers,
+    });
+  } catch {
+    throw new ApiError(
+      isBrowserOffline()
+        ? "You appear to be offline. Check your internet connection and try again."
+        : "We could not connect to CampusOne. Please try again.",
+      0,
+      isBrowserOffline() ? "OFFLINE" : "NETWORK_ERROR",
+    );
+  }
+  if (response.status === 401 && retryOnUnauthorized) {
+    const refreshed = await refreshSession();
+    if (refreshed) return apiDownload(path, false);
+  }
+  if (!response.ok) {
+    const body = await parseResponseBody(response);
+    throw toApiError(response, body);
+  }
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const simpleName = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+  const filename = encodedName
+    ? decodeURIComponent(encodedName)
+    : simpleName || "campusone-export";
+  return { blob: await response.blob(), filename };
+}
