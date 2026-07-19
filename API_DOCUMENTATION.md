@@ -103,10 +103,17 @@ when creating an academic term, where the backend still verifies admin access.
 | `GET` | `/rooms` | List rooms. |
 | `POST` | `/timeslots` | Create a weekly timeslot. |
 | `GET` | `/timeslots` | List timeslots. |
+| `GET` | `/setup-references` | List active departments and courses for the authenticated admin's university. |
+| `PUT` | `/rooms/{roomId}/facilities` | Replace a room's normalized facility set. |
 | `POST` | `/offerings` | Create a course offering for a term. |
 | `GET` | `/terms/{termId}/offerings` | List term offerings. |
 | `POST` | `/meeting-requirements` | Add required weekly sessions for an offering. |
 | `GET` | `/offerings/{offeringId}/meeting-requirements` | List offering requirements. |
+| `PUT` | `/meeting-requirements/{requirementId}/facilities` | Replace required room facilities. |
+| `POST` | `/calendar-exceptions` | Create a term-scoped calendar exception. |
+| `GET` | `/terms/{termId}/calendar-exceptions` | List term calendar exceptions. |
+| `PATCH` | `/calendar-exceptions/{exceptionId}` | Update an active exception with optimistic locking. |
+| `DELETE` | `/calendar-exceptions/{exceptionId}?version={version}` | Deactivate an exception. |
 
 ### Generation and review
 
@@ -123,7 +130,32 @@ when creating an academic term, where the backend still verifies admin access.
 | `GET` | `/versions/{versionId}/clashes` | List detected hard clashes for a timetable version. |
 | `POST` | `/sessions/{sessionId}/move-preview` | Preview a manual room/timeslot move and its resulting clashes. |
 | `PATCH` | `/sessions/{sessionId}/move` | Apply a manual move and refresh clash records. |
+| `POST` | `/sessions/{sessionId}/swap-preview` | Preview a two-session swap. |
+| `PATCH` | `/sessions/{sessionId}/swap` | Apply a validated draft-session swap. |
+| `PATCH` | `/sessions/{sessionId}/pin` | Pin or unpin a draft session assignment. |
+| `POST` | `/versions/{versionId}/clone` | Clone a version into an editable draft. |
+| `GET` | `/versions/{versionId}/compare/{otherVersionId}` | Compare stable occurrences across two versions. |
+| `POST` | `/versions/{versionId}/archive` | Archive an editable draft. |
+| `GET` | `/versions/{versionId}/export?format={format}` | Export CSV, XLSX, JSON, HTML, or ICS. |
 | `GET` | `/terms/{termId}/metrics` | Return aggregate generation/version/clash metrics for admin dashboards. |
+
+### Imports, registration, and scenarios
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/terms/{termId}/imports/preview` | Upload and preview a bounded CSV, XLSX, XLS, or text PDF import. |
+| `POST` | `/imports/{jobId}/validate` | Validate mappings and normalized source rows. |
+| `POST` | `/imports/{jobId}/apply` | Apply a validated import atomically. |
+| `POST` | `/registrations` | Create a university-scoped student registration. |
+| `GET` | `/terms/{termId}/registrations` | List scoped term registrations. |
+| `PATCH` | `/registrations/{registrationId}` | Update a registration with optimistic locking. |
+| `POST` | `/terms/{termId}/what-if` | Create a non-destructive what-if scenario. |
+| `POST` | `/terms/{termId}/emergency-repairs` | Create an emergency review draft. |
+
+Authenticated student endpoints use the separate `/api/v1/aura` base path:
+`/terms`, `/me/registrations`, `/me/timetable`, `/me/timetable.ics`, and
+`/me/resolution-cases`. Student identity and university are always derived from
+the JWT-backed profile.
 
 AURA stores timetable data in normalized PostgreSQL tables managed by Flyway
 and keeps generated versions immutable apart from publish state and explicit
