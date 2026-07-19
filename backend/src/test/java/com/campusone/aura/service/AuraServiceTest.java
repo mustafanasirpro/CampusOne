@@ -64,6 +64,12 @@ class AuraServiceTest {
     @Mock
     private AuraClashDetector clashDetector;
 
+    @Mock
+    private AuraGenerationPersistenceService generationPersistenceService;
+
+    @Mock
+    private AuraNotificationService notificationService;
+
     private AuraService service;
 
     @BeforeEach
@@ -74,6 +80,8 @@ class AuraServiceTest {
                 readinessValidator,
                 solverService,
                 clashDetector,
+                generationPersistenceService,
+                notificationService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         when(authorizationService.requireAdminUniversity(USER_ID))
                 .thenReturn(UNIVERSITY_ID);
@@ -209,6 +217,49 @@ class AuraServiceTest {
         verify(repository, never()).publishVersion(
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void publishVersion_rejectsIncorrectPerRequirementOccurrences() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION,
+                VERSION_ID,
+                UNIVERSITY_ID)).thenReturn(true);
+        when(repository.findVersion(VERSION_ID)).thenReturn(Optional.of(
+                version("DRAFT")));
+        when(repository.countExpectedOccurrences(TERM_ID)).thenReturn(8L);
+        when(repository.countScheduledSessions(VERSION_ID)).thenReturn(8L);
+        when(repository.countOccurrenceIntegrityViolations(VERSION_ID))
+                .thenReturn(1L);
+
+        assertThatThrownBy(() -> service.publishVersion(USER_ID, VERSION_ID))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessageContaining("exactly its required weekly occurrences");
+
+        verify(repository, never()).publishVersion(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void publishVersion_notifiesStudentsAfterSafePublication() {
+        UUID studentId = UUID.randomUUID();
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION,
+                VERSION_ID,
+                UNIVERSITY_ID)).thenReturn(true);
+        when(repository.findVersion(VERSION_ID)).thenReturn(
+                Optional.of(version("DRAFT")),
+                Optional.of(version("PUBLISHED")));
+        when(repository.activeStudentUserIds(TERM_ID))
+                .thenReturn(List.of(studentId));
+        when(repository.publishVersion(VERSION_ID, TERM_ID)).thenReturn(true);
+
+        service.publishVersion(USER_ID, VERSION_ID);
+
+        verify(repository).publishVersion(VERSION_ID, TERM_ID);
+        verify(notificationService).notifyTimetablePublished(
+                List.of(studentId), USER_ID, VERSION_ID);
     }
 
     @Test
