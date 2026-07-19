@@ -36,6 +36,7 @@ export const primaryNavigation: NavigationItem[] = [
     icon: BriefcaseBusiness,
   },
   { label: "Events", path: paths.events, icon: CalendarDays },
+  { label: "My Timetable", path: paths.timetable, icon: CalendarClock },
   { label: "Notifications", path: paths.notifications, icon: Bell },
   { label: "Search", path: paths.search, icon: Search },
   { label: "Leaderboard", path: paths.leaderboard, icon: Trophy },
