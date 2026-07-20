@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -196,6 +197,11 @@ public final class AuraDtos {
             List<SetupReferenceOption> students) {
     }
 
+    public record CapabilitiesResponse(
+            UUID universityId,
+            boolean canManage) {
+    }
+
     public record CreateOfferingRequest(
             @NotNull UUID termId,
             @NotNull UUID courseId,
@@ -316,7 +322,15 @@ public final class AuraDtos {
 
     public record GenerateTimetableRequest(
             @Min(1) @Max(300) Integer terminationSeconds,
-            @Size(max = 500) String notes) {
+            @Size(max = 500) String notes,
+            @Size(max = 24) String profile,
+            Long randomSeed) {
+
+        public GenerateTimetableRequest(
+                Integer terminationSeconds,
+                String notes) {
+            this(terminationSeconds, notes, "BALANCED", 0L);
+        }
     }
 
     public record GenerationRunResponse(
@@ -330,7 +344,38 @@ public final class AuraDtos {
             Instant startedAt,
             Instant completedAt,
             Instant cancelledAt,
-            Instant createdAt) {
+            Instant createdAt,
+            String profile,
+            long randomSeed,
+            Integer candidateCount,
+            String terminationReason) {
+    }
+
+    public record ConstraintWeightRequest(
+            @NotBlank @Size(max = 100) String constraintName,
+            @NotBlank @Size(max = 16) String constraintLevel,
+            @Min(0) @Max(1_000_000) long weight,
+            boolean active) {
+    }
+
+    public record UpsertConstraintProfileRequest(
+            @NotBlank @Size(max = 24) String profile,
+            @NotNull @Size(max = 50)
+            List<@Valid ConstraintWeightRequest> weights) {
+    }
+
+    public record ConstraintWeightResponse(
+            String constraintName,
+            String constraintLevel,
+            long weight,
+            boolean active,
+            boolean customized) {
+    }
+
+    public record ConstraintProfileResponse(
+            UUID termId,
+            String profile,
+            List<ConstraintWeightResponse> weights) {
     }
 
     public record TimetableVersionResponse(
