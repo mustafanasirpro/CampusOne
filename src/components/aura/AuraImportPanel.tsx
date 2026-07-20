@@ -126,6 +126,7 @@ export function AuraImportPanel({ termId }: { termId: string }) {
             Source file
             <input
               accept=".csv,.xlsx,.xls,.pdf"
+              aria-label="Scheduling data file"
               className="sr-only"
               onChange={(event) => {
                 setFile(event.target.files?.item(0) ?? null);
