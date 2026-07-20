@@ -277,6 +277,39 @@ export interface AuraGenerationRun {
   status: string;
   termId: string;
   terminationSeconds: number;
+  profile: AuraConstraintProfileName;
+  randomSeed: number;
+  candidateCount: number | null;
+  terminationReason: string | null;
+}
+
+export type AuraConstraintProfileName =
+  | "FAST_FEASIBLE"
+  | "BALANCED"
+  | "COMPACT"
+  | "ROOM_EFFICIENT"
+  | "INSTRUCTOR_FRIENDLY"
+  | "QUALITY"
+  | "REPAIR"
+  | "WHAT_IF";
+
+export interface AuraConstraintWeight {
+  active: boolean;
+  constraintLevel: "HARD" | "MEDIUM" | "SOFT";
+  constraintName: string;
+  customized: boolean;
+  weight: number;
+}
+
+export interface AuraConstraintProfile {
+  profile: AuraConstraintProfileName;
+  termId: string;
+  weights: AuraConstraintWeight[];
+}
+
+export interface AuraCapabilities {
+  canManage: boolean;
+  universityId: string;
 }
 
 export interface AuraTimetableVersion {
