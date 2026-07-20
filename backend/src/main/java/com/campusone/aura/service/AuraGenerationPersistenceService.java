@@ -36,7 +36,9 @@ public class AuraGenerationPersistenceService {
             UUID userId,
             String score,
             String notes,
-            List<SolverAssignment> assignments) {
+            List<SolverAssignment> assignments,
+            int candidateCount,
+            String terminationReason) {
         RunPersistenceState runState = repository.lockRunForPersistence(
                 runId, termId);
         if (!"RUNNING".equals(runState.status())) {
@@ -69,7 +71,9 @@ public class AuraGenerationPersistenceService {
                 score,
                 "Timetable generated with "
                         + assignments.size()
-                        + " scheduled sessions.");
+                        + " scheduled sessions.",
+                candidateCount,
+                terminationReason);
         if (!completed) {
             throw new AuraStateException(
                     "This generation run could not be completed safely.");
