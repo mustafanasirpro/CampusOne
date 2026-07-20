@@ -4,6 +4,7 @@ import ai.timefold.solver.core.api.domain.solution.PlanningEntityCollectionPrope
 import ai.timefold.solver.core.api.domain.solution.PlanningScore;
 import ai.timefold.solver.core.api.domain.solution.PlanningSolution;
 import ai.timefold.solver.core.api.domain.solution.ProblemFactCollectionProperty;
+import ai.timefold.solver.core.api.domain.solution.ConstraintWeightOverrides;
 import ai.timefold.solver.core.api.domain.valuerange.ValueRangeProvider;
 import ai.timefold.solver.core.api.score.buildin.hardmediumsoft.HardMediumSoftScore;
 import java.util.ArrayList;
@@ -41,6 +42,9 @@ public class AuraTimetableSolution {
 
     @PlanningScore
     private HardMediumSoftScore score;
+
+    private ConstraintWeightOverrides<HardMediumSoftScore>
+            constraintWeightOverrides = ConstraintWeightOverrides.none();
 
     public AuraTimetableSolution() {
     }
@@ -113,5 +117,17 @@ public class AuraTimetableSolution {
 
     public void setScore(HardMediumSoftScore score) {
         this.score = score;
+    }
+
+    public ConstraintWeightOverrides<HardMediumSoftScore>
+            getConstraintWeightOverrides() {
+        return constraintWeightOverrides;
+    }
+
+    public void setConstraintWeightOverrides(
+            ConstraintWeightOverrides<HardMediumSoftScore> overrides) {
+        this.constraintWeightOverrides = overrides == null
+                ? ConstraintWeightOverrides.none()
+                : overrides;
     }
 }
