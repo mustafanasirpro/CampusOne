@@ -1,6 +1,8 @@
 package com.campusone.aura.service;
 
 import com.campusone.note.service.NoteAdminAuthorizationService;
+import com.campusone.user.entity.RoleName;
+import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.util.UUID;
 import org.springframework.security.access.AccessDeniedException;
@@ -22,10 +24,10 @@ public class AuraAuthorizationService {
 
     @Transactional(readOnly = true)
     public void requireAdmin(UUID userId) {
-        String email = userRepository.findById(userId)
-                .map(user -> user.getEmail())
-                .orElse("");
-        if (!adminAuthorizationService.canManage(userId, email)) {
+        User user = userRepository.findWithRolesById(userId)
+                .orElseThrow(() -> new AccessDeniedException(
+                        "Only admins can manage AURA timetable data."));
+        if (!canManageUser(user)) {
             throw new AccessDeniedException(
                     "Only admins can manage AURA timetable data.");
         }
@@ -36,7 +38,7 @@ public class AuraAuthorizationService {
         var user = userRepository.findDetailedById(userId)
                 .orElseThrow(() -> new AccessDeniedException(
                         "Only admins can manage AURA timetable data."));
-        if (!adminAuthorizationService.canManage(userId, user.getEmail())) {
+        if (!canManageUser(user)) {
             throw new AccessDeniedException(
                     "Only admins can manage AURA timetable data.");
         }
@@ -61,7 +63,14 @@ public class AuraAuthorizationService {
         var user = requireUniversityProfile(
                 userId,
                 "A university profile is required to use AURA.");
-        return adminAuthorizationService.canManage(userId, user.getEmail());
+        return canManageUser(user);
+    }
+
+    private boolean canManageUser(User user) {
+        boolean hasAdminRole = user.getRoles().stream()
+                .anyMatch(role -> role.getName() == RoleName.ADMIN);
+        return hasAdminRole
+                || adminAuthorizationService.canManage(user.getId(), user.getEmail());
     }
 
     private com.campusone.user.entity.User requireUniversityProfile(
