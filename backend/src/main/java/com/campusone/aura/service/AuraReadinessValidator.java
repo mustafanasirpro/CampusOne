@@ -5,6 +5,7 @@ import com.campusone.aura.dto.AuraDtos.ReadinessResponse;
 import com.campusone.aura.repository.AuraJdbcRepository;
 import com.campusone.aura.repository.AuraJdbcRepository.RequirementCandidateIssue;
 import com.campusone.aura.repository.AuraJdbcRepository.TermCounts;
+import com.campusone.aura.solver.AuraConstraintCatalog;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -66,6 +67,42 @@ public class AuraReadinessValidator {
                     "There are more required weekly sessions than available room-timeslot combinations.",
                     "TERM",
                     termId));
+        }
+
+        issues.addAll(repository.readinessIntegrityIssues(termId));
+
+        if (repository.hasActiveGenerationRun(termId)) {
+            issues.add(new ReadinessIssue(
+                    "AURA_GENERATION_ALREADY_ACTIVE",
+                    "ERROR",
+                    "Wait for the active generation run to finish or cancel it before starting another.",
+                    "TERM",
+                    termId));
+        }
+
+        if (repository.countActiveRegistrations(termId) == 0) {
+            issues.add(new ReadinessIssue(
+                    "AURA_NO_ACTIVE_REGISTRATIONS",
+                    "WARNING",
+                    "No active student registrations are available, so individual timetable conflicts cannot be optimized.",
+                    "TERM",
+                    termId));
+        }
+
+        for (String profile : AuraConstraintCatalog.PROFILES) {
+            try {
+                AuraConstraintCatalog.weights(
+                        profile,
+                        repository.constraintWeights(termId, profile));
+            } catch (IllegalArgumentException exception) {
+                issues.add(new ReadinessIssue(
+                        "AURA_INVALID_CONSTRAINT_PROFILE",
+                        "ERROR",
+                        "A saved constraint profile contains an unsupported name or score level.",
+                        "TERM",
+                        termId));
+                break;
+            }
         }
 
         for (RequirementCandidateIssue candidateIssue
