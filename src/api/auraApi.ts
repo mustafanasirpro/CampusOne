@@ -1,8 +1,11 @@
 import { apiDownload, apiRequest } from "@/api/apiClient";
 import type {
   AuraAvailability,
+  AuraCapabilities,
   AuraBatch,
   AuraCalendarException,
+  AuraConstraintProfile,
+  AuraConstraintProfileName,
   AuraClash,
   AuraGenerationRun,
   AuraInstructor,
@@ -46,6 +49,10 @@ import type {
 
 const adminAuraPath = "/admin/aura";
 const auraPath = "/aura";
+
+export function getAuraCapabilities(signal?: AbortSignal) {
+  return apiRequest<AuraCapabilities>(`${auraPath}/capabilities`, { signal });
+}
 
 function queryString(parameters: Record<string, string | number | undefined>) {
   const query = new URLSearchParams();
@@ -191,12 +198,46 @@ export function getAuraReadiness(termId: string, signal?: AbortSignal) {
   );
 }
 
-export function startAuraGeneration(termId: string, terminationSeconds = 30) {
+export function startAuraGeneration(
+  termId: string,
+  terminationSeconds = 30,
+  profile: AuraConstraintProfileName = "BALANCED",
+  randomSeed = 0,
+) {
   return apiRequest<AuraGenerationRun>(
     `${adminAuraPath}/terms/${termId}/runs`,
     {
-      body: JSON.stringify({ terminationSeconds }),
+      body: JSON.stringify({
+        profile,
+        randomSeed,
+        terminationSeconds,
+      }),
       method: "POST",
+    },
+  );
+}
+
+export function getAuraConstraintProfile(
+  termId: string,
+  profile: AuraConstraintProfileName,
+  signal?: AbortSignal,
+) {
+  return apiRequest<AuraConstraintProfile>(
+    `${adminAuraPath}/terms/${termId}/constraint-profile${queryString({ profile })}`,
+    { signal },
+  );
+}
+
+export function replaceAuraConstraintProfile(
+  termId: string,
+  profile: AuraConstraintProfileName,
+  weights: AuraConstraintProfile["weights"],
+) {
+  return apiRequest<AuraConstraintProfile>(
+    `${adminAuraPath}/terms/${termId}/constraint-profile`,
+    {
+      body: JSON.stringify({ profile, weights }),
+      method: "PUT",
     },
   );
 }
