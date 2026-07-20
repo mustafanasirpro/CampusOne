@@ -129,6 +129,26 @@ public class AuraAdminController {
         return ResponseEntity.ok(auraService.setupReferences(principal.getUserId()));
     }
 
+    @GetMapping("/terms/{termId}/constraint-profile")
+    @Operation(summary = "Get an AURA constraint profile")
+    public ResponseEntity<AuraDtos.ConstraintProfileResponse> constraintProfile(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID termId,
+            @RequestParam(defaultValue = "BALANCED") String profile) {
+        return ResponseEntity.ok(auraService.constraintProfile(
+                principal.getUserId(), termId, profile));
+    }
+
+    @PutMapping("/terms/{termId}/constraint-profile")
+    @Operation(summary = "Replace an AURA constraint profile")
+    public ResponseEntity<AuraDtos.ConstraintProfileResponse> replaceConstraintProfile(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID termId,
+            @Valid @RequestBody AuraDtos.UpsertConstraintProfileRequest request) {
+        return ResponseEntity.ok(auraService.replaceConstraintProfile(
+                principal.getUserId(), termId, request));
+    }
+
     @GetMapping("/programs")
     @Operation(summary = "List AURA programs")
     public ResponseEntity<List<ProgramResponse>> listPrograms(
