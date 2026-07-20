@@ -21,6 +21,10 @@ import com.campusone.aura.repository.AuraJdbcRepository;
 import com.campusone.aura.repository.AuraJdbcRepository.ScopedResource;
 import com.campusone.aura.repository.AuraJdbcRepository.DetectedClash;
 import com.campusone.aura.repository.AuraJdbcRepository.VersionSessionSnapshot;
+import com.campusone.aura.repository.AuraJdbcRepository.ConstraintConfigurationRow;
+import com.campusone.aura.solver.AuraConstraintCatalog;
+import com.campusone.aura.solver.AuraConstraintCatalog.ConstraintWeight;
+import com.campusone.aura.solver.AuraConstraintCatalog.Level;
 import com.campusone.common.exception.ResourceNotFoundException;
 import jakarta.annotation.PreDestroy;
 import java.nio.charset.StandardCharsets;
@@ -423,6 +427,109 @@ public class AuraService {
                 repository.listStudentReferences(universityId));
     }
 
+    public AuraDtos.ConstraintProfileResponse constraintProfile(
+            UUID userId,
+            UUID termId,
+            String requestedProfile) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.TERM,
+                termId,
+                universityId,
+                "AURA term was not found.");
+        String profile = normalizeConstraintProfile(requestedProfile);
+        Map<String, ConstraintConfigurationRow> configured = repository
+                .listConstraintConfigurations(termId, profile).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        ConstraintConfigurationRow::constraintName,
+                        row -> row));
+        Map<String, ai.timefold.solver.core.api.score.buildin.hardmediumsoft.HardMediumSoftScore>
+                resolved = AuraConstraintCatalog.weights(
+                        profile,
+                        configured.values().stream().collect(
+                                java.util.stream.Collectors.toMap(
+                                        ConstraintConfigurationRow::constraintName,
+                                        row -> new ConstraintWeight(
+                                                row.level(),
+                                                row.active() ? row.weight() : 0))));
+        List<AuraDtos.ConstraintWeightResponse> weights =
+                AuraConstraintCatalog.constraints().entrySet().stream()
+                        .map(entry -> {
+                            ConstraintConfigurationRow custom = configured.get(entry.getKey());
+                            long weight = custom == null
+                                    ? scoreWeight(resolved.get(entry.getKey()), entry.getValue())
+                                    : custom.weight();
+                            return new AuraDtos.ConstraintWeightResponse(
+                                    entry.getKey(),
+                                    entry.getValue().name(),
+                                    weight,
+                                    custom == null || custom.active(),
+                                    custom != null);
+                        })
+                        .sorted(java.util.Comparator.comparing(
+                                AuraDtos.ConstraintWeightResponse::constraintLevel)
+                                .thenComparing(
+                                        AuraDtos.ConstraintWeightResponse::constraintName))
+                        .toList();
+        return new AuraDtos.ConstraintProfileResponse(termId, profile, weights);
+    }
+
+    @Transactional
+    public AuraDtos.ConstraintProfileResponse replaceConstraintProfile(
+            UUID userId,
+            UUID termId,
+            AuraDtos.UpsertConstraintProfileRequest request) {
+        UUID universityId = authorizationService.requireAdminUniversity(userId);
+        requireScopedResource(
+                ScopedResource.TERM,
+                termId,
+                universityId,
+                "AURA term was not found.");
+        String profile = normalizeConstraintProfile(request.profile());
+        Map<String, AuraDtos.ConstraintWeightRequest> unique = new LinkedHashMap<>();
+        for (AuraDtos.ConstraintWeightRequest weight : request.weights()) {
+            Level expected = AuraConstraintCatalog.constraints().get(
+                    weight.constraintName());
+            if (expected == null) {
+                throw new AuraStateException("Unknown AURA constraint name.");
+            }
+            Level supplied;
+            try {
+                supplied = Level.valueOf(weight.constraintLevel()
+                        .trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException exception) {
+                throw new AuraStateException("Unsupported AURA constraint level.");
+            }
+            if (supplied != expected) {
+                throw new AuraStateException(
+                        "A constraint cannot be moved to a different score level.");
+            }
+            if (unique.putIfAbsent(weight.constraintName(), weight) != null) {
+                throw new AuraStateException(
+                        "Each constraint may be configured only once per profile.");
+            }
+        }
+        repository.replaceConstraintConfigurations(
+                termId,
+                profile,
+                unique.values().stream()
+                        .map(weight -> new ConstraintConfigurationRow(
+                                weight.constraintName(),
+                                Level.valueOf(weight.constraintLevel()
+                                        .trim().toUpperCase(Locale.ROOT)),
+                                weight.weight(),
+                                weight.active()))
+                        .toList());
+        repository.insertTermAudit(
+                termId,
+                userId,
+                "CONSTRAINT_PROFILE_UPDATED",
+                "CONSTRAINT_PROFILE",
+                termId,
+                "Updated the " + profile + " constraint profile.");
+        return constraintProfile(userId, termId, profile);
+    }
+
     public OfferingResponse createOffering(
             UUID userId,
             AuraDtos.CreateOfferingRequest request) {
@@ -656,6 +763,8 @@ public class AuraService {
         int terminationSeconds = request.terminationSeconds() == null
                 ? 30
                 : Math.max(1, Math.min(request.terminationSeconds(), 300));
+        String profile = normalizeConstraintProfile(request.profile());
+        long randomSeed = request.randomSeed() == null ? 0L : request.randomSeed();
         UUID revisionId = UUID.randomUUID();
         UUID runId = UUID.randomUUID();
         try {
@@ -663,12 +772,14 @@ public class AuraService {
                     runId,
                     revisionId,
                     termId,
-                    checksum(readiness.toString()),
+                    checksum(repository.schedulingInputSnapshot(termId)),
                     "AURA readiness snapshot: "
                             + readiness.meetingRequirements()
                             + " meeting requirements.",
                     userId,
-                    terminationSeconds);
+                    terminationSeconds,
+                    profile,
+                    randomSeed);
         } catch (DataIntegrityViolationException exception) {
             throw new AuraStateException(
                     "A generation run is already active for this term.");
@@ -679,7 +790,9 @@ public class AuraService {
                     termId,
                     userId,
                     terminationSeconds,
-                    request.notes());
+                    request.notes(),
+                    profile,
+                    randomSeed);
             return null;
         });
         runningRuns.put(runId, task);
@@ -1132,7 +1245,9 @@ public class AuraService {
             UUID termId,
             UUID userId,
             int terminationSeconds,
-            String notes) {
+            String notes,
+            String profile,
+            long randomSeed) {
         try {
             if (!repository.markRunRunning(runId, clock.instant())) {
                 return;
@@ -1146,14 +1261,20 @@ public class AuraService {
                     repository.solverSectionAvailability(termId),
                     repository.solverStudentAvailability(termId),
                     repository.solverTravelRules(termId),
-                    terminationSeconds);
+                    terminationSeconds,
+                    AuraConstraintCatalog.weights(
+                            profile,
+                            repository.constraintWeights(termId, profile)),
+                    randomSeed);
             generationPersistenceService.persistCompletedRun(
                     runId,
                     termId,
                     userId,
                     result.score(),
                     notes,
-                    result.assignments());
+                    result.assignments(),
+                    result.candidateCount(),
+                    result.terminationReason());
         } catch (RuntimeException exception) {
             LOG.error(
                     "AURA generation run {} failed safely: {}",
@@ -1179,6 +1300,24 @@ public class AuraService {
         List<DetectedClash> detected =
                 clashDetector.detect(repository.listSessions(versionId));
         repository.replaceClashes(versionId, detected);
+    }
+
+    private String normalizeConstraintProfile(String profile) {
+        try {
+            return AuraConstraintCatalog.normalizeProfile(profile);
+        } catch (IllegalArgumentException exception) {
+            throw new AuraStateException(exception.getMessage());
+        }
+    }
+
+    private long scoreWeight(
+            ai.timefold.solver.core.api.score.buildin.hardmediumsoft.HardMediumSoftScore score,
+            Level level) {
+        return switch (level) {
+            case HARD -> score.hardScore();
+            case MEDIUM -> score.mediumScore();
+            case SOFT -> score.softScore();
+        };
     }
 
     private Map<String, VersionSessionSnapshot> snapshotsByOccurrence(
