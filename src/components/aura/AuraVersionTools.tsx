@@ -27,6 +27,7 @@ import type {
 
 interface AuraVersionToolsProps {
   onChanged: () => Promise<void>;
+  onVersionSelected: (versionId: string) => void;
   selectedVersionId: string;
   sessions: AuraSession[];
   versions: AuraTimetableVersion[];
@@ -38,6 +39,7 @@ function message(error: unknown, fallback: string) {
 
 export function AuraVersionTools({
   onChanged,
+  onVersionSelected,
   selectedVersionId,
   sessions,
   versions,
@@ -110,8 +112,12 @@ export function AuraVersionTools({
           <Button
             loading={pendingAction === "clone"}
             onClick={() => void run("clone", async () => {
-              await cloneAuraVersion(selectedVersionId, `Draft cloned from version ${selectedVersion.versionNumber}`);
+              const clonedVersion = await cloneAuraVersion(
+                selectedVersionId,
+                `Draft cloned from version ${selectedVersion.versionNumber}`,
+              );
               await onChanged();
+              onVersionSelected(clonedVersion.id);
             })}
             variant="outline"
           >
@@ -144,6 +150,7 @@ export function AuraVersionTools({
           <label className="grid gap-1 text-sm font-medium text-slate-700">
             Compare with
             <select
+              aria-label="Compare with"
               className="rounded-xl border border-slate-300 px-3 py-2"
               onChange={(event) => setOtherVersionId(event.target.value)}
               value={otherVersionId}
@@ -178,6 +185,7 @@ export function AuraVersionTools({
           <label className="grid gap-1 text-sm font-medium text-slate-700">
             Session
             <select
+              aria-label="Session"
               className="rounded-xl border border-slate-300 px-3 py-2"
               disabled={!draft}
               onChange={(event) => {
@@ -197,6 +205,7 @@ export function AuraVersionTools({
           <label className="grid gap-1 text-sm font-medium text-slate-700">
             New room
             <select
+              aria-label="New room"
               className="rounded-xl border border-slate-300 px-3 py-2"
               disabled={!draft}
               onChange={(event) => {
@@ -216,6 +225,7 @@ export function AuraVersionTools({
           <label className="grid gap-1 text-sm font-medium text-slate-700">
             New timeslot
             <select
+              aria-label="New timeslot"
               className="rounded-xl border border-slate-300 px-3 py-2"
               disabled={!draft}
               onChange={(event) => {
@@ -284,6 +294,7 @@ export function AuraVersionTools({
             <label className="grid gap-1 text-sm font-medium text-slate-700" key={index}>
               {index === 0 ? "First session" : "Second session"}
               <select
+                aria-label={index === 0 ? "First session" : "Second session"}
                 className="rounded-xl border border-slate-300 px-3 py-2"
                 disabled={!draft}
                 onChange={(event) => {
