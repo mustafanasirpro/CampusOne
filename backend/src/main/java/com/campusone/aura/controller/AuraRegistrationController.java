@@ -7,6 +7,7 @@ import com.campusone.aura.dto.AuraResolutionDtos;
 import com.campusone.aura.dto.AuraResolutionDtos.ResolutionCaseResponse;
 import com.campusone.aura.service.AuraRegistrationService;
 import com.campusone.aura.service.AuraResolutionService;
+import com.campusone.aura.service.AuraAuthorizationService;
 import com.campusone.security.CampusOneUserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -39,12 +40,27 @@ public class AuraRegistrationController {
 
     private final AuraRegistrationService registrationService;
     private final AuraResolutionService resolutionService;
+    private final AuraAuthorizationService authorizationService;
 
     public AuraRegistrationController(
             AuraRegistrationService registrationService,
-            AuraResolutionService resolutionService) {
+            AuraResolutionService resolutionService,
+            AuraAuthorizationService authorizationService) {
         this.registrationService = registrationService;
         this.resolutionService = resolutionService;
+        this.authorizationService = authorizationService;
+    }
+
+    @GetMapping("/capabilities")
+    @Operation(summary = "Get the signed-in user's AURA capabilities")
+    public ResponseEntity<com.campusone.aura.dto.AuraDtos.CapabilitiesResponse>
+            capabilities(@AuthenticationPrincipal CampusOneUserPrincipal principal) {
+        UUID universityId = authorizationService.requireUniversity(
+                principal.getUserId());
+        return ResponseEntity.ok(
+                new com.campusone.aura.dto.AuraDtos.CapabilitiesResponse(
+                        universityId,
+                        authorizationService.canManage(principal.getUserId())));
     }
 
     @GetMapping("/me/registrations")
