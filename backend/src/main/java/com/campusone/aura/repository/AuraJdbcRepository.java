@@ -17,6 +17,8 @@ import com.campusone.aura.dto.AuraDtos.SetupReferenceOption;
 import com.campusone.aura.dto.AuraDtos.TermResponse;
 import com.campusone.aura.dto.AuraDtos.TimetableVersionResponse;
 import com.campusone.aura.dto.AuraDtos.TimeslotResponse;
+import com.campusone.aura.solver.AuraConstraintCatalog.ConstraintWeight;
+import com.campusone.aura.solver.AuraConstraintCatalog.Level;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -276,6 +278,65 @@ public class AuraJdbcRepository {
                         rs.getString("name")));
     }
 
+    public List<ConstraintConfigurationRow> listConstraintConfigurations(
+            UUID termId,
+            String profile) {
+        return jdbc.query("""
+                SELECT constraint_name, constraint_level, weight, active
+                FROM aura_constraint_configurations
+                WHERE term_id = :termId AND profile = :profile
+                ORDER BY constraint_level, constraint_name
+                """, params()
+                .addValue("termId", termId)
+                .addValue("profile", profile), (rs, rowNum) ->
+                new ConstraintConfigurationRow(
+                        rs.getString("constraint_name"),
+                        Level.valueOf(rs.getString("constraint_level")),
+                        rs.getLong("weight"),
+                        rs.getBoolean("active")));
+    }
+
+    @Transactional
+    public void replaceConstraintConfigurations(
+            UUID termId,
+            String profile,
+            Collection<ConstraintConfigurationRow> rows) {
+        jdbc.update("""
+                DELETE FROM aura_constraint_configurations
+                WHERE term_id = :termId AND profile = :profile
+                """, params()
+                .addValue("termId", termId)
+                .addValue("profile", profile));
+        for (ConstraintConfigurationRow row : rows) {
+            jdbc.update("""
+                    INSERT INTO aura_constraint_configurations (
+                        id, term_id, profile, constraint_name,
+                        constraint_level, weight, active
+                    ) VALUES (
+                        :id, :termId, :profile, :constraintName,
+                        :constraintLevel, :weight, :active
+                    )
+                    """, params()
+                    .addValue("id", UUID.randomUUID())
+                    .addValue("termId", termId)
+                    .addValue("profile", profile)
+                    .addValue("constraintName", row.constraintName())
+                    .addValue("constraintLevel", row.level().name())
+                    .addValue("weight", row.weight())
+                    .addValue("active", row.active()));
+        }
+    }
+
+    public java.util.Map<String, ConstraintWeight> constraintWeights(
+            UUID termId,
+            String profile) {
+        return listConstraintConfigurations(termId, profile).stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        ConstraintConfigurationRow::constraintName,
+                        row -> new ConstraintWeight(
+                                row.level(), row.active() ? row.weight() : 0)));
+    }
+
     public UUID insertProgram(
             UUID id,
             AuraDtos.CreateProgramRequest request) {
@@ -295,7 +356,8 @@ public class AuraJdbcRepository {
     public List<ProgramResponse> listPrograms(UUID universityId) {
         return jdbc.query("""
                 SELECT * FROM aura_programs
-                WHERE (:universityId IS NULL OR university_id = :universityId)
+                WHERE (CAST(:universityId AS UUID) IS NULL
+                    OR university_id = :universityId)
                 ORDER BY name ASC
                 """, params().addValue("universityId", universityId),
                 programMapper());
@@ -322,7 +384,8 @@ public class AuraJdbcRepository {
                 FROM aura_batches b
                 JOIN aura_programs p ON p.id = b.program_id
                 WHERE p.university_id = :universityId
-                  AND (:programId IS NULL OR b.program_id = :programId)
+                  AND (CAST(:programId AS UUID) IS NULL
+                    OR b.program_id = :programId)
                 ORDER BY b.admission_year DESC, b.code ASC
                 """, params()
                 .addValue("universityId", universityId)
@@ -352,7 +415,8 @@ public class AuraJdbcRepository {
                 JOIN aura_batches b ON b.id = s.batch_id
                 JOIN aura_programs p ON p.id = b.program_id
                 WHERE p.university_id = :universityId
-                  AND (:batchId IS NULL OR s.batch_id = :batchId)
+                  AND (CAST(:batchId AS UUID) IS NULL
+                    OR s.batch_id = :batchId)
                 ORDER BY s.display_name ASC
                 """, params()
                 .addValue("universityId", universityId)
@@ -386,7 +450,8 @@ public class AuraJdbcRepository {
     public List<InstructorResponse> listInstructors(UUID universityId) {
         return jdbc.query("""
                 SELECT * FROM aura_instructors
-                WHERE (:universityId IS NULL OR university_id = :universityId)
+                WHERE (CAST(:universityId AS UUID) IS NULL
+                    OR university_id = :universityId)
                 ORDER BY display_name ASC
                 """, params().addValue("universityId", universityId),
                 instructorMapper());
@@ -440,7 +505,8 @@ public class AuraJdbcRepository {
                         WHERE rf.room_id = r.id
                     ), '') AS facilities
                 FROM aura_rooms r
-                WHERE (:universityId IS NULL OR r.university_id = :universityId)
+                WHERE (CAST(:universityId AS UUID) IS NULL
+                    OR r.university_id = :universityId)
                 ORDER BY r.name ASC
                 """, params().addValue("universityId", universityId),
                 roomMapper());
@@ -481,7 +547,8 @@ public class AuraJdbcRepository {
     public List<TimeslotResponse> listTimeslots(UUID universityId) {
         return jdbc.query("""
                 SELECT * FROM aura_timeslots
-                WHERE (:universityId IS NULL OR university_id = :universityId)
+                WHERE (CAST(:universityId AS UUID) IS NULL
+                    OR university_id = :universityId)
                 ORDER BY day_of_week ASC, starts_at ASC
                 """, params().addValue("universityId", universityId),
                 timeslotMapper());
@@ -1203,6 +1270,33 @@ public class AuraJdbcRepository {
                           AND registration.status = 'ACTIVE'
                           AND student_availability.availability = 'UNAVAILABLE'
                       )
+                      AND NOT EXISTS (
+                        SELECT 1
+                        FROM aura_calendar_exceptions exception_row
+                        WHERE exception_row.term_id = :termId
+                          AND exception_row.active = TRUE
+                          AND (
+                            exception_row.exception_type IN (
+                              'HOLIDAY', 'NON_TEACHING_DAY', 'UNIVERSITY_EVENT')
+                            OR exception_row.instructor_id = o.instructor_id
+                            OR exception_row.room_id = room.id
+                            OR exception_row.section_id = o.section_id
+                            OR exception_row.timeslot_id = slot.id
+                            OR (exception_row.exception_type = 'FACILITY_OUTAGE'
+                              AND EXISTS (
+                                SELECT 1
+                                FROM aura_meeting_requirement_facilities required
+                                WHERE required.meeting_requirement_id = r.id
+                                  AND required.facility = exception_row.facility)))
+                          AND EXISTS (
+                            SELECT 1
+                            FROM GENERATE_SERIES(
+                              exception_row.starts_on,
+                              exception_row.ends_on,
+                              INTERVAL '1 day') affected_date
+                            WHERE EXTRACT(ISODOW FROM affected_date) =
+                              slot.day_of_week)
+                      )
                   )
                 ORDER BY c.course_code ASC, r.id ASC
                 """, params().addValue("termId", termId), (rs, rowNum) ->
@@ -1210,6 +1304,138 @@ public class AuraJdbcRepository {
                         uuid(rs, "requirement_id"),
                         rs.getString("course_code"),
                         rs.getString("course_title")));
+    }
+
+    public List<AuraDtos.ReadinessIssue> readinessIntegrityIssues(UUID termId) {
+        return jdbc.query("""
+                SELECT code, severity, message, target_type, target_id
+                FROM (
+                  SELECT 'AURA_OFFERING_WITHOUT_ACTIVE_SECTION' AS code,
+                    'ERROR' AS severity,
+                    'An offering has no active participating section in this university.' AS message,
+                    'OFFERING' AS target_type, offering.id AS target_id
+                  FROM aura_course_offerings offering
+                  JOIN aura_academic_terms term_row ON term_row.id = offering.term_id
+                  WHERE offering.term_id = :termId AND offering.status = 'ACTIVE'
+                    AND NOT EXISTS (
+                      SELECT 1 FROM aura_sections section_row
+                      JOIN aura_batches batch ON batch.id = section_row.batch_id
+                      JOIN aura_programs program ON program.id = batch.program_id
+                      WHERE (section_row.id = offering.section_id OR EXISTS (
+                          SELECT 1 FROM aura_offering_sections link
+                          WHERE link.offering_id = offering.id
+                            AND link.section_id = section_row.id))
+                        AND section_row.active = TRUE AND batch.active = TRUE
+                        AND program.active = TRUE
+                        AND program.university_id = term_row.university_id)
+                  UNION ALL
+                  SELECT 'AURA_INVALID_LINKED_REQUIREMENT', 'ERROR',
+                    'A linked lecture, lab, or tutorial requirement is inactive or belongs to another offering.',
+                    'MEETING_REQUIREMENT', requirement.id
+                  FROM aura_meeting_requirements requirement
+                  JOIN aura_course_offerings offering ON offering.id = requirement.offering_id
+                  LEFT JOIN aura_meeting_requirements linked
+                    ON linked.id = requirement.linked_requirement_id
+                  LEFT JOIN aura_course_offerings linked_offering
+                    ON linked_offering.id = linked.offering_id
+                  WHERE offering.term_id = :termId AND requirement.active = TRUE
+                    AND requirement.linked_requirement_id IS NOT NULL
+                    AND (linked.id IS NULL OR linked.active = FALSE
+                      OR linked.id = requirement.id
+                      OR linked_offering.term_id <> offering.term_id)
+                  UNION ALL
+                  SELECT 'AURA_INVALID_WEEK_PATTERN', 'ERROR',
+                    'A custom week pattern must contain distinct teaching weeks from 1 to 53.',
+                    'MEETING_REQUIREMENT', requirement.id
+                  FROM aura_meeting_requirements requirement
+                  JOIN aura_course_offerings offering ON offering.id = requirement.offering_id
+                  WHERE offering.term_id = :termId AND requirement.active = TRUE
+                    AND requirement.week_pattern = 'CUSTOM_WEEK_SET'
+                    AND (COALESCE(CARDINALITY(requirement.custom_weeks), 0) = 0
+                      OR EXISTS (
+                        SELECT 1 FROM UNNEST(requirement.custom_weeks) week
+                        WHERE week < 1 OR week > 53)
+                      OR CARDINALITY(requirement.custom_weeks) <>
+                        (SELECT COUNT(DISTINCT week)
+                         FROM UNNEST(requirement.custom_weeks) week))
+                  UNION ALL
+                  SELECT 'AURA_INVALID_FIXED_RESOURCE', 'ERROR',
+                    'A fixed room or timeslot is inactive or outside the term university.',
+                    'MEETING_REQUIREMENT', requirement.id
+                  FROM aura_meeting_requirements requirement
+                  JOIN aura_course_offerings offering ON offering.id = requirement.offering_id
+                  JOIN aura_academic_terms term_row ON term_row.id = offering.term_id
+                  LEFT JOIN aura_rooms fixed_room ON fixed_room.id = requirement.fixed_room_id
+                  LEFT JOIN aura_timeslots fixed_slot ON fixed_slot.id = requirement.fixed_timeslot_id
+                  WHERE offering.term_id = :termId AND requirement.active = TRUE
+                    AND ((requirement.fixed_room_id IS NOT NULL
+                          AND (fixed_room.id IS NULL OR fixed_room.active = FALSE
+                            OR fixed_room.university_id <> term_row.university_id))
+                      OR (requirement.fixed_timeslot_id IS NOT NULL
+                          AND (fixed_slot.id IS NULL OR fixed_slot.active = FALSE
+                            OR fixed_slot.university_id <> term_row.university_id
+                            OR (fixed_slot.term_id IS NOT NULL
+                              AND fixed_slot.term_id <> term_row.id))))
+                  UNION ALL
+                  SELECT 'AURA_INVALID_REGISTRATION_SCOPE', 'ERROR',
+                    'A registration references a student, offering, section, or teaching group outside its term and university.',
+                    'REGISTRATION', registration.id
+                  FROM aura_student_course_registrations registration
+                  JOIN aura_academic_terms term_row ON term_row.id = registration.term_id
+                  JOIN aura_course_offerings offering ON offering.id = registration.offering_id
+                  LEFT JOIN student_profiles profile
+                    ON profile.user_id = registration.student_user_id
+                  LEFT JOIN aura_teaching_groups lecture_group
+                    ON lecture_group.id = registration.lecture_group_id
+                  LEFT JOIN aura_teaching_groups lab_group
+                    ON lab_group.id = registration.lab_group_id
+                  LEFT JOIN aura_teaching_groups tutorial_group
+                    ON tutorial_group.id = registration.tutorial_group_id
+                  WHERE registration.term_id = :termId
+                    AND registration.status IN ('ACTIVE', 'PENDING')
+                    AND (registration.university_id <> term_row.university_id
+                      OR profile.university_id IS DISTINCT FROM term_row.university_id
+                      OR offering.term_id <> registration.term_id
+                      OR (lecture_group.id IS NOT NULL
+                        AND (lecture_group.offering_id <> registration.offering_id
+                          OR lecture_group.group_type <> 'LECTURE'))
+                      OR (lab_group.id IS NOT NULL
+                        AND (lab_group.offering_id <> registration.offering_id
+                          OR lab_group.group_type <> 'LAB'))
+                      OR (tutorial_group.id IS NOT NULL
+                        AND (tutorial_group.offering_id <> registration.offering_id
+                          OR tutorial_group.group_type <> 'TUTORIAL')))
+                  UNION ALL
+                  SELECT 'AURA_ENROLLMENT_EXCEEDS_LIMIT', 'ERROR',
+                    'Active registrations exceed an offering or teaching-group capacity.',
+                    'OFFERING', offering.id
+                  FROM aura_course_offerings offering
+                  WHERE offering.term_id = :termId AND offering.status = 'ACTIVE'
+                    AND ((offering.maximum_enrollment IS NOT NULL AND
+                      (SELECT COUNT(*) FROM aura_student_course_registrations registration
+                       WHERE registration.offering_id = offering.id
+                         AND registration.status = 'ACTIVE') > offering.maximum_enrollment)
+                      OR EXISTS (
+                        SELECT 1 FROM aura_teaching_groups teaching_group
+                        WHERE teaching_group.offering_id = offering.id
+                          AND teaching_group.active = TRUE
+                          AND teaching_group.capacity IS NOT NULL
+                          AND (SELECT COUNT(*)
+                               FROM aura_student_course_registrations registration
+                               WHERE registration.status = 'ACTIVE'
+                                 AND (registration.lecture_group_id = teaching_group.id
+                                   OR registration.lab_group_id = teaching_group.id
+                                   OR registration.tutorial_group_id = teaching_group.id))
+                              > teaching_group.capacity))
+                ) issue
+                ORDER BY code, target_id
+                """, params().addValue("termId", termId), (rs, rowNum) ->
+                new AuraDtos.ReadinessIssue(
+                        rs.getString("code"),
+                        rs.getString("severity"),
+                        rs.getString("message"),
+                        rs.getString("target_type"),
+                        nullableUuid(rs, "target_id")));
     }
 
     public List<SolverRoom> solverRooms(UUID termId) {
@@ -1488,7 +1714,9 @@ public class AuraJdbcRepository {
             String checksum,
             String summary,
             UUID userId,
-            int terminationSeconds) {
+            int terminationSeconds,
+            String profile,
+            long randomSeed) {
         insertRevision(
                 revisionId,
                 termId,
@@ -1501,7 +1729,9 @@ public class AuraJdbcRepository {
                 termId,
                 revisionId,
                 userId,
-                terminationSeconds);
+                terminationSeconds,
+                profile,
+                randomSeed);
     }
 
     public int nextRevisionNumber(UUID termId) {
@@ -1513,27 +1743,98 @@ public class AuraJdbcRepository {
         return value == null ? 1 : value;
     }
 
+    public String schedulingInputSnapshot(UUID termId) {
+        return jdbc.queryForObject("""
+                SELECT JSONB_BUILD_OBJECT(
+                  'term', TO_JSONB(term_row),
+                  'programs', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_programs row_data WHERE row_data.university_id = term_row.university_id), '[]'::JSONB),
+                  'batches', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_batches row_data JOIN aura_programs parent ON parent.id = row_data.program_id
+                    WHERE parent.university_id = term_row.university_id), '[]'::JSONB),
+                  'sections', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_sections row_data JOIN aura_batches batch ON batch.id = row_data.batch_id
+                    JOIN aura_programs program ON program.id = batch.program_id
+                    WHERE program.university_id = term_row.university_id
+                      AND (row_data.term_id IS NULL OR row_data.term_id = term_row.id)), '[]'::JSONB),
+                  'instructors', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_instructors row_data WHERE row_data.university_id = term_row.university_id), '[]'::JSONB),
+                  'rooms', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_rooms row_data WHERE row_data.university_id = term_row.university_id), '[]'::JSONB),
+                  'roomFacilities', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.room_id, row_data.facility)
+                    FROM aura_room_facilities row_data JOIN aura_rooms room ON room.id = row_data.room_id
+                    WHERE room.university_id = term_row.university_id), '[]'::JSONB),
+                  'timeslots', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_timeslots row_data WHERE row_data.university_id = term_row.university_id
+                      AND (row_data.term_id IS NULL OR row_data.term_id = term_row.id)), '[]'::JSONB),
+                  'offerings', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_course_offerings row_data WHERE row_data.term_id = term_row.id), '[]'::JSONB),
+                  'offeringSections', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.offering_id, row_data.section_id)
+                    FROM aura_offering_sections row_data JOIN aura_course_offerings offering ON offering.id = row_data.offering_id
+                    WHERE offering.term_id = term_row.id), '[]'::JSONB),
+                  'requirements', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_meeting_requirements row_data JOIN aura_course_offerings offering ON offering.id = row_data.offering_id
+                    WHERE offering.term_id = term_row.id), '[]'::JSONB),
+                  'requirementFacilities', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.meeting_requirement_id, row_data.facility)
+                    FROM aura_meeting_requirement_facilities row_data JOIN aura_meeting_requirements requirement
+                      ON requirement.id = row_data.meeting_requirement_id JOIN aura_course_offerings offering
+                      ON offering.id = requirement.offering_id WHERE offering.term_id = term_row.id), '[]'::JSONB),
+                  'teachingGroups', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_teaching_groups row_data JOIN aura_course_offerings offering ON offering.id = row_data.offering_id
+                    WHERE offering.term_id = term_row.id), '[]'::JSONB),
+                  'offeringConflicts', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_cross_offering_conflicts row_data WHERE row_data.term_id = term_row.id), '[]'::JSONB),
+                  'registrations', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_student_course_registrations row_data WHERE row_data.term_id = term_row.id), '[]'::JSONB),
+                  'studentAvailability', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_student_availability row_data WHERE row_data.term_id = term_row.id), '[]'::JSONB),
+                  'instructorAvailability', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_instructor_availability row_data JOIN aura_instructors instructor ON instructor.id = row_data.instructor_id
+                    WHERE instructor.university_id = term_row.university_id), '[]'::JSONB),
+                  'roomAvailability', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_room_availability row_data JOIN aura_rooms room ON room.id = row_data.room_id
+                    WHERE room.university_id = term_row.university_id), '[]'::JSONB),
+                  'sectionAvailability', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_section_availability row_data JOIN aura_sections section_row ON section_row.id = row_data.section_id
+                    JOIN aura_batches batch ON batch.id = section_row.batch_id JOIN aura_programs program ON program.id = batch.program_id
+                    WHERE program.university_id = term_row.university_id), '[]'::JSONB),
+                  'calendarExceptions', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_calendar_exceptions row_data WHERE row_data.term_id = term_row.id), '[]'::JSONB),
+                  'travelRules', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_building_travel_times row_data WHERE row_data.university_id = term_row.university_id), '[]'::JSONB),
+                  'constraintConfiguration', COALESCE((SELECT JSONB_AGG(TO_JSONB(row_data) ORDER BY row_data.id)
+                    FROM aura_constraint_configurations row_data WHERE row_data.term_id = term_row.id), '[]'::JSONB)
+                )::TEXT
+                FROM aura_academic_terms term_row
+                WHERE term_row.id = :termId
+                """, params().addValue("termId", termId), String.class);
+    }
+
     public UUID insertRun(
             UUID id,
             UUID termId,
             UUID revisionId,
             UUID userId,
-            int terminationSeconds) {
+            int terminationSeconds,
+            String profile,
+            long randomSeed) {
         jdbc.update("""
                 INSERT INTO aura_generation_runs (
                     id, term_id, revision_id, requested_by_user_id,
-                    termination_seconds, input_revision
+                    termination_seconds, input_revision, profile, random_seed
                 ) VALUES (
                     :id, :termId, :revisionId, :userId, :terminationSeconds,
                     (SELECT data_revision FROM aura_academic_terms
-                     WHERE id = :termId)
+                     WHERE id = :termId), :profile, :randomSeed
                 )
                 """, params()
                 .addValue("id", id)
                 .addValue("termId", termId)
                 .addValue("revisionId", revisionId)
                 .addValue("userId", userId)
-                .addValue("terminationSeconds", terminationSeconds));
+                .addValue("terminationSeconds", terminationSeconds)
+                .addValue("profile", profile)
+                .addValue("randomSeed", randomSeed));
         return id;
     }
 
@@ -1557,6 +1858,13 @@ public class AuraJdbcRepository {
                 """, params().addValue("cutoff", Timestamp.from(cutoff)));
     }
 
+    public long countActiveRegistrations(UUID termId) {
+        return count("""
+                SELECT COUNT(*) FROM aura_student_course_registrations
+                WHERE term_id = :termId AND status = 'ACTIVE'
+                """, params().addValue("termId", termId));
+    }
+
     public boolean markRunRunning(UUID runId, Instant startedAt) {
         return jdbc.update("""
                 UPDATE aura_generation_runs
@@ -1567,22 +1875,32 @@ public class AuraJdbcRepository {
                 .addValue("startedAt", Timestamp.from(startedAt))) == 1;
     }
 
-    public boolean markRunCompleted(UUID runId, String score, String message) {
+    public boolean markRunCompleted(
+            UUID runId,
+            String score,
+            String message,
+            int candidateCount,
+            String terminationReason) {
         return jdbc.update("""
                 UPDATE aura_generation_runs
                 SET status = 'COMPLETED', score = :score, message = :message,
-                    completed_at = CURRENT_TIMESTAMP
+                    completed_at = CURRENT_TIMESTAMP,
+                    candidate_count = :candidateCount,
+                    termination_reason = :terminationReason
                 WHERE id = :runId AND status = 'RUNNING'
                 """, params()
                 .addValue("runId", runId)
                 .addValue("score", score)
-                .addValue("message", message)) == 1;
+                .addValue("message", message)
+                .addValue("candidateCount", candidateCount)
+                .addValue("terminationReason", terminationReason)) == 1;
     }
 
     public boolean markRunFailed(UUID runId, String message) {
         return jdbc.update("""
                 UPDATE aura_generation_runs
                 SET status = 'FAILED', message = :message,
+                    termination_reason = 'FAILED',
                     completed_at = CURRENT_TIMESTAMP
                 WHERE id = :runId AND status IN ('QUEUED', 'RUNNING')
                 """, params()
@@ -1613,7 +1931,8 @@ public class AuraJdbcRepository {
         jdbc.update("""
                 UPDATE aura_generation_runs
                 SET status = 'CANCELLED', cancelled_at = CURRENT_TIMESTAMP,
-                    message = 'Generation was cancelled.'
+                    message = 'Generation was cancelled.',
+                    termination_reason = 'CANCELLED'
                 WHERE id = :runId AND status IN ('QUEUED', 'RUNNING')
                 """, params().addValue("runId", runId));
     }
@@ -1892,6 +2211,32 @@ public class AuraJdbcRepository {
                 .addValue("versionId", versionId)
                 .addValue("userId", userId)
                 .addValue("action", action)
+                .addValue("summary", summary));
+    }
+
+    public void insertTermAudit(
+            UUID termId,
+            UUID userId,
+            String action,
+            String targetType,
+            UUID targetId,
+            String summary) {
+        jdbc.update("""
+                INSERT INTO aura_audit_events (
+                    id, university_id, term_id, actor_user_id, action,
+                    target_type, target_id, summary
+                )
+                SELECT :id, term_row.university_id, term_row.id,
+                    :userId, :action, :targetType, :targetId, :summary
+                FROM aura_academic_terms term_row
+                WHERE term_row.id = :termId
+                """, params()
+                .addValue("id", UUID.randomUUID())
+                .addValue("termId", termId)
+                .addValue("userId", userId)
+                .addValue("action", action)
+                .addValue("targetType", targetType)
+                .addValue("targetId", targetId)
                 .addValue("summary", summary));
     }
 
@@ -2487,7 +2832,11 @@ public class AuraJdbcRepository {
                 instant(rs, "started_at"),
                 instant(rs, "completed_at"),
                 instant(rs, "cancelled_at"),
-                instant(rs, "created_at"));
+                instant(rs, "created_at"),
+                rs.getString("profile"),
+                rs.getLong("random_seed"),
+                (Integer) rs.getObject("candidate_count"),
+                rs.getString("termination_reason"));
     }
 
     private RowMapper<TimetableVersionResponse> versionMapper() {
@@ -2603,6 +2952,13 @@ public class AuraJdbcRepository {
             int offerings,
             int requirements,
             int requiredOccurrences) {
+    }
+
+    public record ConstraintConfigurationRow(
+            String constraintName,
+            Level level,
+            long weight,
+            boolean active) {
     }
 
     public record RequirementCandidateIssue(
