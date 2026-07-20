@@ -5,6 +5,7 @@ import com.campusone.aura.dto.AuraRegistrationDtos.PersonalTimetableEntry;
 import com.campusone.aura.dto.AuraRegistrationDtos.StudentRegistrationResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.List;
@@ -146,7 +147,7 @@ public class AuraRegistrationRepository {
             UUID studentUserId) {
         String studentFilter = studentUserId == null
                 ? ""
-                : " AND registration.student_user_id = :studentUserId";
+                : " AND registration.student_user_id = :studentUserId\n";
         return jdbc.query(
                 registrationSelect() + """
                         WHERE registration.term_id = :termId
@@ -313,8 +314,8 @@ public class AuraRegistrationRepository {
                 nullableUuid(rs, "lab_group_id"),
                 nullableUuid(rs, "tutorial_group_id"),
                 nullableUuid(rs, "equivalent_offering_id"),
-                rs.getObject("created_at", Instant.class),
-                rs.getObject("updated_at", Instant.class),
+                instant(rs, "created_at"),
+                instant(rs, "updated_at"),
                 rs.getLong("version"));
     }
 
@@ -324,6 +325,11 @@ public class AuraRegistrationRepository {
 
     private UUID nullableUuid(ResultSet rs, String column) throws SQLException {
         return rs.getObject(column, UUID.class);
+    }
+
+    private Instant instant(ResultSet rs, String column) throws SQLException {
+        Timestamp timestamp = rs.getTimestamp(column);
+        return timestamp == null ? null : timestamp.toInstant();
     }
 
     private List<Integer> intArray(ResultSet rs, String column)
