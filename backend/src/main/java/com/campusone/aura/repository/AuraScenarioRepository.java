@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -255,7 +256,8 @@ public class AuraScenarioRepository {
     }
 
     private Instant instant(ResultSet rs, String column) throws SQLException {
-        return rs.getObject(column, Instant.class);
+        Timestamp timestamp = rs.getTimestamp(column);
+        return timestamp == null ? null : timestamp.toInstant();
     }
 
     private MapSqlParameterSource params() {
