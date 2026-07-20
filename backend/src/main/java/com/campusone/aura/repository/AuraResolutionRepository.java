@@ -4,6 +4,7 @@ import com.campusone.aura.dto.AuraResolutionDtos.ResolutionCaseResponse;
 import com.campusone.aura.dto.AuraResolutionDtos.ResolutionSuggestionResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -89,7 +90,7 @@ public class AuraResolutionRepository {
     public List<ResolutionCaseResponse> listCases(UUID termId, UUID studentUserId) {
         String studentFilter = studentUserId == null
                 ? ""
-                : " AND resolution_case.student_user_id = :studentUserId";
+                : " AND resolution_case.student_user_id = :studentUserId\n";
         return jdbc.query(caseSelect() + """
                 WHERE resolution_case.term_id = :termId
                 """ + studentFilter + """
@@ -547,7 +548,8 @@ public class AuraResolutionRepository {
     }
 
     private Instant instant(ResultSet rs, String column) throws SQLException {
-        return rs.getObject(column, Instant.class);
+        Timestamp timestamp = rs.getTimestamp(column);
+        return timestamp == null ? null : timestamp.toInstant();
     }
 
     private MapSqlParameterSource params() {
