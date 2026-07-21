@@ -98,3 +98,9 @@ Additive AURA migrations:
 - `V32` adds resolution, what-if, and emergency-repair workflow persistence.
 - `V33` persists normalized import source rows and aligns expanded scheduling
   enum domains used by setup and timetable imports.
+- `V34` completes scheduling-input revision triggers across AURA input tables.
+- `V35` adds university-scoped generation constraint profiles, selected profile
+  metadata, deterministic solver seeds, and input checksums.
+
+PostgreSQL 17.10 was used to verify a clean V1–V35 migration and a V34→V35
+upgrade. Prior migrations were not modified.
