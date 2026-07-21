@@ -45,7 +45,8 @@ public final class AuraDtos {
             LocalDate endsOn,
             String status,
             Instant createdAt,
-            Instant updatedAt) {
+            Instant updatedAt,
+            long version) {
     }
 
     public record CreateProgramRequest(
@@ -61,7 +62,8 @@ public final class AuraDtos {
             UUID departmentId,
             String code,
             String name,
-            boolean active) {
+            boolean active,
+            long version) {
     }
 
     public record CreateBatchRequest(
@@ -75,7 +77,8 @@ public final class AuraDtos {
             UUID programId,
             String code,
             int admissionYear,
-            boolean active) {
+            boolean active,
+            long version) {
     }
 
     public record CreateSectionRequest(
@@ -91,7 +94,8 @@ public final class AuraDtos {
             String code,
             String displayName,
             int studentCount,
-            boolean active) {
+            boolean active,
+            long version) {
     }
 
     public record CreateInstructorRequest(
@@ -109,7 +113,8 @@ public final class AuraDtos {
             String displayName,
             String email,
             int maxHoursPerWeek,
-            boolean active) {
+            boolean active,
+            long version) {
     }
 
     public record CreateRoomRequest(
@@ -129,7 +134,8 @@ public final class AuraDtos {
             int capacity,
             String roomType,
             List<String> facilities,
-            boolean active) {
+            boolean active,
+            long version) {
     }
 
     public record CreateTimeslotRequest(
@@ -147,7 +153,8 @@ public final class AuraDtos {
             LocalTime startsAt,
             LocalTime endsAt,
             String label,
-            boolean active) {
+            boolean active,
+            long version) {
     }
 
     public record CreateInstructorAvailabilityRequest(
@@ -221,7 +228,8 @@ public final class AuraDtos {
             UUID instructorId,
             String instructorName,
             int expectedStudents,
-            String status) {
+            String status,
+            long version) {
     }
 
     public record CreateMeetingRequirementRequest(
@@ -244,7 +252,8 @@ public final class AuraDtos {
             String roomType,
             int requiredCapacity,
             String notes,
-            List<String> requiredFacilities) {
+            List<String> requiredFacilities,
+            long version) {
     }
 
     public record ReplaceFacilitiesRequest(
@@ -267,7 +276,21 @@ public final class AuraDtos {
             UUID sectionId,
             UUID timeslotId,
             @Size(max = 40) String facility,
-            @NotBlank @Size(max = 300) String reason) {
+            @NotBlank @Size(max = 300) String reason,
+            LocalTime startsAt,
+            LocalTime endsAt,
+            @Size(max = 20) String recurrencePattern,
+            UUID departmentId,
+            UUID buildingId) {
+
+        public CreateCalendarExceptionRequest(
+                UUID termId, String exceptionType, LocalDate startsOn,
+                LocalDate endsOn, UUID instructorId, UUID roomId,
+                UUID sectionId, UUID timeslotId, String facility, String reason) {
+            this(termId, exceptionType, startsOn, endsOn, instructorId, roomId,
+                    sectionId, timeslotId, facility, reason, null, null,
+                    "NONE", null, null);
+        }
     }
 
     public record UpdateCalendarExceptionRequest(
@@ -280,7 +303,21 @@ public final class AuraDtos {
             UUID timeslotId,
             @Size(max = 40) String facility,
             @NotBlank @Size(max = 300) String reason,
-            @Min(0) long version) {
+            @Min(0) long version,
+            LocalTime startsAt,
+            LocalTime endsAt,
+            @Size(max = 20) String recurrencePattern,
+            UUID departmentId,
+            UUID buildingId) {
+
+        public UpdateCalendarExceptionRequest(
+                String exceptionType, LocalDate startsOn, LocalDate endsOn,
+                UUID instructorId, UUID roomId, UUID sectionId,
+                UUID timeslotId, String facility, String reason, long version) {
+            this(exceptionType, startsOn, endsOn, instructorId, roomId,
+                    sectionId, timeslotId, facility, reason, version,
+                    null, null, "NONE", null, null);
+        }
     }
 
     public record CalendarExceptionResponse(
@@ -298,7 +335,23 @@ public final class AuraDtos {
             boolean active,
             long version,
             Instant createdAt,
-            Instant updatedAt) {
+            Instant updatedAt,
+            LocalTime startsAt,
+            LocalTime endsAt,
+            String recurrencePattern,
+            UUID departmentId,
+            UUID buildingId) {
+
+        public CalendarExceptionResponse(
+                UUID id, UUID termId, String exceptionType,
+                LocalDate startsOn, LocalDate endsOn, UUID instructorId,
+                UUID roomId, UUID sectionId, UUID timeslotId, String facility,
+                String reason, boolean active, long version,
+                Instant createdAt, Instant updatedAt) {
+            this(id, termId, exceptionType, startsOn, endsOn, instructorId,
+                    roomId, sectionId, timeslotId, facility, reason, active,
+                    version, createdAt, updatedAt, null, null, "NONE", null, null);
+        }
     }
 
     public record ReadinessIssue(
@@ -484,7 +537,35 @@ public final class AuraDtos {
             UUID primarySessionId,
             UUID secondarySessionId,
             Instant detectedAt,
-            Instant resolvedAt) {
+            Instant resolvedAt,
+            String status,
+            String reasonCode,
+            String suggestedAction,
+            List<UUID> affectedSessions,
+            List<UUID> affectedStudents,
+            List<UUID> affectedInstructors,
+            List<UUID> affectedSections,
+            List<UUID> affectedRooms) {
+
+        public ClashResponse(
+                UUID id, UUID versionId, String clashType, String severity,
+                String message, UUID primarySessionId, UUID secondarySessionId,
+                Instant detectedAt, Instant resolvedAt) {
+            this(id, versionId, clashType, severity, message, primarySessionId,
+                    secondarySessionId, detectedAt, resolvedAt, "OPEN", clashType,
+                    null,
+                    java.util.stream.Stream.of(primarySessionId, secondarySessionId)
+                            .filter(java.util.Objects::nonNull).toList(),
+                    List.of(), List.of(), List.of(), List.of());
+        }
+
+        public ClashResponse {
+            affectedSessions = affectedSessions == null ? List.of() : List.copyOf(affectedSessions);
+            affectedStudents = affectedStudents == null ? List.of() : List.copyOf(affectedStudents);
+            affectedInstructors = affectedInstructors == null ? List.of() : List.copyOf(affectedInstructors);
+            affectedSections = affectedSections == null ? List.of() : List.copyOf(affectedSections);
+            affectedRooms = affectedRooms == null ? List.of() : List.copyOf(affectedRooms);
+        }
     }
 
     public record ManualMoveRequest(
