@@ -48,7 +48,7 @@ class AuraGenerationPersistenceServiceTest {
 
         assertThatThrownBy(() -> service.persistCompletedRun(
                 RUN_ID, TERM_ID, USER_ID, "0hard/0medium/0soft", null,
-                List.of()))
+                List.of(), 0, "SOLVER_COMPLETED"))
                 .isInstanceOf(AuraStateException.class)
                 .hasMessageContaining("Scheduling data changed");
 
@@ -63,7 +63,7 @@ class AuraGenerationPersistenceServiceTest {
 
         assertThatThrownBy(() -> service.persistCompletedRun(
                 RUN_ID, TERM_ID, USER_ID, "0hard/0medium/0soft", null,
-                List.of()))
+                List.of(), 0, "SOLVER_COMPLETED"))
                 .isInstanceOf(AuraStateException.class)
                 .hasMessage("This generation run is no longer active.");
 
@@ -87,7 +87,9 @@ class AuraGenerationPersistenceServiceTest {
         when(repository.markRunCompleted(
                 RUN_ID,
                 "0hard/0medium/0soft",
-                "Timetable generated with 1 scheduled sessions."))
+                "Timetable generated with 1 scheduled sessions.",
+                1,
+                "SOLVER_COMPLETED"))
                 .thenReturn(true);
 
         UUID persisted = service.persistCompletedRun(
@@ -96,7 +98,9 @@ class AuraGenerationPersistenceServiceTest {
                 USER_ID,
                 "0hard/0medium/0soft",
                 "verified",
-                List.of(assignment));
+                List.of(assignment),
+                1,
+                "SOLVER_COMPLETED");
 
         assertThat(persisted).isEqualTo(VERSION_ID);
         verify(repository).insertSession(any(), eq(VERSION_ID),
@@ -105,7 +109,9 @@ class AuraGenerationPersistenceServiceTest {
         verify(repository).markRunCompleted(
                 RUN_ID,
                 "0hard/0medium/0soft",
-                "Timetable generated with 1 scheduled sessions.");
+                "Timetable generated with 1 scheduled sessions.",
+                1,
+                "SOLVER_COMPLETED");
     }
 
     private static UUID id(int suffix) {
