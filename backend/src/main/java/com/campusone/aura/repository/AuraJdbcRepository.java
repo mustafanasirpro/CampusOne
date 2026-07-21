@@ -28,12 +28,17 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -101,7 +106,8 @@ public class AuraJdbcRepository {
         return jdbc.query("""
                 SELECT term_row.id, term_row.university_id, term_row.code,
                     term_row.name, term_row.starts_on, term_row.ends_on,
-                    term_row.status, term_row.created_at, term_row.updated_at
+                    term_row.status, term_row.created_at, term_row.updated_at,
+                    term_row.version
                 FROM aura_academic_terms term_row
                 WHERE term_row.university_id = :universityId
                   AND EXISTS (
@@ -148,6 +154,7 @@ public class AuraJdbcRepository {
                     """;
             case INSTRUCTOR -> "SELECT university_id FROM aura_instructors WHERE id = :resourceId";
             case ROOM -> "SELECT university_id FROM aura_rooms WHERE id = :resourceId";
+            case BUILDING -> "SELECT university_id FROM aura_buildings WHERE id = :resourceId";
             case TIMESLOT -> "SELECT university_id FROM aura_timeslots WHERE id = :resourceId";
             case OFFERING -> """
                     SELECT t.university_id
@@ -660,7 +667,11 @@ public class AuraJdbcRepository {
                             SELECT 1 FROM aura_room_facilities available
                             WHERE available.room_id = room.id
                               AND available.facility = required.facility))
-                      AND NOT EXISTS (
+                      AND (aura_calendar_exception_applies(
+                        version_row.term_id, instructor.id, room.id,
+                        section_row.id, timeslot.id, timeslot.day_of_week,
+                        timeslot.starts_at, timeslot.ends_at, TRUE, 'INSTRUCTOR')
+                        OR NOT EXISTS (
                         SELECT 1 FROM aura_instructor_availability availability
                         JOIN aura_timeslots blocked
                           ON blocked.id = availability.timeslot_id
@@ -668,8 +679,12 @@ public class AuraJdbcRepository {
                           AND availability.availability = 'UNAVAILABLE'
                           AND blocked.day_of_week = timeslot.day_of_week
                           AND blocked.slot_order BETWEEN timeslot.slot_order
-                            AND timeslot.slot_order + requirement.duration_slots - 1)
-                      AND NOT EXISTS (
+                            AND timeslot.slot_order + requirement.duration_slots - 1))
+                      AND (aura_calendar_exception_applies(
+                        version_row.term_id, instructor.id, room.id,
+                        section_row.id, timeslot.id, timeslot.day_of_week,
+                        timeslot.starts_at, timeslot.ends_at, TRUE, 'ROOM')
+                        OR NOT EXISTS (
                         SELECT 1 FROM aura_room_availability availability
                         JOIN aura_timeslots blocked
                           ON blocked.id = availability.timeslot_id
@@ -677,8 +692,12 @@ public class AuraJdbcRepository {
                           AND availability.availability = 'UNAVAILABLE'
                           AND blocked.day_of_week = timeslot.day_of_week
                           AND blocked.slot_order BETWEEN timeslot.slot_order
-                            AND timeslot.slot_order + requirement.duration_slots - 1)
-                      AND NOT EXISTS (
+                            AND timeslot.slot_order + requirement.duration_slots - 1))
+                      AND (aura_calendar_exception_applies(
+                        version_row.term_id, instructor.id, room.id,
+                        section_row.id, timeslot.id, timeslot.day_of_week,
+                        timeslot.starts_at, timeslot.ends_at, TRUE, 'SECTION')
+                        OR NOT EXISTS (
                         SELECT 1 FROM aura_section_availability availability
                         JOIN aura_timeslots blocked
                           ON blocked.id = availability.timeslot_id
@@ -686,43 +705,19 @@ public class AuraJdbcRepository {
                           AND availability.availability = 'UNAVAILABLE'
                           AND blocked.day_of_week = timeslot.day_of_week
                           AND blocked.slot_order BETWEEN timeslot.slot_order
-                            AND timeslot.slot_order + requirement.duration_slots - 1)
-                      AND NOT EXISTS (
-                        SELECT 1
-                        FROM aura_calendar_exceptions exception_row
-                        WHERE exception_row.term_id = version_row.term_id
-                          AND exception_row.active = TRUE
-                          AND (
-                            exception_row.exception_type IN (
-                              'HOLIDAY', 'NON_TEACHING_DAY', 'UNIVERSITY_EVENT')
-                            OR exception_row.instructor_id = instructor.id
-                            OR exception_row.room_id = room.id
-                            OR exception_row.section_id = section_row.id
-                            OR exception_row.timeslot_id = timeslot.id
-                            OR EXISTS (
-                              SELECT 1 FROM aura_timeslots blocked_slot
-                              WHERE blocked_slot.id = exception_row.timeslot_id
-                                AND blocked_slot.day_of_week = timeslot.day_of_week
-                                AND blocked_slot.slot_order BETWEEN
-                                  timeslot.slot_order
-                                  AND timeslot.slot_order
-                                    + requirement.duration_slots - 1)
-                            OR (exception_row.exception_type = 'FACILITY_OUTAGE'
-                              AND EXISTS (
-                                SELECT 1
-                                FROM aura_room_facilities room_facility
-                                WHERE room_facility.room_id = room.id
-                                  AND room_facility.facility =
-                                    exception_row.facility))
-                          )
-                          AND EXISTS (
-                            SELECT 1
-                            FROM GENERATE_SERIES(
-                              exception_row.starts_on,
-                              exception_row.ends_on,
-                              INTERVAL '1 day') AS affected_date
-                            WHERE EXTRACT(ISODOW FROM affected_date) =
-                              timeslot.day_of_week))
+                            AND timeslot.slot_order + requirement.duration_slots - 1))
+                      AND NOT aura_calendar_exception_applies(
+                        version_row.term_id, instructor.id, room.id,
+                        section_row.id, timeslot.id, timeslot.day_of_week,
+                        timeslot.starts_at,
+                        COALESCE((SELECT final_slot.ends_at
+                          FROM aura_timeslots final_slot
+                          WHERE final_slot.university_id = timeslot.university_id
+                            AND final_slot.term_id IS NOT DISTINCT FROM timeslot.term_id
+                            AND final_slot.day_of_week = timeslot.day_of_week
+                            AND final_slot.slot_order = timeslot.slot_order
+                              + requirement.duration_slots - 1), timeslot.ends_at),
+                        FALSE, NULL)
                 )
                 """, params().addValue("sessionId", sessionId)
                 .addValue("roomId", roomId).addValue("timeslotId", timeslotId),
@@ -930,11 +925,13 @@ public class AuraJdbcRepository {
                 INSERT INTO aura_calendar_exceptions (
                     id, term_id, exception_type, starts_on, ends_on,
                     instructor_id, room_id, section_id, timeslot_id,
-                    facility, reason, created_by_user_id
+                    facility, reason, created_by_user_id, starts_at, ends_at,
+                    recurrence_pattern, department_id, building_id
                 ) VALUES (
                     :id, :termId, :exceptionType, :startsOn, :endsOn,
                     :instructorId, :roomId, :sectionId, :timeslotId,
-                    :facility, :reason, :userId
+                    :facility, :reason, :userId, :startsAt, :endsAt,
+                    :recurrencePattern, :departmentId, :buildingId
                 )
                 """, params()
                 .addValue("id", id)
@@ -948,7 +945,13 @@ public class AuraJdbcRepository {
                 .addValue("timeslotId", request.timeslotId())
                 .addValue("facility", facility)
                 .addValue("reason", request.reason().trim())
-                .addValue("userId", userId));
+                .addValue("userId", userId)
+                .addValue("startsAt", request.startsAt())
+                .addValue("endsAt", request.endsAt())
+                .addValue("recurrencePattern", request.recurrencePattern() == null
+                        ? "NONE" : normalizeEnum(request.recurrencePattern()))
+                .addValue("departmentId", request.departmentId())
+                .addValue("buildingId", request.buildingId()));
         return id;
     }
 
@@ -986,6 +989,11 @@ public class AuraJdbcRepository {
                     timeslot_id = :timeslotId,
                     facility = :facility,
                     reason = :reason,
+                    starts_at = :startsAt,
+                    ends_at = :endsAt,
+                    recurrence_pattern = :recurrencePattern,
+                    department_id = :departmentId,
+                    building_id = :buildingId,
                     updated_at = CURRENT_TIMESTAMP,
                     version = version + 1
                 WHERE id = :id
@@ -1002,6 +1010,12 @@ public class AuraJdbcRepository {
                 .addValue("timeslotId", request.timeslotId())
                 .addValue("facility", facility)
                 .addValue("reason", request.reason().trim())
+                .addValue("startsAt", request.startsAt())
+                .addValue("endsAt", request.endsAt())
+                .addValue("recurrencePattern", request.recurrencePattern() == null
+                        ? "NONE" : normalizeEnum(request.recurrencePattern()))
+                .addValue("departmentId", request.departmentId())
+                .addValue("buildingId", request.buildingId())
                 .addValue("version", request.version()));
         return updated == 1;
     }
@@ -1215,27 +1229,36 @@ public class AuraJdbcRepository {
                               AND available.facility = required.facility
                           )
                       )
-                      AND NOT EXISTS (
+                      AND (aura_calendar_exception_applies(
+                        :termId, o.instructor_id, room.id, o.section_id,
+                        slot.id, slot.day_of_week, slot.starts_at, slot.ends_at,
+                        TRUE, 'INSTRUCTOR') OR NOT EXISTS (
                         SELECT 1
                         FROM aura_instructor_availability ia
                         WHERE ia.instructor_id = o.instructor_id
                           AND ia.timeslot_id = slot.id
                           AND ia.availability = 'UNAVAILABLE'
-                      )
-                      AND NOT EXISTS (
+                      ))
+                      AND (aura_calendar_exception_applies(
+                        :termId, o.instructor_id, room.id, o.section_id,
+                        slot.id, slot.day_of_week, slot.starts_at, slot.ends_at,
+                        TRUE, 'ROOM') OR NOT EXISTS (
                         SELECT 1
                         FROM aura_room_availability ra
                         WHERE ra.room_id = room.id
                           AND ra.timeslot_id = slot.id
                           AND ra.availability = 'UNAVAILABLE'
-                      )
-                      AND NOT EXISTS (
+                      ))
+                      AND (aura_calendar_exception_applies(
+                        :termId, o.instructor_id, room.id, o.section_id,
+                        slot.id, slot.day_of_week, slot.starts_at, slot.ends_at,
+                        TRUE, 'SECTION') OR NOT EXISTS (
                         SELECT 1
                         FROM aura_section_availability sa
                         WHERE sa.section_id = o.section_id
                           AND sa.timeslot_id = slot.id
                           AND sa.availability = 'UNAVAILABLE'
-                      )
+                      ))
                       AND NOT EXISTS (
                         SELECT 1
                         FROM aura_offering_sections linked
@@ -1258,7 +1281,10 @@ public class AuraJdbcRepository {
                                 AND linked_availability.availability = 'UNAVAILABLE'
                             ))
                       )
-                      AND NOT EXISTS (
+                      AND (aura_calendar_exception_applies(
+                        :termId, o.instructor_id, room.id, o.section_id,
+                        slot.id, slot.day_of_week, slot.starts_at, slot.ends_at,
+                        TRUE, 'STUDENT') OR NOT EXISTS (
                         SELECT 1
                         FROM aura_student_course_registrations registration
                         JOIN aura_student_availability student_availability
@@ -1269,34 +1295,18 @@ public class AuraJdbcRepository {
                           AND registration.offering_id = o.id
                           AND registration.status = 'ACTIVE'
                           AND student_availability.availability = 'UNAVAILABLE'
-                      )
-                      AND NOT EXISTS (
-                        SELECT 1
-                        FROM aura_calendar_exceptions exception_row
-                        WHERE exception_row.term_id = :termId
-                          AND exception_row.active = TRUE
-                          AND (
-                            exception_row.exception_type IN (
-                              'HOLIDAY', 'NON_TEACHING_DAY', 'UNIVERSITY_EVENT')
-                            OR exception_row.instructor_id = o.instructor_id
-                            OR exception_row.room_id = room.id
-                            OR exception_row.section_id = o.section_id
-                            OR exception_row.timeslot_id = slot.id
-                            OR (exception_row.exception_type = 'FACILITY_OUTAGE'
-                              AND EXISTS (
-                                SELECT 1
-                                FROM aura_meeting_requirement_facilities required
-                                WHERE required.meeting_requirement_id = r.id
-                                  AND required.facility = exception_row.facility)))
-                          AND EXISTS (
-                            SELECT 1
-                            FROM GENERATE_SERIES(
-                              exception_row.starts_on,
-                              exception_row.ends_on,
-                              INTERVAL '1 day') affected_date
-                            WHERE EXTRACT(ISODOW FROM affected_date) =
-                              slot.day_of_week)
-                      )
+                      ))
+                      AND NOT aura_calendar_exception_applies(
+                        :termId, o.instructor_id, room.id, o.section_id,
+                        slot.id, slot.day_of_week, slot.starts_at,
+                        COALESCE((SELECT final_slot.ends_at
+                          FROM aura_timeslots final_slot
+                          WHERE final_slot.university_id = slot.university_id
+                            AND final_slot.term_id IS NOT DISTINCT FROM slot.term_id
+                            AND final_slot.day_of_week = slot.day_of_week
+                            AND final_slot.slot_order = slot.slot_order
+                              + r.duration_slots - 1), slot.ends_at),
+                        FALSE, NULL)
                   )
                 ORDER BY c.course_code ASC, r.id ASC
                 """, params().addValue("termId", termId), (rs, rowNum) ->
@@ -2349,6 +2359,184 @@ public class AuraJdbcRepository {
                 sessionMapper());
     }
 
+    public ClashDetectionContext clashDetectionContext(UUID versionId) {
+        Map<UUID, Set<UUID>> studentsBySession = new HashMap<>();
+        jdbc.query("""
+                SELECT session_row.id AS session_id, registration.student_user_id
+                FROM aura_scheduled_sessions session_row
+                JOIN aura_meeting_requirements requirement
+                  ON requirement.id = session_row.meeting_requirement_id
+                JOIN aura_student_course_registrations registration
+                  ON registration.offering_id = session_row.offering_id
+                 AND registration.status = 'ACTIVE'
+                WHERE session_row.version_id = :versionId
+                  AND (requirement.teaching_group_id IS NULL
+                    OR requirement.teaching_group_id IN (
+                      registration.lecture_group_id,
+                      registration.lab_group_id,
+                      registration.tutorial_group_id))
+                """, params().addValue("versionId", versionId), (RowCallbackHandler) rs ->
+                studentsBySession.computeIfAbsent(
+                        uuidUnchecked(rs, "session_id"), ignored -> new HashSet<>())
+                        .add(uuidUnchecked(rs, "student_user_id")));
+
+        Set<UUID> studentUnavailableSessions = new HashSet<>();
+        jdbc.query("""
+                SELECT DISTINCT session_row.id
+                FROM aura_scheduled_sessions session_row
+                JOIN aura_timetable_versions version_row
+                  ON version_row.id = session_row.version_id
+                JOIN aura_meeting_requirements requirement
+                  ON requirement.id = session_row.meeting_requirement_id
+                JOIN aura_timeslots assigned ON assigned.id = session_row.timeslot_id
+                JOIN aura_student_course_registrations registration
+                  ON registration.term_id = version_row.term_id
+                 AND registration.offering_id = session_row.offering_id
+                 AND registration.status = 'ACTIVE'
+                JOIN aura_student_availability availability
+                  ON availability.term_id = registration.term_id
+                 AND availability.student_user_id = registration.student_user_id
+                 AND availability.availability = 'UNAVAILABLE'
+                JOIN aura_timeslots blocked ON blocked.id = availability.timeslot_id
+                WHERE session_row.version_id = :versionId
+                  AND blocked.day_of_week = assigned.day_of_week
+                  AND (blocked.id = assigned.id OR (
+                    assigned.slot_order IS NOT NULL
+                    AND blocked.slot_order BETWEEN assigned.slot_order
+                      AND assigned.slot_order + requirement.duration_slots - 1))
+                  AND NOT aura_calendar_exception_applies(
+                    version_row.term_id, session_row.instructor_id,
+                    session_row.room_id, session_row.section_id,
+                    session_row.timeslot_id, assigned.day_of_week,
+                    assigned.starts_at, assigned.ends_at, TRUE, 'STUDENT')
+                """, params().addValue("versionId", versionId), (RowCallbackHandler) rs ->
+                studentUnavailableSessions.add(uuidUnchecked(rs, "id")));
+
+        Set<UUID> overCapacityGroups = new HashSet<>();
+        jdbc.query("""
+                SELECT DISTINCT session_row.id
+                FROM aura_scheduled_sessions session_row
+                JOIN aura_meeting_requirements requirement
+                  ON requirement.id = session_row.meeting_requirement_id
+                JOIN aura_teaching_groups group_row
+                  ON group_row.id = requirement.teaching_group_id
+                WHERE session_row.version_id = :versionId
+                  AND group_row.capacity IS NOT NULL
+                  AND group_row.capacity < (
+                    SELECT COUNT(*)
+                    FROM aura_student_course_registrations registration
+                    WHERE registration.offering_id = session_row.offering_id
+                      AND registration.status = 'ACTIVE'
+                      AND group_row.id IN (registration.lecture_group_id,
+                        registration.lab_group_id, registration.tutorial_group_id))
+                """, params().addValue("versionId", versionId), (RowCallbackHandler) rs ->
+                overCapacityGroups.add(uuidUnchecked(rs, "id")));
+
+        Map<UUID, LinkageRule> linkageByRequirement = new HashMap<>();
+        jdbc.query("""
+                SELECT DISTINCT requirement.id, requirement.linked_requirement_id,
+                    requirement.lecture_before_linked
+                FROM aura_meeting_requirements requirement
+                JOIN aura_scheduled_sessions session_row
+                  ON session_row.meeting_requirement_id = requirement.id
+                WHERE session_row.version_id = :versionId
+                  AND requirement.linked_requirement_id IS NOT NULL
+                """, params().addValue("versionId", versionId), (RowCallbackHandler) rs ->
+                linkageByRequirement.put(uuidUnchecked(rs, "id"), new LinkageRule(
+                        uuidUnchecked(rs, "linked_requirement_id"),
+                        rs.getBoolean("lecture_before_linked"))));
+
+        Map<UUID, String> buildingBySession = new HashMap<>();
+        jdbc.query("""
+                SELECT session_row.id,
+                    COALESCE(building.name, room.building, '') AS building
+                FROM aura_scheduled_sessions session_row
+                JOIN aura_rooms room ON room.id = session_row.room_id
+                LEFT JOIN aura_buildings building ON building.id = room.building_id
+                WHERE session_row.version_id = :versionId
+                """, params().addValue("versionId", versionId), (RowCallbackHandler) rs ->
+                buildingBySession.put(uuidUnchecked(rs, "id"), rs.getString("building")));
+
+        List<TravelContextRule> travelRules = jdbc.query("""
+                SELECT travel.from_building, travel.to_building,
+                    travel.minutes, travel.difficulty
+                FROM aura_building_travel_times travel
+                JOIN aura_timetable_versions version_row ON version_row.id = :versionId
+                JOIN aura_academic_terms term_row ON term_row.id = version_row.term_id
+                WHERE travel.university_id = term_row.university_id
+                  AND travel.active = TRUE
+                """, params().addValue("versionId", versionId), (rs, row) ->
+                new TravelContextRule(
+                        rs.getString("from_building"), rs.getString("to_building"),
+                        rs.getInt("minutes"), rs.getString("difficulty")));
+        return new ClashDetectionContext(
+                Map.copyOf(studentsBySession), Set.copyOf(studentUnavailableSessions),
+                Set.copyOf(overCapacityGroups), Map.copyOf(linkageByRequirement),
+                Map.copyOf(buildingBySession), travelRules);
+    }
+
+    public List<SessionResponse> listScopedSessions(
+            UUID versionId,
+            String scopeType,
+            UUID scopeId,
+            Integer dayOfWeek) {
+        String scopePredicate = switch (scopeType) {
+            case "UNIVERSITY", "WEEK" -> "TRUE";
+            case "INSTRUCTOR" -> "s.instructor_id = :scopeId";
+            case "SECTION" -> "s.section_id = :scopeId";
+            case "ROOM" -> "s.room_id = :scopeId";
+            case "COURSE" -> "o.course_id = :scopeId";
+            case "OFFERING" -> "s.offering_id = :scopeId";
+            case "PROGRAM" -> """
+                    EXISTS (
+                        SELECT 1 FROM aura_sections scoped_section
+                        JOIN aura_batches scoped_batch
+                          ON scoped_batch.id = scoped_section.batch_id
+                        WHERE scoped_section.id = s.section_id
+                          AND scoped_batch.program_id = :scopeId
+                    )
+                    """;
+            case "DEPARTMENT" -> """
+                    (c.department_id = :scopeId OR EXISTS (
+                        SELECT 1 FROM aura_sections scoped_section
+                        JOIN aura_batches scoped_batch
+                          ON scoped_batch.id = scoped_section.batch_id
+                        JOIN aura_programs scoped_program
+                          ON scoped_program.id = scoped_batch.program_id
+                        WHERE scoped_section.id = s.section_id
+                          AND scoped_program.department_id = :scopeId))
+                    """;
+            case "DAY" -> "ts.day_of_week = :dayOfWeek";
+            default -> throw new IllegalArgumentException("Unsupported timetable scope.");
+        };
+        return jdbc.query(sessionSql("""
+                WHERE s.version_id = :versionId
+                  AND %s
+                ORDER BY ts.day_of_week ASC, ts.starts_at ASC, c.course_code ASC
+                """.formatted(scopePredicate)), params()
+                .addValue("versionId", versionId)
+                .addValue("scopeId", scopeId)
+                .addValue("dayOfWeek", dayOfWeek), sessionMapper());
+    }
+
+    public Optional<UUID> findInstructorIdForUser(
+            UUID userId,
+            UUID universityId) {
+        return optionalUuid("""
+                SELECT id FROM aura_instructors
+                WHERE user_id = :userId AND university_id = :universityId
+                  AND active = TRUE
+                """, params().addValue("userId", userId)
+                .addValue("universityId", universityId));
+    }
+
+    public Optional<UUID> findPublishedVersionId(UUID termId) {
+        return optionalUuid("""
+                SELECT id FROM aura_timetable_versions
+                WHERE term_id = :termId AND status = 'PUBLISHED'
+                """, params().addValue("termId", termId));
+    }
+
     public Optional<SessionResponse> findSession(UUID sessionId) {
         return optional(sessionSql("""
                 WHERE s.id = :sessionId
@@ -2409,17 +2597,57 @@ public class AuraJdbcRepository {
     }
 
     public void replaceClashes(UUID versionId, Collection<DetectedClash> clashes) {
+        List<DetectedClash> unique = clashes.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        this::clashFingerprint,
+                        clash -> clash,
+                        (first, ignored) -> first,
+                        LinkedHashMap::new))
+                .values().stream().toList();
+        String[] fingerprints = unique.stream()
+                .map(this::clashFingerprint).toArray(String[]::new);
         jdbc.update("""
-                DELETE FROM aura_clashes WHERE version_id = :versionId
-                """, params().addValue("versionId", versionId));
-        clashes.forEach(clash -> jdbc.update("""
+                UPDATE aura_clashes
+                SET status = 'RESOLVED', resolved_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE version_id = :versionId
+                  AND status IN ('OPEN', 'ACKNOWLEDGED')
+                  AND (CARDINALITY(CAST(:fingerprints AS VARCHAR[])) = 0
+                    OR fingerprint <> ALL(CAST(:fingerprints AS VARCHAR[])))
+                """, params().addValue("versionId", versionId)
+                .addValue("fingerprints", fingerprints));
+        unique.forEach(clash -> jdbc.update("""
                 INSERT INTO aura_clashes (
                     id, version_id, clash_type, severity, message,
-                    primary_session_id, secondary_session_id
+                    primary_session_id, secondary_session_id, fingerprint,
+                    explanation, reason_code, suggested_action,
+                    affected_sessions, affected_students,
+                    affected_instructors, affected_sections, affected_rooms
                 ) VALUES (
                     :id, :versionId, :clashType, :severity, :message,
-                    :primarySessionId, :secondarySessionId
+                    :primarySessionId, :secondarySessionId, :fingerprint,
+                    :message, :reasonCode, :suggestedAction,
+                    CAST(:affectedSessions AS JSONB),
+                    CAST(:affectedStudents AS JSONB),
+                    CAST(:affectedInstructors AS JSONB),
+                    CAST(:affectedSections AS JSONB), CAST(:affectedRooms AS JSONB)
                 )
+                ON CONFLICT (version_id, fingerprint)
+                  WHERE fingerprint IS NOT NULL
+                    AND status IN ('OPEN', 'ACKNOWLEDGED')
+                DO UPDATE SET clash_type = EXCLUDED.clash_type,
+                    severity = EXCLUDED.severity, message = EXCLUDED.message,
+                    primary_session_id = EXCLUDED.primary_session_id,
+                    secondary_session_id = EXCLUDED.secondary_session_id,
+                    explanation = EXCLUDED.explanation,
+                    reason_code = EXCLUDED.reason_code,
+                    suggested_action = EXCLUDED.suggested_action,
+                    affected_sessions = EXCLUDED.affected_sessions,
+                    affected_students = EXCLUDED.affected_students,
+                    affected_instructors = EXCLUDED.affected_instructors,
+                    affected_sections = EXCLUDED.affected_sections,
+                    affected_rooms = EXCLUDED.affected_rooms,
+                    updated_at = CURRENT_TIMESTAMP
                 """, params()
                 .addValue("id", UUID.randomUUID())
                 .addValue("versionId", versionId)
@@ -2427,7 +2655,17 @@ public class AuraJdbcRepository {
                 .addValue("severity", clash.severity())
                 .addValue("message", clash.message())
                 .addValue("primarySessionId", clash.primarySessionId())
-                .addValue("secondarySessionId", clash.secondarySessionId())));
+                .addValue("secondarySessionId", clash.secondarySessionId())
+                .addValue("fingerprint", clashFingerprint(clash))
+                .addValue("reasonCode", clash.reasonCode())
+                .addValue("suggestedAction", clash.suggestedAction())
+                .addValue("affectedSessions", uuidJson(java.util.stream.Stream
+                        .of(clash.primarySessionId(), clash.secondarySessionId())
+                        .filter(java.util.Objects::nonNull).toList()))
+                .addValue("affectedStudents", uuidJson(clash.affectedStudents()))
+                .addValue("affectedInstructors", uuidJson(clash.affectedInstructors()))
+                .addValue("affectedSections", uuidJson(clash.affectedSections()))
+                .addValue("affectedRooms", uuidJson(clash.affectedRooms()))));
     }
 
     public List<ClashResponse> listClashes(UUID versionId) {
@@ -2547,7 +2785,7 @@ public class AuraJdbcRepository {
                           AND (conflict.left_offering_id = s.offering_id
                             OR conflict.right_offering_id = s.offering_id)
                     ), '') AS hard_conflict_offering_ids,
-                    EXISTS (
+                    (EXISTS (
                         SELECT 1 FROM aura_instructor_availability availability
                         JOIN aura_timeslots blocked
                           ON blocked.id = availability.timeslot_id
@@ -2558,8 +2796,12 @@ public class AuraJdbcRepository {
                             ts.slot_order IS NOT NULL
                             AND blocked.slot_order BETWEEN ts.slot_order
                               AND ts.slot_order + requirement.duration_slots - 1))
-                    ) AS instructor_unavailable,
-                    EXISTS (
+                    ) AND NOT aura_calendar_exception_applies(
+                        version_row.term_id, s.instructor_id, s.room_id,
+                        s.section_id, s.timeslot_id, ts.day_of_week,
+                        ts.starts_at, ts.ends_at, TRUE, 'INSTRUCTOR'))
+                    AS instructor_unavailable,
+                    (EXISTS (
                         SELECT 1 FROM aura_room_availability availability
                         JOIN aura_timeslots blocked
                           ON blocked.id = availability.timeslot_id
@@ -2570,8 +2812,12 @@ public class AuraJdbcRepository {
                             ts.slot_order IS NOT NULL
                             AND blocked.slot_order BETWEEN ts.slot_order
                               AND ts.slot_order + requirement.duration_slots - 1))
-                    ) AS room_unavailable,
-                    EXISTS (
+                    ) AND NOT aura_calendar_exception_applies(
+                        version_row.term_id, s.instructor_id, s.room_id,
+                        s.section_id, s.timeslot_id, ts.day_of_week,
+                        ts.starts_at, ts.ends_at, TRUE, 'ROOM'))
+                    AS room_unavailable,
+                    (EXISTS (
                         SELECT 1 FROM aura_section_availability availability
                         JOIN aura_timeslots blocked
                           ON blocked.id = availability.timeslot_id
@@ -2582,32 +2828,23 @@ public class AuraJdbcRepository {
                             ts.slot_order IS NOT NULL
                             AND blocked.slot_order BETWEEN ts.slot_order
                               AND ts.slot_order + requirement.duration_slots - 1))
-                    ) AS section_unavailable,
-                    EXISTS (
-                        SELECT 1 FROM aura_calendar_exceptions exception_row
-                        WHERE exception_row.term_id = version_row.term_id
-                          AND exception_row.active = TRUE
-                          AND (
-                            exception_row.exception_type IN (
-                              'HOLIDAY', 'NON_TEACHING_DAY', 'UNIVERSITY_EVENT')
-                            OR exception_row.instructor_id = s.instructor_id
-                            OR exception_row.room_id = s.room_id
-                            OR exception_row.section_id = s.section_id
-                            OR exception_row.timeslot_id = s.timeslot_id
-                            OR (exception_row.exception_type = 'FACILITY_OUTAGE'
-                              AND EXISTS (
-                                SELECT 1 FROM aura_room_facilities room_facility
-                                WHERE room_facility.room_id = s.room_id
-                                  AND room_facility.facility = exception_row.facility))
-                          )
-                          AND EXISTS (
-                            SELECT 1
-                            FROM GENERATE_SERIES(
-                              exception_row.starts_on,
-                              exception_row.ends_on,
-                              INTERVAL '1 day') AS affected_date
-                            WHERE EXTRACT(ISODOW FROM affected_date) = ts.day_of_week)
-                    ) AS calendar_exception
+                    ) AND NOT aura_calendar_exception_applies(
+                        version_row.term_id, s.instructor_id, s.room_id,
+                        s.section_id, s.timeslot_id, ts.day_of_week,
+                        ts.starts_at, ts.ends_at, TRUE, 'SECTION'))
+                    AS section_unavailable,
+                    aura_calendar_exception_applies(
+                        version_row.term_id, s.instructor_id, s.room_id,
+                        s.section_id, s.timeslot_id, ts.day_of_week,
+                        ts.starts_at,
+                        COALESCE((SELECT final_slot.ends_at
+                          FROM aura_timeslots final_slot
+                          WHERE final_slot.university_id = ts.university_id
+                            AND final_slot.term_id IS NOT DISTINCT FROM ts.term_id
+                            AND final_slot.day_of_week = ts.day_of_week
+                            AND final_slot.slot_order = ts.slot_order
+                              + requirement.duration_slots - 1), ts.ends_at),
+                        FALSE, NULL) AS calendar_exception
                 FROM aura_scheduled_sessions s
                 JOIN aura_timetable_versions version_row ON version_row.id = s.version_id
                 JOIN aura_course_offerings o ON o.id = s.offering_id
@@ -2675,6 +2912,14 @@ public class AuraJdbcRepository {
         return rs.getObject(column, UUID.class);
     }
 
+    private UUID uuidUnchecked(ResultSet rs, String column) {
+        try {
+            return rs.getObject(column, UUID.class);
+        } catch (SQLException exception) {
+            throw new IllegalStateException("AURA query returned an invalid UUID.", exception);
+        }
+    }
+
     private UUID nullableUuid(ResultSet rs, String column) throws SQLException {
         return rs.getObject(column, UUID.class);
     }
@@ -2713,7 +2958,8 @@ public class AuraJdbcRepository {
                 rs.getObject("ends_on", LocalDate.class),
                 rs.getString("status"),
                 instant(rs, "created_at"),
-                instant(rs, "updated_at"));
+                instant(rs, "updated_at"),
+                rs.getLong("version"));
     }
 
     private RowMapper<ProgramResponse> programMapper() {
@@ -2723,7 +2969,8 @@ public class AuraJdbcRepository {
                 uuid(rs, "department_id"),
                 rs.getString("code"),
                 rs.getString("name"),
-                rs.getBoolean("active"));
+                rs.getBoolean("active"),
+                rs.getLong("version"));
     }
 
     private RowMapper<BatchResponse> batchMapper() {
@@ -2732,7 +2979,8 @@ public class AuraJdbcRepository {
                 uuid(rs, "program_id"),
                 rs.getString("code"),
                 rs.getInt("admission_year"),
-                rs.getBoolean("active"));
+                rs.getBoolean("active"),
+                rs.getLong("version"));
     }
 
     private RowMapper<SectionResponse> sectionMapper() {
@@ -2742,7 +2990,8 @@ public class AuraJdbcRepository {
                 rs.getString("code"),
                 rs.getString("display_name"),
                 rs.getInt("student_count"),
-                rs.getBoolean("active"));
+                rs.getBoolean("active"),
+                rs.getLong("version"));
     }
 
     private RowMapper<InstructorResponse> instructorMapper() {
@@ -2753,7 +3002,8 @@ public class AuraJdbcRepository {
                 rs.getString("display_name"),
                 rs.getString("email"),
                 rs.getInt("max_hours_per_week"),
-                rs.getBoolean("active"));
+                rs.getBoolean("active"),
+                rs.getLong("version"));
     }
 
     private RowMapper<RoomResponse> roomMapper() {
@@ -2765,7 +3015,8 @@ public class AuraJdbcRepository {
                 rs.getInt("capacity"),
                 rs.getString("room_type"),
                 splitCsv(rs.getString("facilities")),
-                rs.getBoolean("active"));
+                rs.getBoolean("active"),
+                rs.getLong("version"));
     }
 
     private RowMapper<TimeslotResponse> timeslotMapper() {
@@ -2776,7 +3027,8 @@ public class AuraJdbcRepository {
                 rs.getObject("starts_at", LocalTime.class),
                 rs.getObject("ends_at", LocalTime.class),
                 rs.getString("label"),
-                rs.getBoolean("active"));
+                rs.getBoolean("active"),
+                rs.getLong("version"));
     }
 
     private RowMapper<AvailabilityResponse> availabilityMapper() {
@@ -2804,7 +3056,8 @@ public class AuraJdbcRepository {
                 uuid(rs, "instructor_id"),
                 rs.getString("instructor_name"),
                 rs.getInt("expected_students"),
-                rs.getString("status"));
+                rs.getString("status"),
+                rs.getLong("version"));
     }
 
     private RowMapper<MeetingRequirementResponse> requirementMapper() {
@@ -2817,7 +3070,8 @@ public class AuraJdbcRepository {
                 rs.getString("room_type"),
                 rs.getInt("required_capacity"),
                 rs.getString("notes"),
-                splitCsv(rs.getString("required_facilities")));
+                splitCsv(rs.getString("required_facilities")),
+                rs.getLong("version"));
     }
 
     private RowMapper<GenerationRunResponse> runMapper() {
@@ -2915,7 +3169,37 @@ public class AuraJdbcRepository {
                 uuid(rs, "primary_session_id"),
                 uuid(rs, "secondary_session_id"),
                 instant(rs, "detected_at"),
-                instant(rs, "resolved_at"));
+                instant(rs, "resolved_at"),
+                rs.getString("status"),
+                rs.getString("reason_code"),
+                rs.getString("suggested_action"),
+                uuidJsonList(rs.getString("affected_sessions")),
+                uuidJsonList(rs.getString("affected_students")),
+                uuidJsonList(rs.getString("affected_instructors")),
+                uuidJsonList(rs.getString("affected_sections")),
+                uuidJsonList(rs.getString("affected_rooms")));
+    }
+
+    private String clashFingerprint(DetectedClash clash) {
+        List<String> sessions = java.util.stream.Stream
+                .of(clash.primarySessionId(), clash.secondarySessionId())
+                .filter(java.util.Objects::nonNull).map(UUID::toString).sorted().toList();
+        return UUID.nameUUIDFromBytes((clash.clashType() + "|"
+                + String.join("|", sessions)).getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                .toString();
+    }
+
+    private String uuidJson(Collection<UUID> values) {
+        return values.stream().distinct().map(value -> "\"" + value + "\"")
+                .collect(java.util.stream.Collectors.joining(",", "[", "]"));
+    }
+
+    private List<UUID> uuidJsonList(String value) {
+        if (value == null || value.length() < 2) return List.of();
+        return Arrays.stream(value.substring(1, value.length() - 1).split(","))
+                .map(token -> token.replace("\"", "").trim())
+                .filter(token -> !token.isBlank())
+                .map(UUID::fromString).toList();
     }
 
     private RowMapper<SetupReferenceOption> setupReferenceMapper() {
@@ -2942,7 +3226,12 @@ public class AuraJdbcRepository {
                 rs.getBoolean("active"),
                 rs.getLong("version"),
                 instant(rs, "created_at"),
-                instant(rs, "updated_at"));
+                instant(rs, "updated_at"),
+                rs.getObject("starts_at", LocalTime.class),
+                rs.getObject("ends_at", LocalTime.class),
+                rs.getString("recurrence_pattern"),
+                nullableUuid(rs, "department_id"),
+                nullableUuid(rs, "building_id"));
     }
 
     public record TermCounts(
@@ -3154,7 +3443,70 @@ public class AuraJdbcRepository {
             String severity,
             String message,
             UUID primarySessionId,
-            UUID secondarySessionId) {
+            UUID secondarySessionId,
+            String reasonCode,
+            String suggestedAction,
+            List<UUID> affectedStudents,
+            List<UUID> affectedInstructors,
+            List<UUID> affectedSections,
+            List<UUID> affectedRooms) {
+
+        public DetectedClash(
+                String clashType, String severity, String message,
+                UUID primarySessionId, UUID secondarySessionId) {
+            this(clashType, severity, message, primarySessionId,
+                    secondarySessionId, clashType, null,
+                    List.of(), List.of(), List.of(), List.of());
+        }
+
+        public DetectedClash {
+            affectedStudents = affectedStudents == null
+                    ? List.of() : List.copyOf(affectedStudents);
+            affectedInstructors = affectedInstructors == null
+                    ? List.of() : List.copyOf(affectedInstructors);
+            affectedSections = affectedSections == null
+                    ? List.of() : List.copyOf(affectedSections);
+            affectedRooms = affectedRooms == null
+                    ? List.of() : List.copyOf(affectedRooms);
+        }
+    }
+
+    public record ClashDetectionContext(
+            Map<UUID, Set<UUID>> studentsBySession,
+            Set<UUID> studentUnavailableSessions,
+            Set<UUID> overCapacityGroupSessions,
+            Map<UUID, LinkageRule> linkageByRequirement,
+            Map<UUID, String> buildingBySession,
+            List<TravelContextRule> travelRules) {
+
+        public ClashDetectionContext {
+            studentsBySession = studentsBySession == null
+                    ? Map.of() : Map.copyOf(studentsBySession);
+            studentUnavailableSessions = studentUnavailableSessions == null
+                    ? Set.of() : Set.copyOf(studentUnavailableSessions);
+            overCapacityGroupSessions = overCapacityGroupSessions == null
+                    ? Set.of() : Set.copyOf(overCapacityGroupSessions);
+            linkageByRequirement = linkageByRequirement == null
+                    ? Map.of() : Map.copyOf(linkageByRequirement);
+            buildingBySession = buildingBySession == null
+                    ? Map.of() : Map.copyOf(buildingBySession);
+            travelRules = travelRules == null ? List.of() : List.copyOf(travelRules);
+        }
+
+        public static ClashDetectionContext empty() {
+            return new ClashDetectionContext(
+                    Map.of(), Set.of(), Set.of(), Map.of(), Map.of(), List.of());
+        }
+    }
+
+    public record LinkageRule(UUID linkedRequirementId, boolean lectureBeforeLinked) {
+    }
+
+    public record TravelContextRule(
+            String fromBuilding,
+            String toBuilding,
+            int minutes,
+            String difficulty) {
     }
 
     public record VersionSessionSnapshot(
@@ -3188,6 +3540,7 @@ public class AuraJdbcRepository {
         SECTION,
         INSTRUCTOR,
         ROOM,
+        BUILDING,
         TIMESLOT,
         OFFERING,
         REQUIREMENT,
