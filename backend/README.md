@@ -52,7 +52,8 @@ The backend is a modular Spring Boot API for CampusOne:
 
 - Multi-session management
 - Email Verification
-- AURA automatic localized repair, complete analytics, and browser backtesting
+- AURA automatic localized repair, complete analytics, exhaustive browser
+  journey coverage, and instructor timetable views
 
 ## Requirements
 
@@ -340,6 +341,11 @@ set `APP_CORS_ALLOWED_ORIGINS` to the exact deployed frontend origins.
 ```powershell
 mvn clean verify
 ```
+
+The latest verified local run completed 590 tests with no failures or errors
+and 13 Docker-gated skips. AURA migrations V1–V35, packaged startup, and
+authenticated critical workflows were also exercised on PostgreSQL 17.10; see
+the repository-level `AURA_TEST_REPORT.md`.
 
 ## Available URLs
 
