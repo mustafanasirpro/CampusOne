@@ -16,6 +16,30 @@ import org.junit.jupiter.api.Test;
 class AuraSolverServiceTest {
 
     @Test
+    void solve_sameSeedAndInputs_producesSameAssignments() {
+        List<SolverRequirement> requirements = List.of(new SolverRequirement(
+                id(1), id(2), id(3), id(4), 2,
+                "CLASSROOM", 20, List.of()));
+        List<SolverRoom> rooms = List.of(
+                new SolverRoom(id(5), 30, "CLASSROOM", List.of()),
+                new SolverRoom(id(6), 30, "CLASSROOM", List.of()));
+        List<SolverTimeslot> timeslots = List.of(
+                new SolverTimeslot(id(7), 1, LocalTime.of(9, 0), LocalTime.of(10, 0)),
+                new SolverTimeslot(id(8), 2, LocalTime.of(9, 0), LocalTime.of(10, 0)));
+        AuraSolverService service = new AuraSolverService();
+
+        SolverResult first = service.solve(
+                requirements, rooms, timeslots, List.of(), List.of(), List.of(),
+                List.of(), List.of(), 1, java.util.Map.of(), 42L);
+        SolverResult second = service.solve(
+                requirements, rooms, timeslots, List.of(), List.of(), List.of(),
+                List.of(), List.of(), 1, java.util.Map.of(), 42L);
+
+        assertThat(second.score()).isEqualTo(first.score());
+        assertThat(second.assignments()).isEqualTo(first.assignments());
+    }
+
+    @Test
     void solve_tinyFeasibleDataset_assignsEveryRequiredSession() {
         UUID instructor = UUID.fromString(
                 "90000000-0000-4000-8000-000000000001");
