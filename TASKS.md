@@ -31,3 +31,22 @@
 - [ ] `npm run build`
 - [ ] Confirm `.env`, `dist/`, `node_modules/`, `backend/target/`, logs, and generated junk are not staged.
 - [ ] Confirm no secrets are printed, committed, or copied into documentation.
+
+## AURA acceptance work
+
+Completed locally on 2026-07-20:
+
+- [x] Add persisted generation profiles, validated weights, deterministic seeds, and input checksums.
+- [x] Fix PostgreSQL UUID binding and timestamp mapping defects found by the real runtime harness.
+- [x] Configure Vitest/React Testing Library and pass 11 focused frontend tests.
+- [x] Configure PostgreSQL-backed Playwright and pass the implemented desktop/mobile suite (19 passed, 1 project-specific skip).
+- [x] Verify fresh V1–V35 and V34→V35 migrations on PostgreSQL 17.
+- [x] Measure deterministic 300, 1,000, and 5,000 occurrence solver scenarios.
+
+Still required for full AURA acceptance:
+
+- [ ] Complete every setup entity's update/deactivate lifecycle and UI parity.
+- [ ] Complete independent clash-detector parity and automatic localized repair.
+- [ ] Complete instructor and multidimensional timetable views.
+- [ ] Complete the full deterministic backtest and browser-journey matrices.
+- [ ] Perform production verification only after explicit deployment authorization.
