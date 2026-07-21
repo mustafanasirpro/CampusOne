@@ -14,6 +14,8 @@ Frontend:
 ```bash
 npm run lint
 npm run build
+npm run test
+npm run test:e2e
 ```
 
 ## Lost & Found Automated Coverage
@@ -102,7 +104,32 @@ Focused backend tests added:
   - rejects cross-university term creation;
   - validates calendar exception term dates and facility values.
 
-## Manual AURA Regression Checklist
+## Automated AURA Browser Coverage
+
+`npm run test:e2e` packages Spring Boot, recreates an isolated local PostgreSQL
+database, starts the backend and Vite frontend, seeds dedicated test users, and
+runs Playwright on Chromium-compatible desktop and mobile projects. The current
+suite covers route protection, admin authorization, generated/published
+versions, exports, clone/move/pin/unpin/comparison, personal timetable privacy,
+CSV import validation, readiness blockers, and mobile overflow.
+
+The most recent run passed 19 tests with one desktop skip for the assertion
+that intentionally runs only in the mobile project. This is critical-path
+coverage, not the exhaustive journey matrix tracked in the AURA ledger.
+
+The PostgreSQL migration upgrade path can be repeated after packaging the
+backend:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File e2e/verify-aura-postgres-upgrade.ps1
+```
+
+It starts an isolated PostgreSQL 17 cluster, verifies packaged application
+health at Flyway target V34, upgrades to V35, verifies health again, and cleans
+up local processes.
+
+## AURA Exploratory Regression Reference
 
 Run these in a local or staging environment as an admin:
 
@@ -120,5 +147,5 @@ Run these in a local or staging environment as an admin:
 10. Against PostgreSQL, confirm a generation run advances from queued to
     completed and that session listing plus move preview execute without JDBC
     mapping or timestamp-binding errors.
-10. Preview and apply a manual room/timeslot move.
-11. Confirm sessions and clash counts refresh after the move.
+11. Preview and apply a manual room/timeslot move.
+12. Confirm sessions and clash counts refresh after the move.
