@@ -98,3 +98,8 @@ lib-cov
 .tern-port
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Local browser-test artifacts
+
+playwright-report/
+test-results/
