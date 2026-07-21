@@ -78,11 +78,19 @@ public class AuraService {
             "HOLIDAY",
             "NON_TEACHING_DAY",
             "UNIVERSITY_EVENT",
+            "UNIVERSITY_CLOSURE",
+            "CAMPUS_CLOSURE",
+            "DEPARTMENT_CLOSURE",
+            "EXAMINATION_PERIOD",
             "INSTRUCTOR_ABSENCE",
             "ROOM_CLOSURE",
+            "BUILDING_CLOSURE",
             "SECTION_RESTRICTION",
+            "SECTION_SUSPENSION",
             "TIMESLOT_CANCELLATION",
-            "FACILITY_OUTAGE");
+            "FACILITY_OUTAGE",
+            "EXCEPTIONAL_AVAILABLE_DATE",
+            "EXCEPTIONAL_UNAVAILABLE_DATE");
 
     private final AuraAuthorizationService authorizationService;
     private final AuraJdbcRepository repository;
@@ -698,7 +706,12 @@ public class AuraService {
                         request.sectionId(),
                         request.timeslotId(),
                         request.facility(),
-                        request.reason());
+                        request.reason(),
+                        request.startsAt(),
+                        request.endsAt(),
+                        request.recurrencePattern(),
+                        request.departmentId(),
+                        request.buildingId());
         String type = validateCalendarException(validationRequest, universityId);
         if (!repository.updateCalendarException(
                 exceptionId,
@@ -1028,7 +1041,8 @@ public class AuraService {
         SessionResponse replacement = withAssignment(session, room, timeslot);
         List<DetectedClash> detected = clashDetector.previewMove(
                 repository.listSessions(session.versionId()),
-                replacement);
+                replacement,
+                repository.clashDetectionContext(session.versionId()));
         List<ClashResponse> clashes =
                 toPreviewClashes(session.versionId(), detected);
         boolean allowed = clashes.isEmpty();
@@ -1125,7 +1139,8 @@ public class AuraService {
                     List.of());
         }
         List<SessionResponse> sessions = repository.listSessions(first.versionId());
-        List<DetectedClash> baseline = clashDetector.detect(sessions);
+        var clashContext = repository.clashDetectionContext(first.versionId());
+        List<DetectedClash> baseline = clashDetector.detect(sessions, clashContext);
         SessionResponse movedFirst = withAssignment(first, second);
         SessionResponse movedSecond = withAssignment(second, first);
         List<SessionResponse> swapped = sessions.stream()
@@ -1136,7 +1151,7 @@ public class AuraService {
         Set<String> baselineKeys = baseline.stream()
                 .map(this::clashKey)
                 .collect(java.util.stream.Collectors.toSet());
-        List<DetectedClash> newClashes = clashDetector.detect(swapped).stream()
+        List<DetectedClash> newClashes = clashDetector.detect(swapped, clashContext).stream()
                 .filter(clash -> !baselineKeys.contains(clashKey(clash)))
                 .toList();
         return new AuraDtos.ManualMovePreviewResponse(
@@ -1298,7 +1313,9 @@ public class AuraService {
 
     private void refreshClashes(UUID versionId) {
         List<DetectedClash> detected =
-                clashDetector.detect(repository.listSessions(versionId));
+                clashDetector.detect(
+                        repository.listSessions(versionId),
+                        repository.clashDetectionContext(versionId));
         repository.replaceClashes(versionId, detected);
     }
 
@@ -1496,6 +1513,17 @@ public class AuraService {
             throw new AuraStateException(
                     "Calendar exception start date must be before the end date.");
         }
+        if ((request.startsAt() == null) != (request.endsAt() == null)
+                || (request.startsAt() != null
+                    && !request.startsAt().isBefore(request.endsAt()))) {
+            throw new AuraStateException(
+                    "Partial-day exceptions require a start time before an end time.");
+        }
+        String recurrence = request.recurrencePattern() == null
+                ? "NONE" : normalizeEnumValue(request.recurrencePattern());
+        if (!Set.of("NONE", "WEEKLY").contains(recurrence)) {
+            throw new AuraStateException("Choose a supported exception recurrence.");
+        }
         TermResponse term = repository.findTerm(request.termId())
                 .orElseThrow(() -> notFound("AURA term was not found."));
         if (request.startsOn().isBefore(term.startsOn())
@@ -1531,6 +1559,18 @@ public class AuraService {
                     universityId,
                     "Timeslot was not found.");
         }
+        if (request.departmentId() != null
+                && !repository.departmentBelongsToUniversity(
+                        request.departmentId(), universityId)) {
+            throw notFound("Department was not found.");
+        }
+        if (request.buildingId() != null) {
+            requireScopedResource(
+                    ScopedResource.BUILDING,
+                    request.buildingId(),
+                    universityId,
+                    "Building was not found.");
+        }
         validateCalendarExceptionTarget(type, request);
         return type;
     }
@@ -1539,39 +1579,49 @@ public class AuraService {
             String type,
             AuraDtos.CreateCalendarExceptionRequest request) {
         boolean valid = switch (type) {
-            case "HOLIDAY", "NON_TEACHING_DAY", "UNIVERSITY_EVENT" ->
+            case "HOLIDAY", "NON_TEACHING_DAY", "UNIVERSITY_EVENT",
+                    "UNIVERSITY_CLOSURE", "CAMPUS_CLOSURE", "EXAMINATION_PERIOD" ->
                     request.instructorId() == null
                             && request.roomId() == null
                             && request.sectionId() == null
+                            && request.timeslotId() == null
+                            && request.departmentId() == null
+                            && request.buildingId() == null
                             && request.facility() == null;
+            case "DEPARTMENT_CLOSURE" -> request.departmentId() != null
+                    && targetCount(request) == 1 && request.facility() == null;
             case "INSTRUCTOR_ABSENCE" -> request.instructorId() != null
-                    && request.roomId() == null
-                    && request.sectionId() == null
-                    && request.facility() == null;
+                    && targetCount(request) == 1 && request.facility() == null;
             case "ROOM_CLOSURE" -> request.roomId() != null
-                    && request.instructorId() == null
-                    && request.sectionId() == null
-                    && request.facility() == null;
-            case "SECTION_RESTRICTION" -> request.sectionId() != null
-                    && request.instructorId() == null
-                    && request.roomId() == null
-                    && request.facility() == null;
+                    && targetCount(request) == 1 && request.facility() == null;
+            case "BUILDING_CLOSURE" -> request.buildingId() != null
+                    && targetCount(request) == 1 && request.facility() == null;
+            case "SECTION_RESTRICTION", "SECTION_SUSPENSION" ->
+                    request.sectionId() != null
+                    && targetCount(request) == 1 && request.facility() == null;
             case "TIMESLOT_CANCELLATION" -> request.timeslotId() != null
-                    && request.instructorId() == null
-                    && request.roomId() == null
-                    && request.sectionId() == null
-                    && request.facility() == null;
+                    && targetCount(request) == 1 && request.facility() == null;
             case "FACILITY_OUTAGE" -> request.roomId() != null
                     && request.facility() != null
                     && !request.facility().isBlank()
-                    && request.instructorId() == null
-                    && request.sectionId() == null;
+                    && targetCount(request) == 1;
+            case "EXCEPTIONAL_AVAILABLE_DATE", "EXCEPTIONAL_UNAVAILABLE_DATE" ->
+                    targetCount(request) <= 1 && request.facility() == null;
             default -> false;
         };
         if (!valid) {
             throw new AuraStateException(
                     "Choose the resource that matches this calendar exception type.");
         }
+    }
+
+    private int targetCount(AuraDtos.CreateCalendarExceptionRequest request) {
+        return (request.instructorId() == null ? 0 : 1)
+                + (request.roomId() == null ? 0 : 1)
+                + (request.sectionId() == null ? 0 : 1)
+                + (request.timeslotId() == null ? 0 : 1)
+                + (request.departmentId() == null ? 0 : 1)
+                + (request.buildingId() == null ? 0 : 1);
     }
 
     private String normalizeEnumValue(String value) {
@@ -1594,7 +1644,19 @@ public class AuraService {
                         clash.primarySessionId(),
                         clash.secondarySessionId(),
                         now,
-                        null))
+                        null,
+                        "OPEN",
+                        clash.reasonCode(),
+                        clash.suggestedAction(),
+                        java.util.stream.Stream.of(
+                                        clash.primarySessionId(),
+                                        clash.secondarySessionId())
+                                .filter(java.util.Objects::nonNull)
+                                .toList(),
+                        clash.affectedStudents(),
+                        clash.affectedInstructors(),
+                        clash.affectedSections(),
+                        clash.affectedRooms()))
                 .toList();
     }
 
