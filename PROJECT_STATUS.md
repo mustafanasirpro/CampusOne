@@ -41,3 +41,14 @@ Full backend verification must be rerun after every subsequent backend change.
 - No browser session was manually exercised during this implementation pass.
 - Production Render/Vercel deployment was not performed.
 - Docker-dependent Testcontainers tests may be skipped locally when Docker is unavailable.
+
+## AURA
+
+Status: substantial implementation verified locally; full product acceptance remains incomplete.
+
+- Backend: 590 tests passed with 13 Docker-gated skips; AURA contributed 81 tests with one skip.
+- Frontend: lint, production build, and 11 component tests passed.
+- Browser: isolated PostgreSQL-backed desktop/mobile Playwright suite passed 19 tests with one intentional project-specific skip.
+- Database: PostgreSQL 17.10 verified fresh migrations V1–V35 and an upgrade from V34 to V35.
+- Solver: deterministic 300, 1,000, and 5,000 occurrence checks completed with zero hard score; the largest case has a documented memory warning.
+- Deployment: not performed. See `AURA_FINAL_ACCEPTANCE_REPORT.md` for evidence and remaining acceptance blockers.
