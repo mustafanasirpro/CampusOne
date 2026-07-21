@@ -1,5 +1,9 @@
 package com.campusone.aura.service;
 
+import com.campusone.aura.dto.AuraDtos;
+import com.campusone.aura.dto.AuraDtos.RoomResponse;
+import com.campusone.aura.dto.AuraDtos.SessionResponse;
+import com.campusone.aura.dto.AuraDtos.TimeslotResponse;
 import com.campusone.aura.dto.AuraDtos.TimetableVersionResponse;
 import com.campusone.aura.dto.AuraScenarioDtos;
 import com.campusone.aura.dto.AuraScenarioDtos.EmergencyRepairResponse;
@@ -11,6 +15,8 @@ import com.campusone.aura.repository.AuraJdbcRepository.ScopedResource;
 import com.campusone.aura.repository.AuraScenarioRepository;
 import com.campusone.common.exception.ResourceNotFoundException;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -40,16 +46,19 @@ public class AuraScenarioService {
     private final AuraJdbcRepository repository;
     private final AuraScenarioRepository scenarioRepository;
     private final AuraClashDetector clashDetector;
+    private final AuraService auraService;
 
     public AuraScenarioService(
             AuraAuthorizationService authorizationService,
             AuraJdbcRepository repository,
             AuraScenarioRepository scenarioRepository,
-            AuraClashDetector clashDetector) {
+            AuraClashDetector clashDetector,
+            AuraService auraService) {
         this.authorizationService = authorizationService;
         this.repository = repository;
         this.scenarioRepository = scenarioRepository;
         this.clashDetector = clashDetector;
+        this.auraService = auraService;
     }
 
     @Transactional
@@ -98,6 +107,10 @@ public class AuraScenarioService {
             throw new AuraStateException(
                     "Emergency repairs must start from the published timetable.");
         }
+        if (!scenarioRepository.isVersionCurrent(request.sourceVersionId())) {
+            throw new AuraStateException(
+                    "Scheduling data changed after this timetable was created. Generate and publish a current version first.");
+        }
         String emergencyType = normalize(
                 request.emergencyType(), EMERGENCY_TYPES,
                 "Choose a supported emergency type.");
@@ -116,14 +129,110 @@ public class AuraScenarioService {
                 "EMERGENCY_REPAIR");
         scenarioRepository.completeEmergencyDraft(
                 requestId, draftId, emergencyType, request.affectedResourceId());
+        EmergencyReassignment result = reassignEmergencySessions(
+                userId, universityId, draftId, emergencyType,
+                request.affectedResourceId());
+        scenarioRepository.markEmergencyResult(
+                requestId,
+                result.feasible() ? "DRAFT_READY" : "FAILED",
+                result.moves().size(),
+                result.message());
         List<DetectedClash> clashes = clashDetector.detect(
-                repository.listSessions(draftId));
+                repository.listSessions(draftId),
+                repository.clashDetectionContext(draftId));
         repository.replaceClashes(draftId, clashes);
         repository.insertVersionAudit(
                 draftId, userId, "EMERGENCY_DRAFT_CREATED",
                 "Created a minimally scoped emergency repair draft with unaffected sessions pinned.");
         return scenarioRepository.findEmergency(requestId)
                 .orElseThrow(() -> notFound("AURA emergency repair was not found."));
+    }
+
+    private EmergencyReassignment reassignEmergencySessions(
+            UUID userId,
+            UUID universityId,
+            UUID draftId,
+            String emergencyType,
+            UUID affectedResourceId) {
+        List<UUID> affectedIds = scenarioRepository.listAffectedSessionIds(
+                draftId, emergencyType, affectedResourceId);
+        if (affectedIds.isEmpty()) {
+            return new EmergencyReassignment(true, List.of(),
+                    "No sessions require reassignment in this draft.");
+        }
+        if ("INSTRUCTOR_ABSENCE".equals(emergencyType)
+                || "SECTION_RESTRICTION".equals(emergencyType)) {
+            return new EmergencyReassignment(false, List.of(),
+                    "Automatic reassignment cannot change the assigned instructor or section. Review this draft manually.");
+        }
+        List<RoomResponse> rooms = repository.listRooms(universityId).stream()
+                .filter(RoomResponse::active).toList();
+        List<TimeslotResponse> slots = repository.listTimeslots(universityId).stream()
+                .filter(TimeslotResponse::active).toList();
+        List<EmergencyMove> moves = new ArrayList<>();
+        Set<String> reservedRoomSlots = new HashSet<>();
+        for (UUID sessionId : affectedIds) {
+            SessionResponse session = repository.findSession(sessionId)
+                    .orElseThrow(() -> notFound("Affected timetable session was not found."));
+            if (session.locked()) {
+                return new EmergencyReassignment(false, List.of(),
+                        "An affected session is pinned and cannot be reassigned automatically.");
+            }
+            EmergencyMove move = findEmergencyMove(
+                    userId, session, rooms, slots, emergencyType,
+                    affectedResourceId, reservedRoomSlots);
+            if (move == null) {
+                return new EmergencyReassignment(false, List.of(),
+                        "No clash-free alternative is available for every affected session.");
+            }
+            moves.add(move);
+            reservedRoomSlots.add(move.roomId() + ":" + move.timeslotId());
+        }
+        moves.forEach(move -> auraService.applyMove(
+                userId, move.sessionId(),
+                new AuraDtos.ManualMoveRequest(
+                        move.roomId(), move.timeslotId(),
+                        "Emergency minimum-disruption reassignment")));
+        return new EmergencyReassignment(true, List.copyOf(moves),
+                moves.size() + " affected session" + (moves.size() == 1 ? " was" : "s were")
+                        + " reassigned in the review draft.");
+    }
+
+    private EmergencyMove findEmergencyMove(
+            UUID userId,
+            SessionResponse session,
+            List<RoomResponse> rooms,
+            List<TimeslotResponse> slots,
+            String emergencyType,
+            UUID affectedResourceId,
+            Set<String> reservedRoomSlots) {
+        EmergencyMove best = null;
+        int bestDisruption = Integer.MAX_VALUE;
+        for (TimeslotResponse slot : slots) {
+            if (("TIMESLOT_CANCELLATION".equals(emergencyType)
+                    || "UNIVERSITY_EVENT".equals(emergencyType))
+                    && slot.id().equals(affectedResourceId)) continue;
+            for (RoomResponse room : rooms) {
+                if (("ROOM_CLOSURE".equals(emergencyType)
+                        || "FACILITY_OUTAGE".equals(emergencyType))
+                        && room.id().equals(affectedResourceId)) continue;
+                if (room.id().equals(session.roomId())
+                        && slot.id().equals(session.timeslotId())) continue;
+                if (reservedRoomSlots.contains(room.id() + ":" + slot.id())) continue;
+                var preview = auraService.previewMove(
+                        userId, session.id(),
+                        new AuraDtos.ManualMovePreviewRequest(room.id(), slot.id()));
+                if (!preview.allowed()) continue;
+                int disruption = (room.id().equals(session.roomId()) ? 0 : 5)
+                        + (slot.dayOfWeek() == session.dayOfWeek() ? 0 : 15)
+                        + (slot.startsAt().equals(session.startsAt()) ? 0 : 10);
+                if (disruption < bestDisruption) {
+                    best = new EmergencyMove(session.id(), room.id(), slot.id());
+                    bestDisruption = disruption;
+                }
+            }
+        }
+        return best;
     }
 
     public List<EmergencyRepairResponse> listEmergencies(
@@ -199,4 +308,11 @@ public class AuraScenarioService {
                 ? message.substring(0, message.length() - suffix.length())
                 : message);
     }
+
+    private record EmergencyMove(UUID sessionId, UUID roomId, UUID timeslotId) { }
+
+    private record EmergencyReassignment(
+            boolean feasible,
+            List<EmergencyMove> moves,
+            String message) { }
 }
