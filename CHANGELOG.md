@@ -58,8 +58,18 @@
   room display-name persistence, and generation-run timestamp binding; an
   authenticated smoke test now covers setup, readiness, generation, version
   sessions, and move preflight.
+- AURA generation now supports persisted constraint profiles, deterministic
+  seeds and occurrence identifiers, deterministic input checksums, and a
+  bounded construction pass that completes large feasible fixtures before
+  Timefold improvement.
+- PostgreSQL runtime verification fixed optional UUID parameter binding and
+  timestamp projection defects in registration, scenario, and resolution
+  repositories.
+- Vitest component coverage and a PostgreSQL-backed Playwright harness now
+  exercise critical AURA desktop/mobile workflows.
 
 ### Notes
 
 - Lost & Found is intentionally excluded from unauthenticated global search to preserve same-university privacy rules.
-- Browser and production deployment verification remain separate manual steps.
+- The implemented AURA browser suite is automated locally; production
+  deployment verification remains unperformed and requires authorization.
