@@ -45,3 +45,9 @@ backend/src/main/resources/db/migration/V21__create_lost_found_module.sql
 ## Cost Boundary
 
 Lost & Found adds no new vendor dependency. It uses the existing backend, PostgreSQL/Neon, Cloudflare R2, in-app notifications, moderation services, and deterministic Java matching.
+
+## Current AURA Context
+
+AURA is CampusOne's in-process university timetable module. Its admin API is under `/api/v1/admin/aura`, while authenticated student capability, registration, and personal-timetable endpoints are under `/api/v1/aura`. Scheduling data is university-scoped and stored in PostgreSQL through Flyway migrations V25–V35. Timefold Solver Community Edition runs inside the Spring Boot process; it does not require a paid solver service.
+
+The current workbench connects setup, readiness, constraint profiles, generation, versions, sessions, clash review, imports, registrations, resolution cases, scenarios, exports, and publication. The authoritative distinction between verified behavior and unfinished product scope is maintained in `AURA_COMPLETION_LEDGER.md` and `AURA_TEST_REPORT.md`.
