@@ -104,6 +104,8 @@ when creating an academic term, where the backend still verifies admin access.
 | `POST` | `/timeslots` | Create a weekly timeslot. |
 | `GET` | `/timeslots` | List timeslots. |
 | `GET` | `/setup-references` | List active departments and courses for the authenticated admin's university. |
+| `GET` | `/terms/{termId}/constraint-profile?profile={name}` | Read a validated built-in or persisted generation profile. |
+| `PUT` | `/terms/{termId}/constraint-profile` | Replace a university-scoped profile's validated constraint weights. |
 | `PUT` | `/rooms/{roomId}/facilities` | Replace a room's normalized facility set. |
 | `POST` | `/offerings` | Create a course offering for a term. |
 | `GET` | `/terms/{termId}/offerings` | List term offerings. |
@@ -153,9 +155,14 @@ when creating an academic term, where the backend still verifies admin access.
 | `POST` | `/terms/{termId}/emergency-repairs` | Create an emergency review draft. |
 
 Authenticated student endpoints use the separate `/api/v1/aura` base path:
-`/terms`, `/me/registrations`, `/me/timetable`, `/me/timetable.ics`, and
+`/capabilities`, `/terms`, `/me/registrations`, `/me/timetable`, `/me/timetable.ics`, and
 `/me/resolution-cases`. Student identity and university are always derived from
 the JWT-backed profile.
+
+Generation requests may select a profile and seed. The backend persists the
+effective profile, seed, scheduling revision, and deterministic input checksum
+with the run; clients cannot bypass university authorization through these
+options.
 
 AURA stores timetable data in normalized PostgreSQL tables managed by Flyway
 and keeps generated versions immutable apart from publish state and explicit
