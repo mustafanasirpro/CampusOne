@@ -7,6 +7,8 @@ import com.campusone.note.service.NoteAdminAuthorizationService;
 import com.campusone.academic.entity.Department;
 import com.campusone.academic.entity.University;
 import com.campusone.user.entity.StudentProfile;
+import com.campusone.user.entity.Role;
+import com.campusone.user.entity.RoleName;
 import com.campusone.user.entity.User;
 import com.campusone.user.repository.UserRepository;
 import java.util.Optional;
@@ -37,7 +39,7 @@ class AuraAuthorizationServiceTest {
     @Test
     void requireAdmin_allowsConfiguredCampusOneAdmin() {
         User admin = user(ADMIN_ID, "admin@example.com");
-        when(userRepository.findById(ADMIN_ID)).thenReturn(Optional.of(admin));
+        when(userRepository.findWithRolesById(ADMIN_ID)).thenReturn(Optional.of(admin));
         when(adminAuthorizationService.canManage(
                 ADMIN_ID,
                 "admin@example.com")).thenReturn(true);
@@ -49,7 +51,7 @@ class AuraAuthorizationServiceTest {
     @Test
     void requireAdmin_rejectsNormalStudent() {
         User student = user(STUDENT_ID, "student@example.com");
-        when(userRepository.findById(STUDENT_ID)).thenReturn(Optional.of(student));
+        when(userRepository.findWithRolesById(STUDENT_ID)).thenReturn(Optional.of(student));
 
         AuraAuthorizationService service = new AuraAuthorizationService(
                 userRepository,
@@ -58,6 +60,16 @@ class AuraAuthorizationServiceTest {
         assertThatThrownBy(() -> service.requireAdmin(STUDENT_ID))
                 .isInstanceOf(AccessDeniedException.class)
                 .hasMessage("Only admins can manage AURA timetable data.");
+    }
+
+    @Test
+    void requireAdmin_allowsExistingAdminRoleWithoutFallbackConfiguration() {
+        User admin = user(ADMIN_ID, "role-admin@example.com");
+        admin.addRole(new Role(RoleName.ADMIN));
+        when(userRepository.findWithRolesById(ADMIN_ID)).thenReturn(Optional.of(admin));
+
+        new AuraAuthorizationService(userRepository, adminAuthorizationService)
+                .requireAdmin(ADMIN_ID);
     }
 
     @Test
