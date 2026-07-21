@@ -45,6 +45,16 @@ public class AuraScenarioRepository {
                 .addValue("termId", termId), Boolean.class));
     }
 
+    public boolean isVersionCurrent(UUID versionId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT timetable_version.input_revision = term_row.data_revision
+                FROM aura_timetable_versions timetable_version
+                JOIN aura_academic_terms term_row
+                  ON term_row.id = timetable_version.term_id
+                WHERE timetable_version.id = :versionId
+                """, params().addValue("versionId", versionId), Boolean.class));
+    }
+
     public int countAffectedSessions(
             UUID versionId,
             String scenarioType,
@@ -53,7 +63,8 @@ public class AuraScenarioRepository {
         if (column == null || resourceId == null) return 0;
         Integer count = jdbc.queryForObject("""
                 SELECT COUNT(*) FROM aura_scheduled_sessions
-                WHERE version_id = :versionId AND """ + column + " = :resourceId",
+                WHERE version_id = :versionId AND %s = :resourceId
+                """.formatted(column),
                 params().addValue("versionId", versionId)
                         .addValue("resourceId", resourceId), Integer.class);
         return count == null ? 0 : count;
@@ -171,7 +182,8 @@ public class AuraScenarioRepository {
                         updated_at = CURRENT_TIMESTAMP,
                         version = version + 1
                     WHERE version_id = :draftVersionId
-                      AND """ + column + " <> :affectedResourceId",
+                      AND %s <> :affectedResourceId
+                    """.formatted(column),
                     params().addValue("draftVersionId", draftVersionId)
                             .addValue("affectedResourceId", affectedResourceId));
         }
@@ -185,12 +197,50 @@ public class AuraScenarioRepository {
                 .addValue("draftVersionId", draftVersionId));
     }
 
+    public List<UUID> listAffectedSessionIds(
+            UUID versionId,
+            String emergencyType,
+            UUID resourceId) {
+        String column = resourceColumn(emergencyType);
+        if (column == null) return List.of();
+        return jdbc.query("""
+                SELECT id FROM aura_scheduled_sessions
+                WHERE version_id = :versionId AND %s = :resourceId
+                ORDER BY occurrence_index, id
+                """.formatted(column),
+                params().addValue("versionId", versionId)
+                        .addValue("resourceId", resourceId),
+                (rs, row) -> rs.getObject("id", UUID.class));
+    }
+
+    public void markEmergencyResult(
+            UUID requestId,
+            String status,
+            int reassignedSessions,
+            String message) {
+        jdbc.update("""
+                UPDATE aura_emergency_repair_requests
+                SET status = :status,
+                    impact = impact || CAST(:result AS JSONB),
+                    updated_at = CURRENT_TIMESTAMP,
+                    version = version + 1
+                WHERE id = :requestId
+                """, params().addValue("requestId", requestId)
+                .addValue("status", status)
+                .addValue("result", json(Map.of(
+                        "reassignedSessions", reassignedSessions,
+                        "message", message))));
+    }
+
     public Optional<EmergencyRepairResponse> findEmergency(UUID id) {
         return jdbc.query("""
                 SELECT id, term_id, source_version_id, draft_version_id,
                     emergency_type, affected_resource_id, reason, status,
                     COALESCE((impact->>'affectedSessions')::INTEGER, 0)
                         AS affected_sessions,
+                    COALESCE((impact->>'reassignedSessions')::INTEGER, 0)
+                        AS reassigned_sessions,
+                    COALESCE(impact->>'message', '') AS result_message,
                     created_at
                 FROM aura_emergency_repair_requests WHERE id = :id
                 """, params().addValue("id", id), this::mapEmergency)
@@ -203,6 +253,9 @@ public class AuraScenarioRepository {
                     emergency_type, affected_resource_id, reason, status,
                     COALESCE((impact->>'affectedSessions')::INTEGER, 0)
                         AS affected_sessions,
+                    COALESCE((impact->>'reassignedSessions')::INTEGER, 0)
+                        AS reassigned_sessions,
+                    COALESCE(impact->>'message', '') AS result_message,
                     created_at
                 FROM aura_emergency_repair_requests WHERE term_id = :termId
                 ORDER BY created_at DESC LIMIT 100
@@ -226,7 +279,8 @@ public class AuraScenarioRepository {
                 uuid(rs, "source_version_id"), nullableUuid(rs, "draft_version_id"),
                 rs.getString("emergency_type"), uuid(rs, "affected_resource_id"),
                 rs.getString("reason"), rs.getString("status"),
-                rs.getInt("affected_sessions"), instant(rs, "created_at"));
+                rs.getInt("affected_sessions"), rs.getInt("reassigned_sessions"),
+                rs.getString("result_message"), instant(rs, "created_at"));
     }
 
     private String resourceColumn(String type) {
