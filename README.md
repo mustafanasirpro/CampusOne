@@ -424,6 +424,13 @@ tracks the remaining full CRUD, automatic repair, analytics, fixture,
 browser-E2E, and production-deployment gates without overstating them; the
 latest local evidence is recorded in [AURA_TEST_REPORT.md](AURA_TEST_REPORT.md).
 
+Generation supports persisted constraint profiles, deterministic seeds, and
+input checksums. The local PostgreSQL-backed Playwright suite covers critical
+desktop/mobile administration and student flows. Measured solver results are
+available in [AURA_BENCHMARK_REPORT.md](AURA_BENCHMARK_REPORT.md), and the
+current acceptance decision is in
+[AURA_FINAL_ACCEPTANCE_REPORT.md](AURA_FINAL_ACCEPTANCE_REPORT.md).
+
 ## Quality Checks
 
 Backend:
