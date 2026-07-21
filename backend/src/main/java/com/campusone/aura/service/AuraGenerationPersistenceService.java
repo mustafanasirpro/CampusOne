@@ -64,7 +64,8 @@ public class AuraGenerationPersistenceService {
         }
 
         List<DetectedClash> detected = clashDetector.detect(
-                repository.listSessions(versionId));
+                repository.listSessions(versionId),
+                repository.clashDetectionContext(versionId));
         repository.replaceClashes(versionId, detected);
         boolean completed = repository.markRunCompleted(
                 runId,
