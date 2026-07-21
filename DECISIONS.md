@@ -26,3 +26,14 @@
 - Do not expose reporter contact details, storage credentials, claim proof, reviewer notes, or internal moderation state in public DTOs.
 - Do not add any new paid provider or external service.
 - Do not commit `.env`, build output, generated logs, storage keys, database passwords, JWT secrets, or email provider secrets.
+
+## AURA Decisions
+
+| Area | Decision |
+|---|---|
+| Solver | Run Timefold Community Edition in-process and deterministically pre-construct eligible assignments before local optimization. |
+| Reproducibility | Persist a generation seed, selected profile, scheduling revision, and deterministic input checksum. |
+| Profiles | Keep validated university-scoped weights in PostgreSQL; provide balanced, compact, room-efficient, instructor-friendly, and repair defaults. |
+| Authorization | Derive admin capability and university scope from the authenticated backend identity; never trust client-supplied scope. |
+| Version safety | Persist only complete current-revision runs, keep published schedules immutable, and edit through cloned drafts. |
+| Verification | Use local PostgreSQL 17 for migration/runtime checks when Docker is unavailable and Playwright for browser-visible critical workflows. |
