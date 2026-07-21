@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import com.campusone.aura.dto.AuraDtos.ReadinessResponse;
+import com.campusone.aura.dto.AuraDtos.ReadinessIssue;
 import com.campusone.aura.repository.AuraJdbcRepository;
 import com.campusone.aura.repository.AuraJdbcRepository.RequirementCandidateIssue;
 import com.campusone.aura.repository.AuraJdbcRepository.TermCounts;
@@ -29,6 +30,7 @@ class AuraReadinessValidatorTest {
                 .thenReturn(new TermCounts(0, 0, 0, 0, 0, 0));
         when(repository.requirementsWithoutCandidates(TERM_ID))
                 .thenReturn(List.of());
+        when(repository.countActiveRegistrations(TERM_ID)).thenReturn(1L);
 
         ReadinessResponse response =
                 new AuraReadinessValidator(repository).validate(TERM_ID);
@@ -50,6 +52,7 @@ class AuraReadinessValidatorTest {
                 .thenReturn(new TermCounts(3, 6, 2, 2, 4, 6));
         when(repository.requirementsWithoutCandidates(TERM_ID))
                 .thenReturn(List.of());
+        when(repository.countActiveRegistrations(TERM_ID)).thenReturn(1L);
 
         ReadinessResponse response =
                 new AuraReadinessValidator(repository).validate(TERM_ID);
@@ -69,6 +72,7 @@ class AuraReadinessValidatorTest {
                         requirementId,
                         "CSC275",
                         "Data Structures")));
+        when(repository.countActiveRegistrations(TERM_ID)).thenReturn(1L);
 
         ReadinessResponse response =
                 new AuraReadinessValidator(repository).validate(TERM_ID);
@@ -90,6 +94,7 @@ class AuraReadinessValidatorTest {
                 .thenReturn(new TermCounts(1, 3, 2, 2, 2, 4));
         when(repository.requirementsWithoutCandidates(TERM_ID))
                 .thenReturn(List.of());
+        when(repository.countActiveRegistrations(TERM_ID)).thenReturn(1L);
 
         ReadinessResponse response =
                 new AuraReadinessValidator(repository).validate(TERM_ID);
@@ -98,5 +103,47 @@ class AuraReadinessValidatorTest {
         assertThat(response.issues())
                 .extracting(issue -> issue.code())
                 .contains("AURA_CAPACITY_TOO_SMALL");
+    }
+
+    @Test
+    void validate_activeRunAndRepositoryIntegrityIssueBlockGeneration() {
+        when(repository.countsForTerm(TERM_ID))
+                .thenReturn(new TermCounts(3, 6, 2, 2, 4, 6));
+        when(repository.readinessIntegrityIssues(TERM_ID)).thenReturn(List.of(
+                new ReadinessIssue(
+                        "AURA_INVALID_WEEK_PATTERN",
+                        "ERROR",
+                        "Fix the custom week pattern.",
+                        "MEETING_REQUIREMENT",
+                        TERM_ID)));
+        when(repository.hasActiveGenerationRun(TERM_ID)).thenReturn(true);
+        when(repository.requirementsWithoutCandidates(TERM_ID)).thenReturn(List.of());
+        when(repository.countActiveRegistrations(TERM_ID)).thenReturn(1L);
+
+        ReadinessResponse response =
+                new AuraReadinessValidator(repository).validate(TERM_ID);
+
+        assertThat(response.ready()).isFalse();
+        assertThat(response.issues()).extracting(ReadinessIssue::code)
+                .contains(
+                        "AURA_INVALID_WEEK_PATTERN",
+                        "AURA_GENERATION_ALREADY_ACTIVE");
+    }
+
+    @Test
+    void validate_withoutRegistrationsReturnsWarningWithoutBlocking() {
+        when(repository.countsForTerm(TERM_ID))
+                .thenReturn(new TermCounts(3, 6, 2, 2, 4, 6));
+        when(repository.requirementsWithoutCandidates(TERM_ID)).thenReturn(List.of());
+        when(repository.countActiveRegistrations(TERM_ID)).thenReturn(0L);
+
+        ReadinessResponse response =
+                new AuraReadinessValidator(repository).validate(TERM_ID);
+
+        assertThat(response.ready()).isTrue();
+        assertThat(response.issues()).singleElement().satisfies(issue -> {
+            assertThat(issue.code()).isEqualTo("AURA_NO_ACTIVE_REGISTRATIONS");
+            assertThat(issue.severity()).isEqualTo("WARNING");
+        });
     }
 }
