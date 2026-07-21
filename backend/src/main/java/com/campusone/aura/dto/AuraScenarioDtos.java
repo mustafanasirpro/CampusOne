@@ -49,6 +49,8 @@ public final class AuraScenarioDtos {
             String reason,
             String status,
             int affectedSessions,
+            int reassignedSessions,
+            String message,
             Instant createdAt) {
     }
 }
