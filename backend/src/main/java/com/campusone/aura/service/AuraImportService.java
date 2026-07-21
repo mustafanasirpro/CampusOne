@@ -302,7 +302,9 @@ public class AuraImportService {
         if (resultVersionId != null) {
             auraRepository.replaceClashes(
                     resultVersionId,
-                    clashDetector.detect(auraRepository.listSessions(resultVersionId)));
+                    clashDetector.detect(
+                            auraRepository.listSessions(resultVersionId),
+                            auraRepository.clashDetectionContext(resultVersionId)));
         }
         importRepository.markApplied(jobId, sourceRows.size(), resultVersionId);
         return importRepository.applyResponse(jobId);
