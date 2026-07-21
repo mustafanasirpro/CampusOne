@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/api/apiClient";
 import {
   createAuraTerm,
+  getAuraCapabilities,
   getAuraMetrics,
   getAuraReadiness,
   getAuraGenerationRun,
@@ -38,6 +39,7 @@ import {
 } from "@/components/common";
 import {
   AuraImportPanel,
+  AuraConstraintProfilePanel,
   AuraRegistrationPanel,
   AuraResolutionPanel,
   AuraScenarioPanel,
@@ -46,6 +48,7 @@ import {
 } from "@/components/aura";
 import type {
   AuraClash,
+  AuraConstraintProfileName,
   AuraGenerationRun,
   AuraMetrics,
   AuraReadiness,
@@ -94,6 +97,9 @@ export function AuraWorkbenchPage() {
   const [isCreatingTerm, setIsCreatingTerm] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [generationProfile, setGenerationProfile] =
+    useState<AuraConstraintProfileName>("BALANCED");
+  const [canManage, setCanManage] = useState<boolean | null>(null);
   const { showToast } = useToast();
 
   useDocumentTitle("AURA Timetable Generator · CampusOne");
@@ -161,11 +167,15 @@ export function AuraWorkbenchPage() {
     let active = true;
     void Promise.all([
       getCurrentUserIdentity(controller.signal),
-      listAuraTerms(controller.signal),
+      getAuraCapabilities(controller.signal),
     ])
-      .then(([identity, termPage]) => {
+      .then(async ([identity, capabilities]) => {
         if (!active) return;
         setCurrentUser(identity);
+        setCanManage(capabilities.canManage);
+        if (!capabilities.canManage) return;
+        const termPage = await listAuraTerms(controller.signal);
+        if (!active) return;
         setTerms(termPage.content);
         setSelectedTermId(termPage.content.at(0)?.id || "");
         setError(null);
@@ -264,9 +274,11 @@ export function AuraWorkbenchPage() {
     if (!activeRun || !["QUEUED", "RUNNING"].includes(activeRun.status)) {
       return undefined;
     }
+    let active = true;
     const handle = window.setInterval(() => {
       void getAuraGenerationRun(activeRun.id)
         .then((run) => {
+          if (!active) return;
           setActiveRun(run);
           if (!["QUEUED", "RUNNING"].includes(run.status)) {
             if (selectedTermId) {
@@ -274,9 +286,19 @@ export function AuraWorkbenchPage() {
             }
           }
         })
-        .catch(() => undefined);
+        .catch((requestError: unknown) => {
+          if (active) {
+            setError(apiMessage(
+              requestError,
+              "Generation status could not be refreshed. Try refreshing the page.",
+            ));
+          }
+        });
     }, 2500);
-    return () => window.clearInterval(handle);
+    return () => {
+      active = false;
+      window.clearInterval(handle);
+    };
   }, [activeRun, loadTermDetails, selectedTermId]);
 
   const refreshAll = async () => {
@@ -315,7 +337,12 @@ export function AuraWorkbenchPage() {
     setIsGenerating(true);
     setError(null);
     try {
-      const run = await startAuraGeneration(selectedTermId);
+      const run = await startAuraGeneration(
+        selectedTermId,
+        30,
+        generationProfile,
+        0,
+      );
       setActiveRun(run);
       showToast({
         title: "Generation started",
@@ -356,6 +383,16 @@ export function AuraWorkbenchPage() {
     );
   }
 
+  if (canManage === false) {
+    return (
+      <EmptyState
+        description="AURA administration is available to university admins. Your personal timetable remains available from My timetable."
+        icon={<AlertTriangle className="size-6" />}
+        title="You do not have access to AURA administration"
+      />
+    );
+  }
+
   return (
     <div className="grid gap-6 pb-8">
       <PageHeader
@@ -381,51 +418,63 @@ export function AuraWorkbenchPage() {
             <p className="text-sm text-slate-500">
               Terms are created for {currentUser?.university.shortName ?? "your university"}.
             </p>
-            <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              onChange={(event) =>
-                setTermForm((current) => ({
-                  ...current,
-                  code: event.target.value,
-                }))
-              }
-              placeholder="FALL-2026"
-              value={termForm.code}
-            />
-            <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              onChange={(event) =>
-                setTermForm((current) => ({
-                  ...current,
-                  name: event.target.value,
-                }))
-              }
-              placeholder="Fall 2026"
-              value={termForm.name}
-            />
+            <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+              Term code
+              <input
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                onChange={(event) =>
+                  setTermForm((current) => ({
+                    ...current,
+                    code: event.target.value,
+                  }))
+                }
+                placeholder="FALL-2026"
+                value={termForm.code}
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+              Term name
+              <input
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                onChange={(event) =>
+                  setTermForm((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+                placeholder="Fall 2026"
+                value={termForm.name}
+              />
+            </label>
             <div className="grid gap-3 sm:grid-cols-2">
-              <input
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                onChange={(event) =>
-                  setTermForm((current) => ({
-                    ...current,
-                    startsOn: event.target.value,
-                  }))
-                }
-                type="date"
-                value={termForm.startsOn}
-              />
-              <input
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                onChange={(event) =>
-                  setTermForm((current) => ({
-                    ...current,
-                    endsOn: event.target.value,
-                  }))
-                }
-                type="date"
-                value={termForm.endsOn}
-              />
+              <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+                Start date
+                <input
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  onChange={(event) =>
+                    setTermForm((current) => ({
+                      ...current,
+                      startsOn: event.target.value,
+                    }))
+                  }
+                  type="date"
+                  value={termForm.startsOn}
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm font-medium text-slate-700">
+                End date
+                <input
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  onChange={(event) =>
+                    setTermForm((current) => ({
+                      ...current,
+                      endsOn: event.target.value,
+                    }))
+                  }
+                  type="date"
+                  value={termForm.endsOn}
+                />
+              </label>
             </div>
             <Button
               disabled={
@@ -450,6 +499,7 @@ export function AuraWorkbenchPage() {
             {terms.length ? (
               <>
                 <select
+                  aria-label="Academic term"
                   className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
                   onChange={(event) => setSelectedTermId(event.target.value)}
                   value={selectedTermId}
@@ -540,6 +590,14 @@ export function AuraWorkbenchPage() {
           onChanged={() => loadTermDetails(selectedTermId)}
           termId={selectedTermId}
           universityId={currentUser.university.id}
+        />
+      ) : null}
+
+      {selectedTermId ? (
+        <AuraConstraintProfilePanel
+          onProfileChange={setGenerationProfile}
+          selectedProfile={generationProfile}
+          termId={selectedTermId}
         />
       ) : null}
 
@@ -692,6 +750,7 @@ export function AuraWorkbenchPage() {
 
       <AuraVersionTools
         onChanged={refreshAll}
+        onVersionSelected={setSelectedVersionId}
         selectedVersionId={selectedVersionId}
         sessions={sessions}
         versions={versions}
