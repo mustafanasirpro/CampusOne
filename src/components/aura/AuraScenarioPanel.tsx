@@ -68,6 +68,7 @@ export function AuraScenarioPanel({
     return [...byId.entries()];
   }, [option.value, sessions]);
   const published = versions.find((version) => version.status === "PUBLISHED");
+  const selectedPublished = published?.id === selectedVersionId;
 
   const act = async (key: string, task: () => Promise<void>) => {
     setPending(key);
@@ -115,7 +116,7 @@ export function AuraScenarioPanel({
           })}>
             <FlaskConical className="size-4" /> Run what-if
           </Button>
-          <Button disabled={!published || !resourceId || !reason.trim()} loading={pending === "emergency"} onClick={() => void act("emergency", async () => {
+          <Button disabled={!selectedPublished || !resourceId || !reason.trim()} loading={pending === "emergency"} onClick={() => void act("emergency", async () => {
             const result = await createAuraEmergencyRepair(termId, published!.id, option.emergency, resourceId, reason.trim());
             setEmergencies((current) => [result, ...current]);
             setReason("");
@@ -124,6 +125,9 @@ export function AuraScenarioPanel({
             <AlertTriangle className="size-4" /> Create emergency draft
           </Button>
         </div>
+        {!selectedPublished ? (
+          <p className="text-sm text-amber-700">Select the published version to plan an emergency repair.</p>
+        ) : null}
         {whatIfResults.at(0) ? (
           <div className="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-900">
             <p className="font-semibold">Latest what-if · {whatIfResults[0].scenarioType.replaceAll("_", " ")}</p>
@@ -134,7 +138,11 @@ export function AuraScenarioPanel({
         {emergencies.length ? (
           <div className="flex flex-wrap gap-2">
             {emergencies.slice(0, 5).map((emergency) => (
-              <Badge key={emergency.id}>{emergency.emergencyType.replaceAll("_", " ")} · {emergency.status.replaceAll("_", " ")}</Badge>
+              <div className="grid gap-1 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm" key={emergency.id}>
+                <Badge>{emergency.emergencyType.replaceAll("_", " ")} · {emergency.status.replaceAll("_", " ")}</Badge>
+                <p className="text-slate-600">{emergency.message || `${emergency.affectedSessions} affected session${emergency.affectedSessions === 1 ? "" : "s"}.`}</p>
+                <p className="text-xs text-slate-500">{emergency.reassignedSessions} reassigned in the review draft</p>
+              </div>
             ))}
           </div>
         ) : null}
