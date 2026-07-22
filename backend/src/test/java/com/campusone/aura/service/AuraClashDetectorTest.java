@@ -4,8 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.campusone.aura.dto.AuraDtos.SessionResponse;
 import com.campusone.aura.repository.AuraJdbcRepository.DetectedClash;
+import com.campusone.aura.repository.AuraJdbcRepository.ClashDetectionContext;
+import com.campusone.aura.repository.AuraJdbcRepository.LinkageRule;
+import com.campusone.aura.repository.AuraJdbcRepository.TravelContextRule;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -157,6 +162,73 @@ class AuraClashDetectorTest {
                         "INVALID_CONTIGUOUS_DURATION");
     }
 
+    @Test
+    void detect_registeredStudentOverlap_reportsAffectedStudentOnce() {
+        SessionResponse first = contextualSession(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                ROOM_ID, INSTRUCTOR_ID, SECTION_ID, 1,
+                LocalTime.of(9, 0), LocalTime.of(10, 0));
+        SessionResponse second = contextualSession(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                OTHER_ROOM_ID, UUID.randomUUID(), UUID.randomUUID(), 1,
+                LocalTime.of(9, 30), LocalTime.of(10, 30));
+        UUID studentId = UUID.randomUUID();
+        ClashDetectionContext context = new ClashDetectionContext(
+                Map.of(first.id(), Set.of(studentId), second.id(), Set.of(studentId)),
+                Set.of(), Set.of(), Map.of(), Map.of(), List.of());
+
+        assertThat(detector.detect(List.of(first, second), context))
+                .filteredOn(clash -> "STUDENT_DOUBLE_BOOKED".equals(clash.clashType()))
+                .singleElement()
+                .satisfies(clash -> assertThat(clash.affectedStudents())
+                        .containsExactly(studentId));
+    }
+
+    @Test
+    void detect_insufficientTravelTime_reportsSharedInstructorImpact() {
+        UUID instructor = UUID.randomUUID();
+        SessionResponse first = contextualSession(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                ROOM_ID, instructor, UUID.randomUUID(), 1,
+                LocalTime.of(9, 0), LocalTime.of(10, 0));
+        SessionResponse second = contextualSession(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+                OTHER_ROOM_ID, instructor, UUID.randomUUID(), 1,
+                LocalTime.of(10, 5), LocalTime.of(11, 0));
+        ClashDetectionContext context = new ClashDetectionContext(
+                Map.of(), Set.of(), Set.of(), Map.of(),
+                Map.of(first.id(), "North", second.id(), "South"),
+                List.of(new TravelContextRule("North", "South", 15, "NORMAL")));
+
+        assertThat(detector.detect(List.of(first, second), context))
+                .filteredOn(clash -> "BUILDING_TRAVEL_TIME".equals(clash.clashType()))
+                .singleElement()
+                .satisfies(clash -> assertThat(clash.affectedInstructors())
+                        .containsExactly(instructor));
+    }
+
+    @Test
+    void detect_linkedActivityOutOfOrder_reportsHardClash() {
+        UUID lectureRequirement = UUID.randomUUID();
+        UUID labRequirement = UUID.randomUUID();
+        SessionResponse lecture = contextualSession(
+                UUID.randomUUID(), UUID.randomUUID(), lectureRequirement,
+                ROOM_ID, INSTRUCTOR_ID, SECTION_ID, 2,
+                LocalTime.of(11, 0), LocalTime.of(12, 0));
+        SessionResponse lab = contextualSession(
+                UUID.randomUUID(), UUID.randomUUID(), labRequirement,
+                OTHER_ROOM_ID, UUID.randomUUID(), UUID.randomUUID(), 1,
+                LocalTime.of(9, 0), LocalTime.of(10, 0));
+        ClashDetectionContext context = new ClashDetectionContext(
+                Map.of(), Set.of(), Set.of(),
+                Map.of(lectureRequirement, new LinkageRule(labRequirement, true)),
+                Map.of(), List.of());
+
+        assertThat(detector.detect(List.of(lecture, lab), context))
+                .extracting(DetectedClash::clashType)
+                .contains("LINKED_ACTIVITY_ORDER");
+    }
+
     private SessionResponse session(
             UUID sessionId,
             UUID roomId,
@@ -222,6 +294,27 @@ class AuraClashDetectorTest {
                 requiredCapacity, "CLASSROOM", roomCapacity,
                 requiredFacilities, roomFacilities, "INSTRUCTIONAL",
                 true, true, true, null, null, weekPattern, customWeeks,
+                List.of(), false, false, false, false);
+    }
+
+    private SessionResponse contextualSession(
+            UUID id,
+            UUID offeringId,
+            UUID requirementId,
+            UUID roomId,
+            UUID instructorId,
+            UUID sectionId,
+            int day,
+            LocalTime startsAt,
+            LocalTime endsAt) {
+        return new SessionResponse(
+                id, VERSION_ID, offeringId, requirementId,
+                "CS101", "Programming Fundamentals", sectionId, "BSCS-1A",
+                instructorId, "Dr Ahmed", roomId, "Room 101", "CLASSROOM",
+                UUID.randomUUID(), day, startsAt, endsAt, false, "SOLVER",
+                1, 1, 1, 1, 30, "CLASSROOM", 40,
+                List.of(), List.of(), "INSTRUCTIONAL",
+                true, true, true, null, null, "EVERY_WEEK", List.of(),
                 List.of(), false, false, false, false);
     }
 }
