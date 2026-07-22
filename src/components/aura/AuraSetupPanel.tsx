@@ -22,6 +22,7 @@ import {
   listAuraRooms,
   listAuraSections,
   listAuraTimeslots,
+  setAuraResourceActive,
   upsertAuraInstructorAvailability,
   upsertAuraRoomAvailability,
   upsertAuraSectionAvailability,
@@ -452,6 +453,43 @@ export function AuraSetupPanel({
           ) : null}
         </SetupCard>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle>Manage saved setup</CardTitle></CardHeader>
+        <CardContent className="grid gap-2">
+          {[
+            ...setup.programs.map((item) => ({ active: item.active, id: item.id, label: `Program · ${item.code}`, type: "program", version: item.version })),
+            ...setup.batches.map((item) => ({ active: item.active, id: item.id, label: `Batch · ${item.code}`, type: "batch", version: item.version })),
+            ...setup.sections.map((item) => ({ active: item.active, id: item.id, label: `Section · ${item.displayName}`, type: "section", version: item.version })),
+            ...setup.instructors.map((item) => ({ active: item.active, id: item.id, label: `Instructor · ${item.displayName}`, type: "instructor", version: item.version })),
+            ...setup.rooms.map((item) => ({ active: item.active, id: item.id, label: `Room · ${item.name}`, type: "room", version: item.version })),
+            ...setup.timeslots.map((item) => ({ active: item.active, id: item.id, label: `Timeslot · ${item.label}`, type: "timeslot", version: item.version })),
+            ...setup.offerings.map((item) => ({ active: item.status === "ACTIVE", id: item.id, label: `Offering · ${item.courseCode} ${item.sectionName}`, type: "offering", version: item.version })),
+          ].map((item) => (
+            <div className="flex flex-col gap-2 rounded-xl border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between" key={`${item.type}-${item.id}`}>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{item.label}</p>
+                <p className="text-xs text-slate-500">{item.active ? "Active" : "Inactive"}</p>
+              </div>
+              <Button
+                loading={busyAction === `state-${item.id}`}
+                onClick={() => void runAction(
+                  `state-${item.id}`,
+                  () => setAuraResourceActive(
+                    item.type,
+                    item.id,
+                    !item.active,
+                    item.version,
+                    item.active ? "Deactivated from setup management" : "Reactivated from setup management",
+                  ),
+                  () => undefined,
+                )}
+                variant="outline"
+              >{item.active ? `Deactivate ${item.label}` : `Activate ${item.label}`}</Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {!setup.programs.length && !setup.rooms.length && !setup.instructors.length ? (
         <EmptyState description="Start with a program, then add its batch and section alongside instructors, rooms, and weekly timeslots." icon={<Database className="size-6" />} title="Build the scheduling foundation" />
