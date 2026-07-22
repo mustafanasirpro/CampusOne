@@ -1,6 +1,9 @@
 import { apiDownload, apiRequest } from "@/api/apiClient";
 import type {
   AuraAvailability,
+  AuraAnalytics,
+  AuraAuditEvent,
+  AuraBuilding,
   AuraCapabilities,
   AuraBatch,
   AuraCalendarException,
@@ -30,6 +33,11 @@ import type {
   AuraTimetableVersion,
   AuraVersionComparison,
   AuraMovePreview,
+  AuraOfferingConflict,
+  AuraRepairPlan,
+  AuraScopedTimetable,
+  AuraTeachingGroup,
+  AuraTravelRule,
   CreateAuraInstructorAvailabilityRequest,
   CreateAuraCalendarExceptionRequest,
   CreateAuraInstructorRequest,
@@ -705,6 +713,207 @@ export function listAuraEmergencyRepairs(
 ) {
   return apiRequest<AuraEmergencyRepair[]>(
     `${adminAuraPath}/terms/${termId}/emergency-repairs`,
+    { signal },
+  );
+}
+
+export function listAuraBuildings(signal?: AbortSignal) {
+  return apiRequest<AuraBuilding[]>(`${adminAuraPath}/buildings`, { signal });
+}
+
+export function createAuraBuilding(request: {
+  code: string;
+  minimumTransitionMinutes: number;
+  name: string;
+}) {
+  return apiRequest<AuraBuilding>(`${adminAuraPath}/buildings`, {
+    body: JSON.stringify(request),
+    method: "POST",
+  });
+}
+
+export function setAuraResourceActive(
+  resourceType: string,
+  resourceId: string,
+  active: boolean,
+  version: number,
+  reason: string,
+) {
+  return apiRequest<import("@/types/aura").AuraMutationResult>(
+    `${adminAuraPath}/${resourceType}/${resourceId}/active-state`,
+    {
+      body: JSON.stringify({ active, reason, version }),
+      method: "PATCH",
+    },
+  );
+}
+
+export function updateAuraBuilding(
+  buildingId: string,
+  request: Omit<AuraBuilding, "id">,
+) {
+  return apiRequest<import("@/types/aura").AuraMutationResult>(
+    `${adminAuraPath}/buildings/${buildingId}`,
+    { body: JSON.stringify(request), method: "PATCH" },
+  );
+}
+
+export function listAuraTeachingGroups(termId: string, signal?: AbortSignal) {
+  return apiRequest<AuraTeachingGroup[]>(
+    `${adminAuraPath}/terms/${termId}/teaching-groups`,
+    { signal },
+  );
+}
+
+export function createAuraTeachingGroup(request: {
+  active: boolean;
+  capacity: number | null;
+  code: string;
+  displayName: string;
+  groupType: AuraTeachingGroup["groupType"];
+  offeringId: string;
+}) {
+  return apiRequest<AuraTeachingGroup>(`${adminAuraPath}/teaching-groups`, {
+    body: JSON.stringify(request),
+    method: "POST",
+  });
+}
+
+export function updateAuraTeachingGroup(
+  groupId: string,
+  request: Omit<AuraTeachingGroup, "id" | "termId">,
+) {
+  return apiRequest<AuraTeachingGroup>(`${adminAuraPath}/teaching-groups/${groupId}`, {
+    body: JSON.stringify(request),
+    method: "PATCH",
+  });
+}
+
+export function listAuraOfferingConflicts(
+  termId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<AuraOfferingConflict[]>(
+    `${adminAuraPath}/terms/${termId}/offering-conflicts`,
+    { signal },
+  );
+}
+
+export function createAuraOfferingConflict(request: {
+  active: boolean;
+  leftOfferingId: string;
+  reason: string;
+  rightOfferingId: string;
+  severity: AuraOfferingConflict["severity"];
+  source: string;
+  termId: string;
+}) {
+  return apiRequest<AuraOfferingConflict>(
+    `${adminAuraPath}/offering-conflicts`,
+    { body: JSON.stringify(request), method: "POST" },
+  );
+}
+
+export function updateAuraOfferingConflict(
+  conflictId: string,
+  request: Omit<AuraOfferingConflict, "id">,
+) {
+  return apiRequest<AuraOfferingConflict>(
+    `${adminAuraPath}/offering-conflicts/${conflictId}`,
+    { body: JSON.stringify(request), method: "PATCH" },
+  );
+}
+
+export function listAuraTravelRules(signal?: AbortSignal) {
+  return apiRequest<AuraTravelRule[]>(`${adminAuraPath}/travel-rules`, {
+    signal,
+  });
+}
+
+export function createAuraTravelRule(request: {
+  active: boolean;
+  difficulty: AuraTravelRule["difficulty"];
+  fromBuilding: string;
+  minutes: number;
+  toBuilding: string;
+}) {
+  return apiRequest<AuraTravelRule>(`${adminAuraPath}/travel-rules`, {
+    body: JSON.stringify(request),
+    method: "POST",
+  });
+}
+
+export function updateAuraTravelRule(
+  ruleId: string,
+  request: Omit<AuraTravelRule, "id">,
+) {
+  return apiRequest<AuraTravelRule>(`${adminAuraPath}/travel-rules/${ruleId}`, {
+    body: JSON.stringify(request),
+    method: "PATCH",
+  });
+}
+
+export function listAuraAuditEvents(
+  termId?: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<AuraAuditEvent[]>(
+    `${adminAuraPath}/audit${queryString({ termId, size: 25 })}`,
+    { signal },
+  );
+}
+
+export function getAuraAnalytics(
+  termId: string,
+  versionId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<AuraAnalytics>(
+    `${adminAuraPath}/terms/${termId}/analytics${queryString({ versionId })}`,
+    { signal },
+  );
+}
+
+export function getAuraScopedTimetable(
+  versionId: string,
+  scope = "WEEK",
+  scopeId?: string,
+  dayOfWeek?: number,
+  signal?: AbortSignal,
+) {
+  return apiRequest<AuraScopedTimetable>(
+    `${adminAuraPath}/versions/${versionId}/timetable-view${queryString({
+      dayOfWeek,
+      scope,
+      scopeId,
+    })}`,
+    { signal },
+  );
+}
+
+export function previewAuraRepair(
+  versionId: string,
+  request: { clashId?: string; reason: string; sessionId?: string },
+) {
+  return apiRequest<AuraRepairPlan>(
+    `${adminAuraPath}/versions/${versionId}/repair-preview`,
+    { body: JSON.stringify(request), method: "POST" },
+  );
+}
+
+export function applyAuraRepair(planId: string, previewToken: string) {
+  return apiRequest<AuraRepairPlan>(
+    `${adminAuraPath}/repair-plans/${planId}/apply`,
+    { body: JSON.stringify({ previewToken }), method: "POST" },
+  );
+}
+
+export function getMyAuraInstructorTimetable(
+  termId: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<AuraScopedTimetable>(
+    `${auraPath}/me/instructor-timetable${queryString({ termId })}`,
     { signal },
   );
 }
