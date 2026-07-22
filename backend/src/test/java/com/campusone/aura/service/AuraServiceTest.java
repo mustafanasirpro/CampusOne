@@ -395,7 +395,8 @@ class AuraServiceTest {
                 LocalDate.of(2026, 12, 31),
                 "DRAFT",
                 NOW,
-                NOW);
+                NOW,
+                0L);
     }
 
     private TimetableVersionResponse version(String status) {
