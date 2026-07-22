@@ -12,6 +12,7 @@ import com.campusone.aura.repository.AuraImportRepository;
 import com.campusone.aura.repository.AuraImportRepository.ImportJob;
 import com.campusone.aura.repository.AuraImportRepository.SourceRow;
 import com.campusone.aura.repository.AuraJdbcRepository;
+import com.campusone.aura.repository.AuraJdbcRepository.ClashDetectionContext;
 import com.campusone.aura.repository.AuraJdbcRepository.ScopedResource;
 import com.campusone.aura.dto.AuraImportDtos.ImportApplyResponse;
 import java.io.ByteArrayOutputStream;
@@ -228,7 +229,9 @@ class AuraImportServiceTest {
                 TERM_ID, 1, java.time.LocalTime.of(9, 0)))
                 .thenReturn(Optional.of(timeslotId));
         when(auraRepository.listSessions(versionId)).thenReturn(List.of());
-        when(clashDetector.detect(List.of())).thenReturn(List.of());
+        var context = ClashDetectionContext.empty();
+        when(auraRepository.clashDetectionContext(versionId)).thenReturn(context);
+        when(clashDetector.detect(List.of(), context)).thenReturn(List.of());
         ImportApplyResponse applied = new ImportApplyResponse(
                 jobId, "TIMETABLE", "APPLIED", 1, 0, versionId,
                 "Import applied successfully.");
