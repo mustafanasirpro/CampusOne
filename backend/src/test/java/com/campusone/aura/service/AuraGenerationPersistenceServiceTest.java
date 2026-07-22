@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.campusone.aura.exception.AuraStateException;
 import com.campusone.aura.repository.AuraJdbcRepository;
+import com.campusone.aura.repository.AuraJdbcRepository.ClashDetectionContext;
 import com.campusone.aura.repository.AuraJdbcRepository.RunPersistenceState;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverAssignment;
 import java.util.List;
@@ -83,7 +84,9 @@ class AuraGenerationPersistenceServiceTest {
                 eq("0hard/0medium/0soft"), eq("verified"), eq(USER_ID)))
                 .thenReturn(VERSION_ID);
         when(repository.listSessions(VERSION_ID)).thenReturn(List.of());
-        when(clashDetector.detect(List.of())).thenReturn(List.of());
+        var context = ClashDetectionContext.empty();
+        when(repository.clashDetectionContext(VERSION_ID)).thenReturn(context);
+        when(clashDetector.detect(List.of(), context)).thenReturn(List.of());
         when(repository.markRunCompleted(
                 RUN_ID,
                 "0hard/0medium/0soft",
