@@ -64,8 +64,12 @@ export function AuraVersionTools({
     () => versions.find((version) => version.id === selectedVersionId) ?? null,
     [selectedVersionId, versions],
   );
+  const selectedSessions = useMemo(
+    () => sessions.filter((session) => session.versionId === selectedVersionId),
+    [selectedVersionId, sessions],
+  );
   const draft = selectedVersion?.status === "DRAFT";
-  const firstSession = sessions.find((session) => session.id === firstSessionId);
+  const firstSession = selectedSessions.find((session) => session.id === firstSessionId);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -195,7 +199,7 @@ export function AuraVersionTools({
               value={moveSessionId}
             >
               <option value="">Choose a session</option>
-              {sessions.map((session) => (
+              {selectedSessions.map((session) => (
                 <option key={session.id} value={session.id}>
                   {session.courseCode} · {session.sectionName} · {session.roomName}
                 </option>
@@ -305,7 +309,7 @@ export function AuraVersionTools({
                 value={value}
               >
                 <option value="">Choose a session</option>
-                {sessions.map((session) => (
+                {selectedSessions.map((session) => (
                   <option key={session.id} value={session.id}>
                     {session.courseCode} · {session.sectionName} · {session.roomName}
                   </option>
