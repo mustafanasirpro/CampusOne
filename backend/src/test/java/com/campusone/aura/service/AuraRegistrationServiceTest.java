@@ -158,7 +158,8 @@ class AuraRegistrationServiceTest {
                         LocalDate.of(2026, 9, 28),
                         "PUBLISHED",
                         Instant.parse("2026-01-01T00:00:00Z"),
-                        Instant.parse("2026-01-01T00:00:00Z"))));
+                        Instant.parse("2026-01-01T00:00:00Z"),
+                        0L)));
         when(auraRepository.termTimezone(TERM_ID)).thenReturn("Asia/Karachi");
         PersonalTimetableEntry oddWeeks = new PersonalTimetableEntry(
                 UUID.randomUUID(), OFFERING_ID, "CS101", "Programming",
