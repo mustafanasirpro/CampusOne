@@ -27,16 +27,23 @@ export default async function globalSetup() {
     ON CONFLICT DO NOTHING;
     SELECT id FROM users
     WHERE LOWER(email) = LOWER('${e2eUsers.student.email}');`;
-  const studentUserId = execFileSync(psql, [
+  const userRows = execFileSync(psql, [
     "-h", "127.0.0.1", "-p", port, "-U", "postgres", "-d", database,
     "-v", "ON_ERROR_STOP=1", "-Atc", promoteSql,
-  ], { encoding: "utf8" }).trim().split(/\r?\n/).at(-1);
+  ], { encoding: "utf8" }).trim().split(/\r?\n/);
+  const studentUserId = userRows.at(-1);
   if (!studentUserId) throw new Error("The local AURA E2E student was not created.");
 
   const session = await post<{ accessToken: string }>("/auth/login", {
     email: e2eUsers.admin.email,
     password: e2eUsers.admin.password,
   });
+  const adminUserId = execFileSync(psql, [
+    "-h", "127.0.0.1", "-p", port, "-U", "postgres", "-d", database,
+    "-v", "ON_ERROR_STOP=1", "-Atc",
+    `SELECT id FROM users WHERE LOWER(email) = LOWER('${e2eUsers.admin.email}');`,
+  ], { encoding: "utf8" }).trim();
+  if (!adminUserId) throw new Error("The local AURA E2E administrator was not created.");
   const headers = { Authorization: `Bearer ${session.accessToken}` };
   const references = await get<SetupReferences>(
     "/admin/aura/setup-references",
@@ -72,6 +79,7 @@ export default async function globalSetup() {
   }, headers);
   const instructor = await post<Resource>("/admin/aura/instructors", {
     universityId,
+    userId: adminUserId,
     displayName: "E2E Instructor",
     email: "aura-instructor-e2e@campusone.test",
     maxHoursPerWeek: 20,
@@ -98,7 +106,7 @@ export default async function globalSetup() {
   )));
 
   const offerings: Resource[] = [];
-  for (const course of references.courses.slice(0, 2)) {
+  for (const course of references.courses.slice(0, 3)) {
     const offering = await post<Resource>("/admin/aura/offerings", {
       termId: term.id,
       courseId: course.id,
@@ -149,11 +157,24 @@ export default async function globalSetup() {
   const version = versions[0];
   if (!version) throw new Error("AURA generation did not create a timetable version.");
   await post(`/admin/aura/versions/${version.id}/publish`, {}, headers);
+  const sessions = await get<Array<SessionResource>>(
+    `/admin/aura/versions/${version.id}/sessions`, headers,
+  );
+  if (!sessions.length) throw new Error("AURA generation did not create timetable sessions.");
 
   const fixture: AuraE2eFixture = {
-    courseCodes: references.courses.slice(0, 2).map((course) => course.code),
+    courseIds: references.courses.slice(0, 3).map((course) => course.id),
+    courseCodes: references.courses.slice(0, 3).map((course) => course.code),
+    departmentId,
+    instructorId: instructor.id,
+    offeringIds: offerings.map((offering) => offering.id),
+    programId: program.id,
     roomIds: rooms.map((room) => room.id),
     sectionId: section.id,
+    sessionCourseCodes: sessions.map((session) => session.courseCode),
+    sessionIds: sessions.map((session) => session.id),
+    sessionRoomIds: sessions.map((session) => session.roomId),
+    sessionTimeslotIds: sessions.map((session) => session.timeslotId),
     studentUserId,
     termId: term.id,
     timeslotIds: timeslots.map((slot) => slot.id),
@@ -222,6 +243,7 @@ async function request<T>(pathName: string, init: RequestInit) {
 }
 
 interface Resource { id: string }
+interface SessionResource extends Resource { courseCode: string; roomId: string; timeslotId: string }
 interface SetupReferences {
   universityId: string;
   courses: Array<{ id: string; code: string }>;
