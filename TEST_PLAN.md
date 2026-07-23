@@ -113,7 +113,7 @@ suite covers route protection, admin authorization, generated/published
 versions, exports, clone/move/pin/unpin/comparison, personal timetable privacy,
 CSV import validation, readiness blockers, and mobile overflow.
 
-The most recent run passed 19 tests with one desktop skip for the assertion
+The most recent run passed 31 tests with one desktop skip for the assertion
 that intentionally runs only in the mobile project. This is critical-path
 coverage, not the exhaustive journey matrix tracked in the AURA ledger.
 
@@ -126,7 +126,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```
 
 It starts an isolated PostgreSQL 17 cluster, verifies packaged application
-health at Flyway target V34, upgrades to V35, verifies health again, and cleans
+health at Flyway target V35, upgrades to V36, verifies health again, and cleans
 up local processes.
 
 ## AURA Exploratory Regression Reference
