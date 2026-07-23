@@ -39,6 +39,7 @@ import {
 } from "@/components/common";
 import {
   AuraImportPanel,
+  AuraOperationsPanel,
   AuraConstraintProfilePanel,
   AuraRegistrationPanel,
   AuraResolutionPanel,
@@ -593,6 +594,17 @@ export function AuraWorkbenchPage() {
         />
       ) : null}
 
+      {selectedTermId && currentUser?.university.id ? (
+        <AuraOperationsPanel
+          clashes={clashes}
+          onChanged={refreshAll}
+          sessions={sessions}
+          termId={selectedTermId}
+          universityId={currentUser.university.id}
+          versionId={selectedVersionId || undefined}
+        />
+      ) : null}
+
       {selectedTermId ? (
         <AuraConstraintProfilePanel
           onProfileChange={setGenerationProfile}
@@ -749,6 +761,7 @@ export function AuraWorkbenchPage() {
       </section>
 
       <AuraVersionTools
+        key={selectedVersionId}
         onChanged={refreshAll}
         onVersionSelected={setSelectedVersionId}
         selectedVersionId={selectedVersionId}
