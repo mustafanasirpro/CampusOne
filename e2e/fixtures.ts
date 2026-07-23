@@ -12,9 +12,18 @@ export const e2eUsers = {
 } as const;
 
 export interface AuraE2eFixture {
+  courseIds: string[];
   courseCodes: string[];
+  departmentId: string;
+  instructorId: string;
+  offeringIds: string[];
+  programId: string;
   roomIds: string[];
   sectionId: string;
+  sessionCourseCodes: string[];
+  sessionIds: string[];
+  sessionRoomIds: string[];
+  sessionTimeslotIds: string[];
   studentUserId: string;
   termId: string;
   timeslotIds: string[];
