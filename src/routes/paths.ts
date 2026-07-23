@@ -41,6 +41,7 @@ export const paths = {
   leaderboard: "/leaderboard",
   assistant: "/ai",
   timetable: "/timetable",
+  instructorTimetable: "/instructor-timetable",
   admin: "/admin",
   adminAura: "/admin/aura",
   settings: "/settings",
