@@ -8,6 +8,133 @@ export interface PageResponse<T> {
   totalPages: number;
 }
 
+export interface AuraMutationResult {
+  active: boolean;
+  id: string;
+  resourceType: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface AuraBuilding {
+  active: boolean;
+  code: string;
+  id: string;
+  minimumTransitionMinutes: number;
+  name: string;
+  version: number;
+}
+
+export interface AuraTeachingGroup {
+  active: boolean;
+  capacity: number | null;
+  code: string;
+  displayName: string;
+  groupType: "LECTURE" | "LAB" | "TUTORIAL";
+  id: string;
+  offeringId: string;
+  version: number;
+}
+
+export interface AuraOfferingConflict {
+  active: boolean;
+  id: string;
+  leftOfferingId: string;
+  reason: string;
+  rightOfferingId: string;
+  severity: "HARD" | "MEDIUM";
+  source: string;
+  termId: string;
+  version: number;
+}
+
+export interface AuraTravelRule {
+  active: boolean;
+  difficulty: "NORMAL" | "DIFFICULT" | "IMPOSSIBLE";
+  fromBuilding: string;
+  id: string;
+  minutes: number;
+  toBuilding: string;
+  version: number;
+}
+
+export interface AuraAuditEvent {
+  action: string;
+  actorName: string;
+  actorUserId: string;
+  correlationId: string;
+  createdAt: string;
+  id: string;
+  metadata: Record<string, unknown>;
+  result: string;
+  summary: string;
+  targetId: string | null;
+  targetType: string;
+  termId: string | null;
+}
+
+export interface AuraScopedTimetable {
+  scopeId: string | null;
+  scopeLabel: string;
+  scopeType: string;
+  sessions: AuraSession[];
+  termId: string;
+  versionId: string;
+}
+
+export interface AuraAnalytics {
+  averageRepairDisruption: number;
+  averageRoomCapacityUtilization: number;
+  buildingUtilization: Record<string, number>;
+  clashesByType: Record<string, number>;
+  impossibleRequirements: number;
+  instructorLoads: Record<string, number>;
+  repairPlans: number;
+  roomUtilization: Record<string, number>;
+  sectionLoads: Record<string, number>;
+  sessionsByDay: Record<string, number>;
+  termId: string;
+  unresolvedClashes: number;
+  versionId: string;
+}
+
+export interface AuraRepairMove {
+  affectedStudents: number;
+  disruptionScore: number;
+  originalRoomId: string;
+  originalTimeslotId: string;
+  proposedRoomId: string;
+  proposedTimeslotId: string;
+  sessionId: string;
+}
+
+export interface AuraRepairPlan {
+  appliedAt: string | null;
+  draftVersionId: string;
+  expiresAt: string;
+  feasible: boolean;
+  id: string;
+  impact: {
+    clashesResolved: number;
+    dayChanges: number;
+    disruptionScore: number;
+    instructorsAffected: number;
+    newClashes: number;
+    roomChanges: number;
+    sectionsAffected: number;
+    sessionsMoved: number;
+    studentsAffected: number;
+    timeChanges: number;
+  };
+  message: string;
+  previewToken: string | null;
+  proposedMoves: AuraRepairMove[];
+  sourceVersionId: string;
+  status: string;
+  triggerId: string;
+  triggerType: string;
+}
+
 export interface AuraTerm {
   code: string;
   createdAt: string;
@@ -18,6 +145,7 @@ export interface AuraTerm {
   status: string;
   universityId: string;
   updatedAt: string;
+  version: number;
 }
 
 export interface AuraProgram {
@@ -27,6 +155,7 @@ export interface AuraProgram {
   id: string;
   name: string;
   universityId: string;
+  version: number;
 }
 
 export interface AuraBatch {
@@ -35,6 +164,7 @@ export interface AuraBatch {
   code: string;
   id: string;
   programId: string;
+  version: number;
 }
 
 export interface AuraSection {
@@ -44,6 +174,7 @@ export interface AuraSection {
   displayName: string;
   id: string;
   studentCount: number;
+  version: number;
 }
 
 export interface AuraSetupReference {
@@ -180,6 +311,7 @@ export interface AuraRoom {
   name: string;
   roomType: string;
   universityId: string;
+  version: number;
 }
 
 export interface AuraTimeslot {
@@ -190,6 +322,7 @@ export interface AuraTimeslot {
   label: string;
   startsAt: string;
   universityId: string;
+  version: number;
 }
 
 export type AuraAvailabilityType =
@@ -218,6 +351,7 @@ export interface AuraInstructor {
   maxHoursPerWeek: number;
   universityId: string;
   userId: string | null;
+  version: number;
 }
 
 export interface AuraOffering {
@@ -232,6 +366,7 @@ export interface AuraOffering {
   sectionName: string;
   status: string;
   termId: string;
+  version: number;
 }
 
 export interface AuraMeetingRequirement {
@@ -244,6 +379,7 @@ export interface AuraMeetingRequirement {
   requiredFacilities: string[];
   roomType: string;
   sessionsPerWeek: number;
+  version: number;
 }
 
 export interface AuraReadinessIssue {
@@ -428,6 +564,8 @@ export interface AuraWhatIfResult {
 export interface AuraEmergencyRepair {
   affectedResourceId: string;
   affectedSessions: number;
+  message: string;
+  reassignedSessions: number;
   createdAt: string;
   draftVersionId: string | null;
   emergencyType: string;
