@@ -116,6 +116,16 @@ when creating an academic term, where the backend still verifies admin access.
 | `GET` | `/terms/{termId}/calendar-exceptions` | List term calendar exceptions. |
 | `PATCH` | `/calendar-exceptions/{exceptionId}` | Update an active exception with optimistic locking. |
 | `DELETE` | `/calendar-exceptions/{exceptionId}?version={version}` | Deactivate an exception. |
+| `PATCH` | `/{resourceType}/{id}/active-state` | Activate or deactivate a supported scoped setup resource. |
+| `PATCH` | `/terms/{id}` | Update/archive a term with optimistic locking. |
+| `PATCH` | `/programs/{id}`, `/batches/{id}`, `/sections/{id}` | Update core academic setup resources. |
+| `PATCH` | `/instructors/{id}`, `/rooms/{id}`, `/timeslots/{id}` | Update resource setup and active state. |
+| `PATCH` | `/offerings/{id}`, `/meeting-requirements/{id}` | Update offering and lesson requirements. |
+| `POST/GET/PATCH` | `/buildings`, `/buildings/{id}` | Manage university buildings. |
+| `POST/GET/PATCH` | `/teaching-groups`, `/terms/{termId}/teaching-groups`, `/teaching-groups/{id}` | Manage lecture/lab/tutorial teaching groups. |
+| `POST/GET` | `/student-availability`, `/terms/{termId}/student-availability` | Upsert and list scoped student availability. |
+| `POST/GET/PATCH` | `/offering-conflicts`, `/terms/{termId}/offering-conflicts`, `/offering-conflicts/{id}` | Manage hard/medium offering conflicts. |
+| `POST/GET/PATCH` | `/travel-rules`, `/travel-rules/{id}` | Manage building travel-time rules. |
 
 ### Generation and review
 
@@ -138,8 +148,14 @@ when creating an academic term, where the backend still verifies admin access.
 | `POST` | `/versions/{versionId}/clone` | Clone a version into an editable draft. |
 | `GET` | `/versions/{versionId}/compare/{otherVersionId}` | Compare stable occurrences across two versions. |
 | `POST` | `/versions/{versionId}/archive` | Archive an editable draft. |
-| `GET` | `/versions/{versionId}/export?format={format}` | Export CSV, XLSX, JSON, HTML, or ICS. |
+| `GET` | `/versions/{versionId}/export?format={format}` | Export CSV, XLSX, PDF, JSON, printable HTML, or ICS. |
 | `GET` | `/terms/{termId}/metrics` | Return aggregate generation/version/clash metrics for admin dashboards. |
+| `POST` | `/versions/{versionId}/repair-preview` | Create a bounded, tokenized localized-repair preview from a clash or session. |
+| `POST` | `/repair-plans/{planId}/apply` | Atomically apply a current repair preview to its isolated draft. |
+| `GET` | `/repair-plans/{planId}` | Read an authorized repair plan without exposing its stored hash. |
+| `GET` | `/versions/{versionId}/timetable-view` | Query sessions by instructor, section, room, course, offering, program, department, day, or week. |
+| `GET` | `/terms/{termId}/analytics` | Read persisted university-scoped utilization, load, clash, repair, and audit summaries. |
+| `GET` | `/audit` | Read paginated university-scoped AURA audit events with supported filters. |
 
 ### Imports, registration, and scenarios
 
@@ -156,8 +172,9 @@ when creating an academic term, where the backend still verifies admin access.
 
 Authenticated student endpoints use the separate `/api/v1/aura` base path:
 `/capabilities`, `/terms`, `/me/registrations`, `/me/timetable`, `/me/timetable.ics`, and
-`/me/resolution-cases`. Student identity and university are always derived from
-the JWT-backed profile.
+`/me/resolution-cases`. A linked instructor uses
+`GET /api/v1/aura/me/instructor-timetable?termId={termId}`. Student/instructor
+identity and university are always derived from the JWT-backed profile.
 
 Generation requests may select a profile and seed. The backend persists the
 effective profile, seed, scheduling revision, and deterministic input checksum
