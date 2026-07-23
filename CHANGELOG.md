@@ -4,6 +4,15 @@
 
 ### Added
 
+- AURA operations and reliability completion slice:
+  - append-only V36 schema for buildings, teaching groups, offering conflicts, travel rules, localized repair plans, and audit events;
+  - activate/deactivate and update APIs for setup resources;
+  - bounded tokenized localized-repair preview/apply with stale-input protection;
+  - current-published-version emergency room/timeslot reassignment into isolated drafts;
+  - linked-instructor and administrator-scoped timetable views;
+  - persisted utilization/load/clash analytics and university-scoped audit history;
+  - expanded Vitest and PostgreSQL-backed desktop/mobile Playwright coverage.
+
 - Native Lost & Found module:
   - authenticated browse, submit, detail, edit, owner lifecycle actions, claims, matches, and admin statistics;
   - PostgreSQL/Flyway schema for items, images, claims, and deterministic matches;
