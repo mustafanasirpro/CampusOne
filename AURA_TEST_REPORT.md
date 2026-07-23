@@ -1,46 +1,55 @@
 # AURA Verification Report
 
-This report records locally reproduced evidence for the current AURA implementation. It separates passing gates from product scope that remains incomplete in the [completion ledger](AURA_COMPLETION_LEDGER.md).
+This report records reproduced local evidence for the current AURA implementation as of 2026-07-22. Product requirements that remain incomplete are kept separate in [AURA_COMPLETION_LEDGER.md](AURA_COMPLETION_LEDGER.md).
 
-## Verification snapshot
+## Final gate snapshot
 
 | Check | Result | Evidence |
 |---|---|---|
-| Backend verification | Passed | `mvn clean verify`: 590 tests, 0 failures, 0 errors, 13 skipped |
-| AURA backend tests | Passed | 81 tests, 0 failures, 0 errors, 1 Docker-gated skip |
+| Backend verification | Passed | `mvn clean verify`: 607 tests, 0 failures, 0 errors, 13 skipped |
+| AURA backend tests | Passed | 98 tests, 0 failures, 0 errors, 1 Docker-gated skip |
 | Frontend lint | Passed | `npm run lint` |
-| Frontend production build | Passed | `npm run build` |
-| Frontend component tests | Passed | `npm run test`: 5 files, 11 tests |
-| Browser E2E | Passed for implemented suite | `npm run test:e2e`: 19 passed, 0 failed, 1 desktop skip for the mobile-only assertion |
-| PostgreSQL/Flyway | Passed | PostgreSQL 17.10; fresh V1–V35 and V34→V35 upgrade verified |
-| Packaged application startup | Passed | Flyway validation, JPA initialization, Tomcat startup, and health check succeeded |
+| Frontend production build | Passed | `npm run build` (`tsc -b && vite build`) |
+| Frontend component tests | Passed | `npm run test`: 8 files, 15 tests |
+| Browser E2E | Passed for the implemented suite | `npm run test:e2e`: 31 passed, 0 failed, 1 intentional desktop skip for a mobile-only assertion |
+| PostgreSQL/Flyway fresh path | Passed | PostgreSQL 17.10; packaged application applied V1–V36 and became healthy |
+| PostgreSQL/Flyway upgrade path | Passed | `UPGRADE_FROM=35 UPGRADE_TO=36 HEALTH=PASS` |
 | Render/Vercel | Not performed | Deployment and remote changes were not authorized |
 
-## Behavior verified
+## PostgreSQL-backed runtime coverage
 
-- Admin authorization is derived from the authenticated role and university; student access to `/api/v1/admin/aura/**` is rejected.
-- Readiness returns structured blockers and prevents generation for an incomplete term.
-- Generation uses persisted PostgreSQL scheduling facts, a selected constraint profile, a deterministic seed, and a deterministic input checksum.
-- A complete generated result is persisted atomically only for an active, current-revision run.
-- Published versions remain immutable; CSV export produces a download.
-- A published version can be cloned to a draft, selected immediately, previewed, safely moved, pinned, unpinned, and compared.
-- Personal timetables expose only the authenticated student's published schedule.
-- Empty imports fail with an actionable message; valid CSV imports reach preview and row validation.
-- The browser harness starts the packaged Spring Boot application against an isolated PostgreSQL database and exercises desktop and mobile projects.
+The Playwright harness created a disposable PostgreSQL 17 database, packaged and started the real Spring Boot application, applied all migrations through V36, validated Hibernate/JPA, started Tomcat, created deterministic users and scheduling data, and ran the real Vite frontend. The suite exercised:
 
-## PostgreSQL evidence
+- unauthenticated redirects and student/admin authorization boundaries;
+- readiness, selected constraint profiles, Timefold generation, score/session persistence, and publication;
+- published immutability, draft clone, move preview/apply, pin/unpin, version comparison, and CSV download;
+- student and linked-instructor personal timetables;
+- administrator queries for instructor, section, room, course, offering, program, department, day, and week scopes, including guessed-ID rejection;
+- building, teaching-group, offering-conflict, travel-rule, and active-state operations;
+- persisted analytics and audit rendering;
+- regeneration/publication after scheduling-input mutations;
+- current-version emergency room reassignment and bounded localized-repair preview/apply;
+- CSV import validation, readiness blockers, empty/error states, and mobile usability.
 
-The local PostgreSQL 17.10 cluster applied all 35 successful Flyway migrations through `V35__add_aura_generation_profiles.sql`. The packaged application initialized Hibernate/JPA and embedded Tomcat. A separate pre-V35 database was migrated from V34 to V35 without modifying prior migrations.
+## Reliability defects reproduced and corrected
 
-The authenticated runtime fixture completed one generation run and persisted timetable versions and sessions. Browser tests then exercised readiness, version workflows, import validation, export, personal timetable access, and admin/student authorization boundaries.
+- A program-scoped timetable SQL predicate had a missing closing parenthesis. PostgreSQL runtime coverage reproduced it; the query is corrected and all scoped dimensions now pass.
+- Dynamic emergency-resource SQL concatenation could produce `ANDroom_id`. Resource columns are allow-listed and formatted with explicit whitespace; repository tests protect every supported resource column.
+- Instructor term loading and timetable loading shared one flag, causing a request race. Separate loading state and selection handling now prevent stale rendering.
+- Published operational input changes correctly made the prior version stale, but the E2E workflow tried to repair it. The workflow now regenerates/publishes current data, and emergency repair now rejects stale published sources rather than cloning old sessions under a current revision.
+- Scenario controls could retain a draft selected by an earlier mutation while an emergency request referenced the published source. The UI now requires and selects the published version explicitly.
+- Move E2E data assumed stable cloned session IDs. It now resolves cloned sessions by stable course identity and verifies a deterministic safe room move.
 
 ## Skipped tests
 
-The AURA-specific skip is `AuraDefaultProfileStartupIntegrationTest`, guarded by Testcontainers because Docker is unavailable. Equivalent startup and migration coverage ran directly against local PostgreSQL. Twelve additional existing integration tests from other CampusOne modules are also Docker-gated.
+The only AURA skip is `AuraDefaultProfileStartupIntegrationTest`, guarded by Testcontainers because Docker Desktop is unavailable. Its required behavior is independently covered by the packaged-application PostgreSQL 17 fresh and V35→V36 upgrade runs. Twelve existing tests in other modules are also Docker-gated.
 
-## Remaining verification gaps
+## Solver evidence
 
-- The completion ledger still identifies genuine product gaps, including exhaustive setup lifecycle screens, complete independent clash-detector parity, automatic localized repair, instructor timetable views, and the full deterministic backtest matrix.
-- The current Playwright suite covers critical connected flows but not every requested browser journey.
-- The 5,000-occurrence run completed with zero hard score but used substantial memory; see [AURA_BENCHMARK_REPORT.md](AURA_BENCHMARK_REPORT.md).
-- Production deployment and Render/Vercel smoke verification were not performed.
+The previously measured deterministic 300, 1,000, and 5,000 occurrence cases remain valid because this pass did not change solver construction or constraints. Each completed with `0hard/0medium/0soft`; exact timing and memory observations are in [AURA_BENCHMARK_REPORT.md](AURA_BENCHMARK_REPORT.md).
+
+## Known verification limits
+
+- The Playwright suite is materially expanded but does not cover every journey in the requested exhaustive matrix (notably all import formats, every setup update form, all exports, notifications, no-solution repairs, and all publication failure paths).
+- The deterministic solver/repair scenario matrix and non-generation performance benchmarks remain incomplete.
+- Production deployment and remote smoke testing were explicitly prohibited.
