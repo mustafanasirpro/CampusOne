@@ -126,7 +126,11 @@ try {
     Push-Location $root
     try {
         Write-Host "[AURA E2E] Running Playwright"
-        & npx.cmd playwright test --config=playwright.config.ts
+        $playwrightArguments = @("playwright", "test", "--config=playwright.config.ts")
+        if (-not [string]::IsNullOrWhiteSpace($env:PLAYWRIGHT_GREP)) {
+            $playwrightArguments += @("--grep", $env:PLAYWRIGHT_GREP)
+        }
+        & npx.cmd @playwrightArguments
         $exitCode = $LASTEXITCODE
     } finally { Pop-Location }
 } finally {
