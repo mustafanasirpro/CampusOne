@@ -36,4 +36,8 @@
 | Profiles | Keep validated university-scoped weights in PostgreSQL; provide balanced, compact, room-efficient, instructor-friendly, and repair defaults. |
 | Authorization | Derive admin capability and university scope from the authenticated backend identity; never trust client-supplied scope. |
 | Version safety | Persist only complete current-revision runs, keep published schedules immutable, and edit through cloned drafts. |
+| Localized repair | Preview bounded repairs in an isolated draft, store only a hash of the expiring apply token, revalidate source/input revisions at apply time, and never mutate the published source. |
+| Emergency repair | Start only from the current published version, pin unaffected sessions, apply supported room/timeslot reassignments atomically to a review draft, and return a structured failure when no complete safe reassignment exists. |
+| Timetable views | Query only the requested university-scoped dimension; derive student and instructor personal identities from authentication rather than accepting trusted IDs. |
+| Dynamic SQL | Permit dynamic resource columns only through fixed internal enum/allow-list mappings; all user values remain bound parameters. |
 | Verification | Use local PostgreSQL 17 for migration/runtime checks when Docker is unavailable and Playwright for browser-visible critical workflows. |
