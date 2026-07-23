@@ -5,3 +5,4 @@ export { AuraVersionTools } from "./AuraVersionTools";
 export { AuraConstraintProfilePanel } from "./AuraConstraintProfilePanel";
 export { AuraResolutionPanel } from "./AuraResolutionPanel";
 export { AuraScenarioPanel } from "./AuraScenarioPanel";
+export { AuraOperationsPanel } from "./AuraOperationsPanel";
