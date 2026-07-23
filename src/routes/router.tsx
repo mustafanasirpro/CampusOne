@@ -185,6 +185,11 @@ const PersonalTimetablePage = lazy(async () => {
   return { default: module.PersonalTimetablePage };
 });
 
+const InstructorTimetablePage = lazy(async () => {
+  const module = await import("@/pages/InstructorTimetablePage");
+  return { default: module.InstructorTimetablePage };
+});
+
 const ForgotPasswordPage = lazy(async () => {
   const module = await import("@/pages/ForgotPasswordPage");
   return { default: module.ForgotPasswordPage };
@@ -416,6 +421,13 @@ export const router = createBrowserRouter([
           {
             path: paths.timetable,
             element: lazyRoute(<PersonalTimetablePage />, paths.timetable),
+          },
+          {
+            path: paths.instructorTimetable,
+            element: lazyRoute(
+              <InstructorTimetablePage />,
+              paths.instructorTimetable,
+            ),
           },
           {
             path: paths.settings,
