@@ -43,6 +43,9 @@ The backend is a modular Spring Boot API for CampusOne:
 - AURA student registrations, personal timetables, ICS export, resolution
   cases, stale-safe generation persistence/publication, safe moves/swaps,
   scenarios, comparison, notifications, and multi-format exports
+- AURA operational rules, scoped administrator timetable views, linked-instructor
+  timetable access, bounded localized repair, room/timeslot emergency reassignment,
+  utilization/load analytics, and university-scoped audit history
 - Java 21 development environment
 - Maven build and test pipeline
 - JWT configuration validation
@@ -52,8 +55,8 @@ The backend is a modular Spring Boot API for CampusOne:
 
 - Multi-session management
 - Email Verification
-- AURA automatic localized repair, complete analytics, exhaustive browser
-  journey coverage, and instructor timetable views
+- AURA multi-session localized repair, complete analytics/audit/notification
+  coverage, exhaustive browser journeys, and remaining setup lifecycle parity
 
 ## Requirements
 
@@ -342,8 +345,8 @@ set `APP_CORS_ALLOWED_ORIGINS` to the exact deployed frontend origins.
 mvn clean verify
 ```
 
-The latest verified local run completed 590 tests with no failures or errors
-and 13 Docker-gated skips. AURA migrations V1–V35, packaged startup, and
+The latest verified local run completed 607 tests with no failures or errors
+and 13 Docker-gated skips. AURA migrations V1–V36, packaged startup, and
 authenticated critical workflows were also exercised on PostgreSQL 17.10; see
 the repository-level `AURA_TEST_REPORT.md`.
 
