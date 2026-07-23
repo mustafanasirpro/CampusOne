@@ -78,6 +78,8 @@ Tables:
 | `aura_generation_runs` | Asynchronous solver run history and status. |
 | `aura_timetable_versions`, `aura_scheduled_sessions` | Generated timetable versions and assigned sessions. |
 | `aura_clashes`, `aura_resolution_suggestions`, `aura_manual_moves` | Persisted clash detection, repair suggestions, and manual move audit records. |
+| `aura_buildings`, `aura_teaching_groups`, `aura_offering_conflicts`, `aura_building_travel_times` | University-scoped operational scheduling policy and teaching-group data. |
+| `aura_repair_plans`, `aura_audit_events` | Tokenized localized-repair previews and sanitized university-scoped audit history. |
 
 AURA uses Spring JDBC DTO mapping rather than Hibernate entities, so these
 tables are not part of JPA schema validation. Foreign keys point to existing
@@ -101,6 +103,8 @@ Additive AURA migrations:
 - `V34` completes scheduling-input revision triggers across AURA input tables.
 - `V35` adds university-scoped generation constraint profiles, selected profile
   metadata, deterministic solver seeds, and input checksums.
+- `V36` adds buildings, teaching groups, offering conflicts, travel rules,
+  localized-repair plans, audit events, supporting indexes, and revision triggers.
 
-PostgreSQL 17.10 was used to verify a clean V1–V35 migration and a V34→V35
+PostgreSQL 17.10 was used to verify a clean V1–V36 migration and a V35→V36
 upgrade. Prior migrations were not modified.
