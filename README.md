@@ -414,13 +414,16 @@ use the returned bearer token in Swagger UI.
 AURA currently ships as an admin timetable-generation workbench with normalized
 setup records, readiness checks, Timefold-powered draft generation, timetable
 versions, independent hard-clash detection, manual move/swap/pin controls,
-metrics, comparison, exports, and publication controls. CSV, XLSX, XLS, and
+bounded localized repair, emergency room/timeslot reassignment, operational
+rules, scoped timetable views, analytics, audit, comparison, exports, and
+publication controls. CSV, XLSX, XLS, and
 text-PDF imports support preview, mapping, validation, and atomic apply.
 Authenticated students have scoped registrations, personal week timetables,
 ICS export, clash indicators, and resolution requests. Generation persistence
 and publication use term-revision and optimistic-state guards so stale solver
 results cannot replace current scheduling data. The completion ledger
-tracks the remaining full CRUD, automatic repair, analytics, fixture,
+tracks the remaining full lifecycle parity, multi-session repair, complete
+analytics/audit/notification coverage, fixture,
 browser-E2E, and production-deployment gates without overstating them; the
 latest local evidence is recorded in [AURA_TEST_REPORT.md](AURA_TEST_REPORT.md).
 
