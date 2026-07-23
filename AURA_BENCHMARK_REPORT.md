@@ -1,6 +1,6 @@
 # AURA Solver Benchmark Report
 
-Measured locally on 2026-07-20 using Java 21 and Timefold Solver Community Edition. These figures describe this machine and synthetic deterministic inputs; they are not production capacity guarantees.
+Measured locally on 2026-07-20 using Java 21 and Timefold Solver Community Edition and retained after the 2026-07-22 completion pass. The later pass did not change solver construction or constraints, and the full solver regression suite remained green. These figures describe this machine and synthetic deterministic inputs; they are not production capacity guarantees.
 
 ## Results
 
@@ -27,4 +27,4 @@ mvn -Dtest=AuraSolverPerformanceTest `
   -Daura.benchmark.seconds=2 test
 ```
 
-The benchmark records actual elapsed time, score, and process-memory observations. It does not fabricate utilization, student-gap, or repair metrics; those remain open in the completion ledger.
+The benchmark records actual elapsed time, score, and process-memory observations. It does not fabricate utilization, student-gap, query, import, clash-detection, or repair benchmark metrics; those remain open in the completion ledger and prevent full performance acceptance.
