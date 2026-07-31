@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
@@ -71,10 +72,14 @@ public final class AuraRegistrationDtos {
             String registrationType,
             String weekPattern,
             List<Integer> customWeeks,
+            List<LocalDate> cancelledDates,
             boolean personalClash) {
 
         public PersonalTimetableEntry {
             customWeeks = customWeeks == null ? List.of() : List.copyOf(customWeeks);
+            cancelledDates = cancelledDates == null
+                    ? List.of()
+                    : List.copyOf(cancelledDates);
         }
 
         public PersonalTimetableEntry(
@@ -94,7 +99,29 @@ public final class AuraRegistrationDtos {
                     sessionId, offeringId, courseCode, courseTitle,
                     instructorName, sectionName, roomName, dayOfWeek,
                     startsAt, endsAt, registrationType, "EVERY_WEEK",
-                    List.of(), personalClash);
+                    List.of(), List.of(), personalClash);
+        }
+
+        public PersonalTimetableEntry(
+                UUID sessionId,
+                UUID offeringId,
+                String courseCode,
+                String courseTitle,
+                String instructorName,
+                String sectionName,
+                String roomName,
+                int dayOfWeek,
+                LocalTime startsAt,
+                LocalTime endsAt,
+                String registrationType,
+                String weekPattern,
+                List<Integer> customWeeks,
+                boolean personalClash) {
+            this(
+                    sessionId, offeringId, courseCode, courseTitle,
+                    instructorName, sectionName, roomName, dayOfWeek,
+                    startsAt, endsAt, registrationType, weekPattern,
+                    customWeeks, List.of(), personalClash);
         }
 
         public PersonalTimetableEntry withPersonalClash(boolean clash) {
@@ -112,6 +139,7 @@ public final class AuraRegistrationDtos {
                     registrationType,
                     weekPattern,
                     customWeeks,
+                    cancelledDates,
                     clash);
         }
     }
