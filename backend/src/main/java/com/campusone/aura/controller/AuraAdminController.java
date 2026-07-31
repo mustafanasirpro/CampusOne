@@ -523,6 +523,16 @@ public class AuraAdminController {
                 principal.getUserId(), versionId, request));
     }
 
+    @PostMapping("/versions/{versionId}/rollback-draft")
+    @Operation(summary = "Create a revalidated rollback draft from a historical version")
+    public ResponseEntity<TimetableVersionResponse> createRollbackDraft(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID versionId,
+            @Valid @RequestBody AuraDtos.CloneVersionRequest request) {
+        return ResponseEntity.ok(auraService.createRollbackDraft(
+                principal.getUserId(), versionId, request));
+    }
+
     @GetMapping("/versions/{versionId}/compare/{otherVersionId}")
     @Operation(summary = "Compare two timetable versions from the same term")
     public ResponseEntity<AuraDtos.VersionComparisonResponse> compareVersions(
