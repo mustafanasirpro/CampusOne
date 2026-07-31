@@ -307,7 +307,25 @@ public final class AuraOperationsDtos {
             long unresolvedClashes,
             long impossibleRequirements,
             long repairPlans,
-            double averageRepairDisruption) {
+            double averageRepairDisruption,
+            double averageStudentGapMinutes,
+            double averageInstructorGapMinutes,
+            double averageSectionGapMinutes,
+            double instructorLoadVariance,
+            double sectionLoadVariance,
+            double undesirableSlotFairnessVariance,
+            double averageTravelMinutes,
+            int generationCandidates,
+            long generationSeed,
+            int generationDurationSeconds,
+            Map<String, Long> hardClashTrend,
+            Map<String, Long> bottlenecks) {
+        public AnalyticsResponse {
+            hardClashTrend = hardClashTrend == null
+                    ? Map.of() : Map.copyOf(hardClashTrend);
+            bottlenecks = bottlenecks == null
+                    ? Map.of() : Map.copyOf(bottlenecks);
+        }
     }
 
     public record ScopedTimetableResponse(
