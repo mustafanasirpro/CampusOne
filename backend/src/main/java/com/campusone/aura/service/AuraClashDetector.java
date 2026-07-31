@@ -4,6 +4,7 @@ import com.campusone.aura.dto.AuraDtos.SessionResponse;
 import com.campusone.aura.repository.AuraJdbcRepository.DetectedClash;
 import com.campusone.aura.repository.AuraJdbcRepository.ClashDetectionContext;
 import com.campusone.aura.repository.AuraJdbcRepository.LinkageRule;
+import com.campusone.aura.repository.AuraJdbcRepository.TeachingGroupContext;
 import com.campusone.aura.repository.AuraJdbcRepository.TravelContextRule;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -75,7 +76,19 @@ public class AuraClashDetector {
                             left.id(), right.id()));
                 }
                 Set<UUID> sharedStudents = sharedStudents(left, right, resolvedContext);
-                if (overlaps && !sharedStudents.isEmpty()) {
+                boolean duplicateGroupAttendance = duplicateGroupAttendance(
+                        left, right, sharedStudents, resolvedContext);
+                if (duplicateGroupAttendance) {
+                    clashes.add(new DetectedClash(
+                            "DUPLICATE_TEACHING_GROUP_ATTENDANCE", "HARD",
+                            "A student is assigned to multiple parallel teaching groups.",
+                            left.id(), right.id(), "DUPLICATE_GROUP_ATTENDANCE",
+                            "Keep one compatible teaching group for each activity type.",
+                            sharedStudents.stream().sorted().toList(),
+                            List.of(), List.of(), List.of()));
+                }
+                if (overlaps && !sharedStudents.isEmpty()
+                        && !duplicateGroupAttendance) {
                     clashes.add(new DetectedClash(
                             "STUDENT_DOUBLE_BOOKED", "HARD",
                             "A registered student is assigned to overlapping sessions.",
@@ -231,6 +244,25 @@ public class AuraClashDetector {
         Set<UUID> shared = new java.util.HashSet<>(leftStudents);
         shared.retainAll(rightStudents);
         return Set.copyOf(shared);
+    }
+
+    private boolean duplicateGroupAttendance(
+            SessionResponse left,
+            SessionResponse right,
+            Set<UUID> sharedStudents,
+            ClashDetectionContext context) {
+        if (sharedStudents.isEmpty()
+                || !left.offeringId().equals(right.offeringId())) {
+            return false;
+        }
+        TeachingGroupContext leftGroup = context.teachingGroupBySession()
+                .get(left.id());
+        TeachingGroupContext rightGroup = context.teachingGroupBySession()
+                .get(right.id());
+        return leftGroup != null
+                && rightGroup != null
+                && leftGroup.meetingType().equals(rightGroup.meetingType())
+                && !leftGroup.groupId().equals(rightGroup.groupId());
     }
 
     private void detectLinkedOrdering(
