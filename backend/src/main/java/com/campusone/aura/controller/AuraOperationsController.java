@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -208,6 +209,16 @@ public class AuraOperationsController {
                     @RequestParam(required = false) UUID studentUserId) {
         return ResponseEntity.ok(service.listStudentAvailability(
                 principal.getUserId(), termId, studentUserId));
+    }
+
+    @DeleteMapping("/student-availability/{id}")
+    @Operation(summary = "Delete a student availability preference")
+    public ResponseEntity<Void> deleteStudentAvailability(
+            @AuthenticationPrincipal CampusOneUserPrincipal principal,
+            @PathVariable UUID id,
+            @RequestParam @Min(0) long version) {
+        service.deleteStudentAvailability(principal.getUserId(), id, version);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/offering-conflicts")
