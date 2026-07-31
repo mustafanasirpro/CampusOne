@@ -38,10 +38,13 @@ public class AuraOperationsService {
 
     private static final Set<String> TERM_STATUSES = Set.of("DRAFT", "READY", "ARCHIVED");
     private static final Set<String> ROOM_TYPES = Set.of(
-            "CLASSROOM", "LAB", "LECTURE_HALL", "SEMINAR_ROOM");
+            "CLASSROOM", "LAB", "LECTURE_HALL", "LECTURE_ROOM",
+            "COMPUTER_LAB", "SCIENCE_LAB", "SEMINAR_ROOM", "AUDITORIUM",
+            "STUDIO", "WORKSHOP", "ONLINE", "OTHER");
     private static final Set<String> SLOT_TYPES = Set.of("INSTRUCTIONAL", "BREAK");
     private static final Set<String> MEETING_TYPES = Set.of(
-            "LECTURE", "LAB", "TUTORIAL", "SEMINAR");
+            "LECTURE", "LAB", "TUTORIAL", "SEMINAR", "PROJECT",
+            "WORKSHOP", "ONLINE", "HYBRID", "OTHER");
     private static final Set<String> WEEK_PATTERNS = Set.of(
             "EVERY_WEEK", "ODD_WEEK", "EVEN_WEEK", "CUSTOM_WEEK_SET");
     private static final Set<String> AVAILABILITY_TYPES = Set.of(
@@ -391,6 +394,24 @@ public class AuraOperationsService {
             throw notFound("Student was not found.");
         }
         return repository.listStudentAvailability(termId, studentUserId);
+    }
+
+    @Transactional
+    public void deleteStudentAvailability(
+            UUID actorId,
+            UUID availabilityId,
+            long version) {
+        UUID universityId = adminUniversity(actorId);
+        UUID termId = repository.studentAvailabilityTerm(availabilityId, universityId)
+                .orElseThrow(() -> notFound("Student availability was not found."));
+        if (!repository.deleteStudentAvailability(
+                availabilityId, universityId, version)) {
+            throw stale();
+        }
+        audit(actorId, universityId, termId,
+                "STUDENT_AVAILABILITY_DELETED",
+                "STUDENT_AVAILABILITY",
+                availabilityId);
     }
 
     @Transactional
