@@ -14,6 +14,8 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @ConditionalOnProperty(
@@ -22,6 +24,9 @@ import org.springframework.stereotype.Service;
         havingValue = "true",
         matchIfMissing = true)
 public class AuraNotificationService {
+
+    private static final Logger LOG =
+            LoggerFactory.getLogger(AuraNotificationService.class);
 
     private final NotificationService notificationService;
     private final ModeratorRepository moderatorRepository;
@@ -56,14 +61,15 @@ public class AuraNotificationService {
                         .filter(user -> hasUniversity(user, universityId))
                         .ifPresent(user -> recipients.add(user.getId())));
         recipients.remove(excludedUserId);
-        notificationService.createBulkNotifications(
-                recipients,
-                NotificationType.AURA_UPDATE,
-                title,
-                message,
-                NotificationTargetType.AURA_RESOLUTION,
-                targetId,
-                "/admin/aura");
+        safelyDispatch(targetId, () ->
+                notificationService.createBulkNotifications(
+                        recipients,
+                        NotificationType.AURA_UPDATE,
+                        title,
+                        message,
+                        NotificationTargetType.AURA_RESOLUTION,
+                        targetId,
+                        "/admin/aura"));
     }
 
     public void notifyStudent(
@@ -71,14 +77,15 @@ public class AuraNotificationService {
             String title,
             String message,
             UUID targetId) {
-        notificationService.createNotification(
-                studentUserId,
-                NotificationType.AURA_UPDATE,
-                title,
-                message,
-                NotificationTargetType.AURA_RESOLUTION,
-                targetId,
-                "/timetable");
+        safelyDispatch(targetId, () ->
+                notificationService.createNotification(
+                        studentUserId,
+                        NotificationType.AURA_UPDATE,
+                        title,
+                        message,
+                        NotificationTargetType.AURA_RESOLUTION,
+                        targetId,
+                        "/timetable"));
     }
 
     public void notifyTimetablePublished(
@@ -88,14 +95,44 @@ public class AuraNotificationService {
         LinkedHashSet<UUID> recipients = new LinkedHashSet<>();
         studentUserIds.forEach(recipients::add);
         recipients.remove(actorUserId);
-        notificationService.createBulkNotifications(
-                recipients,
-                NotificationType.AURA_UPDATE,
-                "A new timetable is available",
-                "Your latest university timetable is ready to view.",
-                NotificationTargetType.AURA_TIMETABLE,
-                versionId,
-                "/timetable");
+        safelyDispatch(versionId, () ->
+                notificationService.createBulkNotifications(
+                        recipients,
+                        NotificationType.AURA_UPDATE,
+                        "A new timetable is available",
+                        "Your latest university timetable is ready to view.",
+                        NotificationTargetType.AURA_TIMETABLE,
+                        versionId,
+                        "/timetable"));
+    }
+
+    public void notifyInstructorsTimetablePublished(
+            Iterable<UUID> instructorUserIds,
+            UUID actorUserId,
+            UUID versionId) {
+        LinkedHashSet<UUID> recipients = new LinkedHashSet<>();
+        instructorUserIds.forEach(recipients::add);
+        recipients.remove(actorUserId);
+        safelyDispatch(versionId, () ->
+                notificationService.createBulkNotifications(
+                        recipients,
+                        NotificationType.AURA_UPDATE,
+                        "Your teaching timetable is available",
+                        "The latest published teaching timetable is ready to view.",
+                        NotificationTargetType.AURA_TIMETABLE,
+                        versionId,
+                        "/instructor-timetable"));
+    }
+
+    private void safelyDispatch(UUID targetId, Runnable dispatch) {
+        try {
+            dispatch.run();
+        } catch (RuntimeException exception) {
+            LOG.warn(
+                    "AURA notification delivery failed safely for target {}: {}",
+                    targetId,
+                    exception.getClass().getSimpleName());
+        }
     }
 
     private boolean hasUniversity(
