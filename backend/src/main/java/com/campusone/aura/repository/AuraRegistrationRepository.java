@@ -7,7 +7,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -96,6 +98,160 @@ public class AuraRegistrationRepository {
                 .addValue("groupId", groupId)
                 .addValue("offeringId", offeringId)
                 .addValue("groupType", groupType), Boolean.class));
+    }
+
+    public boolean registrationGroupsComplete(
+            UUID offeringId,
+            UUID lectureGroupId,
+            UUID labGroupId,
+            UUID tutorialGroupId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT NOT EXISTS (
+                  SELECT 1
+                  FROM aura_meeting_requirements requirement
+                  WHERE requirement.offering_id = :offeringId
+                    AND requirement.active = TRUE
+                    AND requirement.teaching_group_id IS NOT NULL
+                    AND (requirement.meeting_type = 'LECTURE'
+                          AND CAST(:lectureGroupId AS UUID) IS NULL
+                      OR requirement.meeting_type = 'LAB'
+                          AND CAST(:labGroupId AS UUID) IS NULL
+                      OR requirement.meeting_type = 'TUTORIAL'
+                          AND CAST(:tutorialGroupId AS UUID) IS NULL)
+                )
+                """, params()
+                .addValue("offeringId", offeringId)
+                .addValue("lectureGroupId", lectureGroupId)
+                .addValue("labGroupId", labGroupId)
+                .addValue("tutorialGroupId", tutorialGroupId), Boolean.class));
+    }
+
+    public boolean hasActiveParallelRegistration(
+            UUID termId,
+            UUID studentUserId,
+            UUID offeringId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM aura_course_offerings candidate
+                  JOIN aura_course_offerings existing
+                    ON existing.term_id = candidate.term_id
+                   AND existing.id <> candidate.id
+                   AND candidate.parallel_group IS NOT NULL
+                   AND LOWER(existing.parallel_group) =
+                     LOWER(candidate.parallel_group)
+                  JOIN aura_student_course_registrations registration
+                    ON registration.offering_id = existing.id
+                   AND registration.term_id = candidate.term_id
+                   AND registration.student_user_id = :studentUserId
+                   AND registration.status IN ('ACTIVE', 'PENDING')
+                  WHERE candidate.id = :offeringId
+                    AND candidate.term_id = :termId
+                )
+                """, params()
+                .addValue("termId", termId)
+                .addValue("studentUserId", studentUserId)
+                .addValue("offeringId", offeringId), Boolean.class));
+    }
+
+    public void lockRegistrationCapacity(
+            UUID offeringId,
+            Collection<UUID> teachingGroupIds) {
+        jdbc.queryForObject("""
+                SELECT id
+                FROM aura_course_offerings
+                WHERE id = :offeringId
+                FOR UPDATE
+                """, params().addValue("offeringId", offeringId), UUID.class);
+        List<UUID> groupIds = teachingGroupIds == null
+                ? List.of()
+                : teachingGroupIds.stream().filter(java.util.Objects::nonNull).toList();
+        if (!groupIds.isEmpty()) {
+            jdbc.query("""
+                    SELECT id
+                    FROM aura_teaching_groups
+                    WHERE id IN (:groupIds)
+                    ORDER BY id
+                    FOR UPDATE
+                    """, params().addValue("groupIds", groupIds),
+                    (rs, rowNum) -> uuid(rs, "id"));
+        }
+    }
+
+    public boolean registrationCapacityAvailable(
+            UUID offeringId,
+            UUID lectureGroupId,
+            UUID labGroupId,
+            UUID tutorialGroupId,
+            UUID excludedRegistrationId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT
+                  (offering.maximum_enrollment IS NULL OR
+                    (SELECT COUNT(*)
+                     FROM aura_student_course_registrations registration
+                     WHERE registration.offering_id = offering.id
+                       AND registration.status IN ('ACTIVE', 'PENDING')
+                       AND (CAST(:excludedRegistrationId AS UUID) IS NULL
+                         OR registration.id <> :excludedRegistrationId))
+                    < offering.maximum_enrollment)
+                  AND NOT EXISTS (
+                    SELECT 1
+                    FROM aura_teaching_groups teaching_group
+                    WHERE teaching_group.id IN (
+                        :lectureGroupId, :labGroupId, :tutorialGroupId)
+                      AND teaching_group.capacity IS NOT NULL
+                      AND (SELECT COUNT(*)
+                           FROM aura_student_course_registrations registration
+                           WHERE registration.status IN ('ACTIVE', 'PENDING')
+                             AND (CAST(:excludedRegistrationId AS UUID) IS NULL
+                               OR registration.id <> :excludedRegistrationId)
+                             AND (registration.lecture_group_id =
+                                    teaching_group.id
+                               OR registration.lab_group_id =
+                                    teaching_group.id
+                               OR registration.tutorial_group_id =
+                                    teaching_group.id))
+                          >= teaching_group.capacity)
+                FROM aura_course_offerings offering
+                WHERE offering.id = :offeringId
+                """, params()
+                .addValue("offeringId", offeringId)
+                .addValue("lectureGroupId", lectureGroupId)
+                .addValue("labGroupId", labGroupId)
+                .addValue("tutorialGroupId", tutorialGroupId)
+                .addValue("excludedRegistrationId", excludedRegistrationId),
+                Boolean.class));
+    }
+
+    public boolean equivalentOfferingCompatible(
+            UUID offeringId,
+            UUID equivalentOfferingId,
+            UUID termId) {
+        if (equivalentOfferingId == null) {
+            return true;
+        }
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                  SELECT 1
+                  FROM aura_course_offerings source
+                  JOIN aura_course_offerings equivalent
+                    ON equivalent.id = :equivalentOfferingId
+                   AND equivalent.term_id = source.term_id
+                   AND equivalent.status = 'ACTIVE'
+                  WHERE source.id = :offeringId
+                    AND source.term_id = :termId
+                    AND (source.course_id = equivalent.course_id
+                      OR source.parallel_group IS NOT NULL
+                        AND LOWER(source.parallel_group) =
+                          LOWER(equivalent.parallel_group)
+                      OR source.elective_group IS NOT NULL
+                        AND LOWER(source.elective_group) =
+                          LOWER(equivalent.elective_group))
+                )
+                """, params()
+                .addValue("offeringId", offeringId)
+                .addValue("equivalentOfferingId", equivalentOfferingId)
+                .addValue("termId", termId), Boolean.class));
     }
 
     public UUID insertRegistration(
@@ -209,7 +365,37 @@ public class AuraRegistrationRepository {
                           AND block_slot.active = TRUE
                     ), slot.ends_at) AS ends_at,
                     registration.registration_type,
-                    requirement.week_pattern, requirement.custom_weeks
+                    requirement.week_pattern, requirement.custom_weeks,
+                    ARRAY(
+                      SELECT affected_date::DATE
+                      FROM GENERATE_SERIES(
+                        term_row.starts_on,
+                        term_row.ends_on,
+                        INTERVAL '1 day') affected_date
+                      WHERE EXTRACT(ISODOW FROM affected_date)
+                        = slot.day_of_week
+                        AND aura_calendar_exception_applies_on_date(
+                          term_row.id,
+                          session.instructor_id,
+                          session.room_id,
+                          session.section_id,
+                          session.timeslot_id,
+                          affected_date::DATE,
+                          slot.starts_at,
+                          COALESCE((
+                            SELECT final_slot.ends_at
+                            FROM aura_timeslots final_slot
+                            WHERE final_slot.university_id = slot.university_id
+                              AND final_slot.term_id IS NOT DISTINCT
+                                FROM slot.term_id
+                              AND final_slot.day_of_week = slot.day_of_week
+                              AND final_slot.slot_order =
+                                slot.slot_order + requirement.duration_slots - 1
+                          ), slot.ends_at),
+                          FALSE,
+                          NULL)
+                      ORDER BY affected_date
+                    ) AS cancelled_dates
                 FROM aura_student_course_registrations registration
                 JOIN aura_course_offerings offering
                     ON offering.id = registration.offering_id
@@ -217,6 +403,8 @@ public class AuraRegistrationRepository {
                 JOIN aura_timetable_versions timetable_version
                     ON timetable_version.term_id = registration.term_id
                     AND timetable_version.status = 'PUBLISHED'
+                JOIN aura_academic_terms term_row
+                    ON term_row.id = timetable_version.term_id
                 JOIN aura_scheduled_sessions session
                     ON session.version_id = timetable_version.id
                     AND session.offering_id = offering.id
@@ -232,27 +420,16 @@ public class AuraRegistrationRepository {
                   AND registration.status = 'ACTIVE'
                   AND (registration.teaching_section_id IS NULL
                       OR registration.teaching_section_id = session.section_id)
-                  AND (registration.lecture_group_id IS NULL
-                      OR requirement.meeting_type <> 'LECTURE'
-                      OR requirement.teaching_group IS NULL
-                      OR requirement.teaching_group = (
-                          SELECT lecture_group.code
-                          FROM aura_teaching_groups lecture_group
-                          WHERE lecture_group.id = registration.lecture_group_id))
-                  AND (registration.lab_group_id IS NULL
-                      OR requirement.meeting_type <> 'LAB'
-                      OR requirement.teaching_group IS NULL
-                      OR requirement.teaching_group = (
-                          SELECT lab_group.code
-                          FROM aura_teaching_groups lab_group
-                          WHERE lab_group.id = registration.lab_group_id))
-                  AND (registration.tutorial_group_id IS NULL
-                      OR requirement.meeting_type <> 'TUTORIAL'
-                      OR requirement.teaching_group IS NULL
-                      OR requirement.teaching_group = (
-                          SELECT tutorial_group.code
-                          FROM aura_teaching_groups tutorial_group
-                          WHERE tutorial_group.id = registration.tutorial_group_id))
+                  AND (requirement.teaching_group_id IS NULL
+                    OR requirement.meeting_type = 'LECTURE'
+                      AND requirement.teaching_group_id =
+                        registration.lecture_group_id
+                    OR requirement.meeting_type = 'LAB'
+                      AND requirement.teaching_group_id =
+                        registration.lab_group_id
+                    OR requirement.meeting_type = 'TUTORIAL'
+                      AND requirement.teaching_group_id =
+                        registration.tutorial_group_id)
                 ORDER BY slot.day_of_week, slot.starts_at, course.course_code
                 """, params()
                 .addValue("termId", termId)
@@ -271,6 +448,7 @@ public class AuraRegistrationRepository {
                         rs.getString("registration_type"),
                         rs.getString("week_pattern"),
                         intArray(rs, "custom_weeks"),
+                        localDateArray(rs, "cancelled_dates"),
                         false));
     }
 
@@ -342,6 +520,19 @@ public class AuraRegistrationRepository {
                 .filter(Number.class::isInstance)
                 .map(Number.class::cast)
                 .map(Number::intValue)
+                .toList();
+    }
+
+    private List<LocalDate> localDateArray(ResultSet rs, String column)
+            throws SQLException {
+        java.sql.Array sqlArray = rs.getArray(column);
+        if (sqlArray == null || !(sqlArray.getArray() instanceof Object[] values)) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(values)
+                .map(value -> value instanceof java.sql.Date date
+                        ? date.toLocalDate()
+                        : LocalDate.parse(value.toString()))
                 .toList();
     }
 
