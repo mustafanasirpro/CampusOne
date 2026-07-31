@@ -17,6 +17,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -502,6 +503,40 @@ public class AuraOperationsRepository {
                 (rs, row) -> studentAvailability(rs));
     }
 
+    public Optional<UUID> studentAvailabilityTerm(
+            UUID availabilityId,
+            UUID universityId) {
+        return jdbc.query("""
+                SELECT availability.term_id
+                FROM aura_student_availability availability
+                JOIN aura_academic_terms term_row
+                  ON term_row.id = availability.term_id
+                WHERE availability.id = :id
+                  AND term_row.university_id = :universityId
+                """, new MapSqlParameterSource()
+                .addValue("id", availabilityId)
+                .addValue("universityId", universityId),
+                (rs, row) -> rs.getObject("term_id", UUID.class))
+                .stream().findFirst();
+    }
+
+    public boolean deleteStudentAvailability(
+            UUID availabilityId,
+            UUID universityId,
+            long version) {
+        return jdbc.update("""
+                DELETE FROM aura_student_availability availability
+                USING aura_academic_terms term_row
+                WHERE availability.id = :id
+                  AND availability.version = :version
+                  AND term_row.id = availability.term_id
+                  AND term_row.university_id = :universityId
+                """, new MapSqlParameterSource()
+                .addValue("id", availabilityId)
+                .addValue("universityId", universityId)
+                .addValue("version", version)) == 1;
+    }
+
     public UUID insertOfferingConflict(
             UUID actorId,
             AuraOperationsDtos.UpsertOfferingConflictRequest request) {
@@ -710,6 +745,171 @@ public class AuraOperationsRepository {
                 WHERE session_row.version_id = :versionId
                 GROUP BY timeslot.day_of_week ORDER BY timeslot.day_of_week
                 """, termId, versionId);
+        Map<String, Number> gapAndFairness = jdbc.queryForObject("""
+                WITH session_data AS (
+                  SELECT session_row.id, session_row.offering_id,
+                    session_row.meeting_requirement_id,
+                    session_row.instructor_id, session_row.section_id,
+                    slot.day_of_week, slot.starts_at, slot.ends_at
+                  FROM aura_scheduled_sessions session_row
+                  JOIN aura_timeslots slot ON slot.id = session_row.timeslot_id
+                  WHERE session_row.version_id = :versionId
+                ),
+                instructor_gaps AS (
+                  SELECT EXTRACT(EPOCH FROM (
+                    starts_at - LAG(ends_at) OVER (
+                      PARTITION BY instructor_id, day_of_week
+                      ORDER BY starts_at, id))) / 60.0 AS gap
+                  FROM session_data
+                ),
+                section_gaps AS (
+                  SELECT EXTRACT(EPOCH FROM (
+                    starts_at - LAG(ends_at) OVER (
+                      PARTITION BY section_id, day_of_week
+                      ORDER BY starts_at, id))) / 60.0 AS gap
+                  FROM session_data
+                ),
+                student_sessions AS (
+                  SELECT DISTINCT registration.student_user_id,
+                    session_data.id, session_data.day_of_week,
+                    session_data.starts_at, session_data.ends_at
+                  FROM session_data
+                  JOIN aura_meeting_requirements requirement
+                    ON requirement.id = session_data.meeting_requirement_id
+                  JOIN aura_student_course_registrations registration
+                    ON registration.offering_id = session_data.offering_id
+                   AND registration.term_id = :termId
+                   AND registration.status = 'ACTIVE'
+                  WHERE requirement.teaching_group_id IS NULL
+                    OR requirement.meeting_type = 'LECTURE'
+                      AND requirement.teaching_group_id =
+                        registration.lecture_group_id
+                    OR requirement.meeting_type = 'LAB'
+                      AND requirement.teaching_group_id =
+                        registration.lab_group_id
+                    OR requirement.meeting_type = 'TUTORIAL'
+                      AND requirement.teaching_group_id =
+                        registration.tutorial_group_id
+                ),
+                student_gaps AS (
+                  SELECT EXTRACT(EPOCH FROM (
+                    starts_at - LAG(ends_at) OVER (
+                      PARTITION BY student_user_id, day_of_week
+                      ORDER BY starts_at, id))) / 60.0 AS gap
+                  FROM student_sessions
+                ),
+                instructor_load AS (
+                  SELECT instructor_id, COUNT(*)::DOUBLE PRECISION AS load
+                  FROM session_data GROUP BY instructor_id
+                ),
+                section_load AS (
+                  SELECT section_id, COUNT(*)::DOUBLE PRECISION AS load
+                  FROM session_data GROUP BY section_id
+                ),
+                undesirable_by_section AS (
+                  SELECT section_id, COUNT(*) FILTER (
+                    WHERE starts_at < TIME '08:30'
+                       OR ends_at > TIME '17:00')::DOUBLE PRECISION AS count
+                  FROM session_data GROUP BY section_id
+                )
+                SELECT
+                  COALESCE((SELECT AVG(gap) FROM student_gaps
+                    WHERE gap > 0), 0) AS student_gap,
+                  COALESCE((SELECT AVG(gap) FROM instructor_gaps
+                    WHERE gap > 0), 0) AS instructor_gap,
+                  COALESCE((SELECT AVG(gap) FROM section_gaps
+                    WHERE gap > 0), 0) AS section_gap,
+                  COALESCE((SELECT VAR_POP(load) FROM instructor_load), 0)
+                    AS instructor_variance,
+                  COALESCE((SELECT VAR_POP(load) FROM section_load), 0)
+                    AS section_variance,
+                  COALESCE((SELECT VAR_POP(count)
+                    FROM undesirable_by_section), 0) AS fairness_variance
+                """, metricParams(termId, versionId), (rs, row) -> Map.of(
+                        "studentGap", rs.getDouble("student_gap"),
+                        "instructorGap", rs.getDouble("instructor_gap"),
+                        "sectionGap", rs.getDouble("section_gap"),
+                        "instructorVariance",
+                            rs.getDouble("instructor_variance"),
+                        "sectionVariance", rs.getDouble("section_variance"),
+                        "fairnessVariance",
+                            rs.getDouble("fairness_variance")));
+        Double averageTravelMinutes = jdbc.queryForObject("""
+                WITH ordered AS (
+                  SELECT session_row.instructor_id, slot.day_of_week,
+                    slot.starts_at, slot.ends_at,
+                    COALESCE(building.name, room.building, '') AS building,
+                    LAG(COALESCE(building.name, room.building, '')) OVER (
+                      PARTITION BY session_row.instructor_id, slot.day_of_week
+                      ORDER BY slot.starts_at, session_row.id) AS previous_building
+                  FROM aura_scheduled_sessions session_row
+                  JOIN aura_timeslots slot ON slot.id = session_row.timeslot_id
+                  JOIN aura_rooms room ON room.id = session_row.room_id
+                  LEFT JOIN aura_buildings building ON building.id = room.building_id
+                  WHERE session_row.version_id = :versionId
+                )
+                SELECT COALESCE(AVG(travel.minutes), 0)
+                FROM ordered
+                JOIN aura_academic_terms term_row ON term_row.id = :termId
+                JOIN aura_building_travel_times travel
+                  ON travel.university_id = term_row.university_id
+                 AND travel.active = TRUE
+                 AND ((LOWER(travel.from_building) = LOWER(previous_building)
+                       AND LOWER(travel.to_building) = LOWER(building))
+                   OR (LOWER(travel.to_building) = LOWER(previous_building)
+                       AND LOWER(travel.from_building) = LOWER(building)))
+                WHERE previous_building IS NOT NULL
+                  AND previous_building <> building
+                """, metricParams(termId, versionId), Double.class);
+        Map<String, Number> generation = jdbc.queryForObject("""
+                SELECT COALESCE(run.candidate_count, 0) AS candidates,
+                    COALESCE(run.random_seed, 0) AS seed,
+                    COALESCE(run.termination_seconds, 0) AS duration
+                FROM aura_timetable_versions version_row
+                LEFT JOIN aura_generation_runs run
+                  ON run.id = version_row.generation_run_id
+                WHERE version_row.id = :versionId
+                """, metricParams(termId, versionId), (rs, row) -> Map.of(
+                        "candidates", rs.getInt("candidates"),
+                        "seed", rs.getLong("seed"),
+                        "duration", rs.getInt("duration")));
+        Map<String, Long> hardClashTrend = longMetrics("""
+                SELECT version_row.version_number::TEXT AS label,
+                    COUNT(clash.id) FILTER (
+                      WHERE clash.severity = 'HARD') AS metric
+                FROM aura_timetable_versions version_row
+                LEFT JOIN aura_clashes clash
+                  ON clash.version_id = version_row.id
+                WHERE version_row.term_id = :termId
+                GROUP BY version_row.id, version_row.version_number
+                ORDER BY version_row.version_number
+                """, termId, versionId);
+        Map<String, Long> bottlenecks = longMetrics("""
+                SELECT label, metric FROM (
+                  SELECT 'ROOM_CAPACITY' AS label, COUNT(*) AS metric
+                  FROM aura_meeting_requirements requirement
+                  JOIN aura_course_offerings offering
+                    ON offering.id = requirement.offering_id
+                  WHERE offering.term_id = :termId
+                    AND requirement.active = TRUE
+                    AND NOT EXISTS (
+                      SELECT 1 FROM aura_rooms room
+                      JOIN aura_academic_terms term_row
+                        ON term_row.university_id = room.university_id
+                      WHERE term_row.id = :termId AND room.active = TRUE
+                        AND room.capacity >= requirement.required_capacity
+                        AND room.room_type = requirement.room_type)
+                  UNION ALL
+                  SELECT 'CALENDAR_EXCEPTIONS', COUNT(*)
+                  FROM aura_calendar_exceptions
+                  WHERE term_id = :termId AND active = TRUE
+                  UNION ALL
+                  SELECT 'UNRESOLVED_HARD_CLASHES', COUNT(*)
+                  FROM aura_clashes
+                  WHERE version_id = :versionId
+                    AND severity = 'HARD' AND resolved_at IS NULL
+                ) bottleneck
+                """, termId, versionId);
         Map<String, Number> totals = jdbc.queryForObject("""
                 SELECT COALESCE(AVG(
                     100.0 * requirement.required_capacity / NULLIF(room.capacity, 0)), 0) AS capacity,
@@ -747,7 +947,18 @@ public class AuraOperationsRepository {
                 instructorLoads, sectionLoads, clashes, sessionsByDay,
                 totals.get("capacity").doubleValue(), totals.get("unresolved").longValue(),
                 totals.get("impossible").longValue(), totals.get("repairs").longValue(),
-                totals.get("disruption").doubleValue());
+                totals.get("disruption").doubleValue(),
+                gapAndFairness.get("studentGap").doubleValue(),
+                gapAndFairness.get("instructorGap").doubleValue(),
+                gapAndFairness.get("sectionGap").doubleValue(),
+                gapAndFairness.get("instructorVariance").doubleValue(),
+                gapAndFairness.get("sectionVariance").doubleValue(),
+                gapAndFairness.get("fairnessVariance").doubleValue(),
+                averageTravelMinutes == null ? 0 : averageTravelMinutes,
+                generation.get("candidates").intValue(),
+                generation.get("seed").longValue(),
+                generation.get("duration").intValue(),
+                hardClashTrend, bottlenecks);
     }
 
     public Optional<RepairSourceState> repairSourceState(UUID versionId) {
@@ -803,6 +1014,21 @@ public class AuraOperationsRepository {
                 WHERE offering_id = :offeringId AND status = 'ACTIVE'
                 """, new MapSqlParameterSource("offeringId", offeringId), Integer.class);
         return count == null ? 0 : count;
+    }
+
+    public List<UUID> activeStudentUserIdsForOfferings(
+            Collection<UUID> offeringIds) {
+        if (offeringIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query("""
+                SELECT DISTINCT student_user_id
+                FROM aura_student_course_registrations
+                WHERE offering_id IN (:offeringIds)
+                  AND status = 'ACTIVE'
+                ORDER BY student_user_id
+                """, new MapSqlParameterSource("offeringIds", offeringIds),
+                (rs, row) -> rs.getObject("student_user_id", UUID.class));
     }
 
     public UUID insertRepairPlan(
