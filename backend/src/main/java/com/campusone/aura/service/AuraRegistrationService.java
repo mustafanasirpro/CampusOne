@@ -74,12 +74,29 @@ public class AuraRegistrationService {
         }
         validateOffering(request.offeringId(), request.termId());
         validateOptionalOffering(request.equivalentOfferingId(), request.termId());
+        validateEquivalentOffering(
+                request.offeringId(),
+                request.equivalentOfferingId(),
+                request.termId());
         validateSections(request, universityId);
         validateGroups(
                 request.offeringId(),
                 request.lectureGroupId(),
                 request.labGroupId(),
                 request.tutorialGroupId());
+        if (registrationRepository.hasActiveParallelRegistration(
+                request.termId(),
+                request.studentUserId(),
+                request.offeringId())) {
+            throw new AuraStateException(
+                    "This student is already registered for a parallel offering.");
+        }
+        requireRegistrationCapacity(
+                request.offeringId(),
+                request.lectureGroupId(),
+                request.labGroupId(),
+                request.tutorialGroupId(),
+                null);
         String registrationType = normalized(
                 request.registrationType(), REGISTRATION_TYPES, "registration type");
         UUID id = UUID.randomUUID();
@@ -117,6 +134,10 @@ public class AuraRegistrationService {
         StudentRegistrationResponse existing = requireRegistration(registrationId);
         requireTerm(existing.termId(), universityId);
         validateOptionalOffering(request.equivalentOfferingId(), existing.termId());
+        validateEquivalentOffering(
+                existing.offeringId(),
+                request.equivalentOfferingId(),
+                existing.termId());
         validateSection(
                 request.teachingSectionId(), existing.termId(), universityId);
         validateGroups(
@@ -126,6 +147,14 @@ public class AuraRegistrationService {
                 request.tutorialGroupId());
         String status = normalized(
                 request.status(), REGISTRATION_STATUSES, "registration status");
+        if ("ACTIVE".equals(status) || "PENDING".equals(status)) {
+            requireRegistrationCapacity(
+                    existing.offeringId(),
+                    request.lectureGroupId(),
+                    request.labGroupId(),
+                    request.tutorialGroupId(),
+                    registrationId);
+        }
         if (!registrationRepository.updateRegistration(
                 registrationId, request, status)) {
             throw new AuraStateException(
@@ -190,7 +219,8 @@ public class AuraRegistrationService {
                     date = date.plusWeeks(1)) {
                 int week = (int) ChronoUnit.WEEKS.between(
                         term.startsOn(), date) + 1;
-                if (!occursInWeek(entry, week)) {
+                if (!occursInWeek(entry, week)
+                        || entry.cancelledDates().contains(date)) {
                     continue;
                 }
                 calendar.append("BEGIN:VEVENT\r\n")
@@ -343,6 +373,14 @@ public class AuraRegistrationService {
         validateGroup(lectureGroupId, offeringId, "LECTURE");
         validateGroup(labGroupId, offeringId, "LAB");
         validateGroup(tutorialGroupId, offeringId, "TUTORIAL");
+        if (!registrationRepository.registrationGroupsComplete(
+                offeringId,
+                lectureGroupId,
+                labGroupId,
+                tutorialGroupId)) {
+            throw new AuraStateException(
+                    "Choose each required lecture, lab, and tutorial group.");
+        }
     }
 
     private void validateGroup(UUID groupId, UUID offeringId, String type) {
@@ -361,6 +399,39 @@ public class AuraRegistrationService {
     private void validateOptionalOffering(UUID offeringId, UUID termId) {
         if (offeringId != null) {
             validateOffering(offeringId, termId);
+        }
+    }
+
+    private void validateEquivalentOffering(
+            UUID offeringId,
+            UUID equivalentOfferingId,
+            UUID termId) {
+        if (!registrationRepository.equivalentOfferingCompatible(
+                offeringId, equivalentOfferingId, termId)) {
+            throw new AuraStateException(
+                    "Choose an equivalent offering for the same course or configured alternative group.");
+        }
+    }
+
+    private void requireRegistrationCapacity(
+            UUID offeringId,
+            UUID lectureGroupId,
+            UUID labGroupId,
+            UUID tutorialGroupId,
+            UUID excludedRegistrationId) {
+        List<UUID> groupIds = java.util.stream.Stream.of(
+                        lectureGroupId, labGroupId, tutorialGroupId)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        registrationRepository.lockRegistrationCapacity(offeringId, groupIds);
+        if (!registrationRepository.registrationCapacityAvailable(
+                offeringId,
+                lectureGroupId,
+                labGroupId,
+                tutorialGroupId,
+                excludedRegistrationId)) {
+            throw new AuraStateException(
+                    "The offering or selected teaching group has reached capacity.");
         }
     }
 
