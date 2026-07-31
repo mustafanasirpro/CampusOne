@@ -27,6 +27,11 @@ public final class AuraScenarioDtos {
             int affectedSessions,
             int clashesAdded,
             int clashesRemoved,
+            String baselineScore,
+            String projectedScore,
+            boolean feasible,
+            int candidateCount,
+            String terminationReason,
             String recommendation,
             Instant createdAt,
             Instant completedAt) {
