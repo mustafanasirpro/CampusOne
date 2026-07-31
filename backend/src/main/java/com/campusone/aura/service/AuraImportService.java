@@ -44,6 +44,7 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -61,6 +62,7 @@ public class AuraImportService {
     private static final int PREVIEW_ROW_LIMIT = 200;
     private static final int MAX_COLUMNS = 100;
     private static final int MAX_CELL_LENGTH = 500;
+    private static final String ALL_VISIBLE_SHEETS = "All visible sheets";
     private static final Set<String> ROOM_TYPES = Set.of(
             "CLASSROOM", "LAB", "LECTURE_HALL", "LECTURE_ROOM",
             "COMPUTER_LAB", "SCIENCE_LAB", "SEMINAR_ROOM", "AUDITORIUM",
@@ -187,6 +189,15 @@ public class AuraImportService {
                 suggestedMapping,
                 parsed.rows().size(),
                 parsed.ocrRequired());
+        auraRepository.insertTermAudit(
+                termId,
+                userId,
+                "IMPORT_PREVIEWED",
+                "IMPORT_JOB",
+                id,
+                "Prepared a validated preview source for "
+                        + normalizedType.toLowerCase(Locale.ROOT)
+                        + " import.");
         List<String> warnings = new ArrayList<>(parsed.warnings());
         if (parsed.rows().size() > PREVIEW_ROW_LIMIT) {
             warnings.add("Only the first " + PREVIEW_ROW_LIMIT
@@ -235,6 +246,16 @@ public class AuraImportService {
         int accepted = normalizedRows.size() - rejected;
         importRepository.replaceIssues(jobId, issues);
         importRepository.markValidated(jobId, mapping, accepted, rejected);
+        auraRepository.insertTermAudit(
+                job.termId(),
+                userId,
+                rejected == 0 ? "IMPORT_VALIDATED" : "IMPORT_REJECTED",
+                "IMPORT_JOB",
+                jobId,
+                rejected == 0
+                        ? "Validated all import rows successfully."
+                        : "Import validation found " + rejected
+                            + " rejected row(s).");
         if (rejected == 0
                 && request.saveAsProfile() != null
                 && !request.saveAsProfile().isBlank()) {
@@ -307,6 +328,13 @@ public class AuraImportService {
                             auraRepository.clashDetectionContext(resultVersionId)));
         }
         importRepository.markApplied(jobId, sourceRows.size(), resultVersionId);
+        auraRepository.insertTermAudit(
+                job.termId(),
+                userId,
+                "IMPORT_APPLIED",
+                "IMPORT_JOB",
+                jobId,
+                "Applied " + sourceRows.size() + " validated import row(s).");
         return importRepository.applyResponse(jobId);
     }
 
@@ -1045,52 +1073,87 @@ public class AuraImportService {
             if (sources.isEmpty()) {
                 throw new AuraStateException("The workbook has no visible sheets.");
             }
+            List<String> sourceChoices = new ArrayList<>(sources);
+            if (sources.size() > 1) {
+                sourceChoices.add(ALL_VISIBLE_SHEETS);
+            }
             String selected = requestedSource == null || requestedSource.isBlank()
                     ? sources.getFirst()
                     : requestedSource.trim();
-            if (!sources.contains(selected)) {
+            if (!sourceChoices.contains(selected)) {
                 throw new AuraStateException("Select a valid workbook sheet.");
             }
-            Sheet sheet = workbook.getSheet(selected);
-            Row headerRow = firstNonEmptyRow(sheet);
-            if (headerRow == null) {
-                throw new AuraStateException("The selected sheet is empty.");
-            }
-            int columnCount = Math.min(headerRow.getLastCellNum(), MAX_COLUMNS);
-            List<String> rawHeaders = new ArrayList<>();
             DataFormatter formatter = new DataFormatter(Locale.ROOT);
-            for (int column = 0; column < columnCount; column++) {
-                rawHeaders.add(safeCell(cellText(
-                        headerRow.getCell(column), formatter)));
-            }
-            List<String> headers = validateHeaders(rawHeaders);
+            List<String> headers = null;
             List<Map<String, String>> rows = new ArrayList<>();
-            for (int index = headerRow.getRowNum() + 1;
-                    index <= sheet.getLastRowNum();
-                    index++) {
-                if (rows.size() >= maxRows) {
+            List<String> sheetsToRead = ALL_VISIBLE_SHEETS.equals(selected)
+                    ? sources
+                    : List.of(selected);
+            for (String sheetName : sheetsToRead) {
+                SheetRows parsedSheet = readSheet(
+                        workbook.getSheet(sheetName), formatter);
+                if (parsedSheet == null) {
+                    if (sheetsToRead.size() == 1) {
+                        throw new AuraStateException("The selected sheet is empty.");
+                    }
+                    continue;
+                }
+                if (headers == null) {
+                    headers = parsedSheet.headers();
+                } else if (!normalizedHeaders(headers).equals(
+                        normalizedHeaders(parsedSheet.headers()))) {
+                    throw new AuraStateException(
+                            "Visible sheets must use the same columns before they can be combined.");
+                }
+                if (rows.size() + parsedSheet.rows().size() > maxRows) {
                     throw new AuraStateException(
                             "The import contains more than " + maxRows + " rows.");
                 }
-                Row workbookRow = sheet.getRow(index);
-                if (workbookRow == null) continue;
-                Map<String, String> row = new LinkedHashMap<>();
-                for (int column = 0; column < headers.size(); column++) {
-                    row.put(headers.get(column), safeCell(cellText(
-                            workbookRow.getCell(column), formatter)));
-                }
-                if (row.values().stream().anyMatch(value -> !value.isBlank())) {
-                    rows.add(Map.copyOf(row));
-                }
+                rows.addAll(remapRows(parsedSheet, headers));
+            }
+            if (headers == null) {
+                throw new AuraStateException("The selected workbook sheets are empty.");
             }
             return new ParsedImport(
                     headers,
                     List.copyOf(rows),
-                    List.copyOf(sources),
+                    List.copyOf(sourceChoices),
                     selected,
                     false,
                     List.of());
         }
+    }
+
+    private SheetRows readSheet(Sheet sheet, DataFormatter formatter) {
+        Row headerRow = firstNonEmptyRow(sheet);
+        if (headerRow == null) {
+            return null;
+        }
+        int columnCount = Math.min(headerRow.getLastCellNum(), MAX_COLUMNS);
+        List<CellRangeAddress> mergedRegions = sheet.getMergedRegions();
+        List<String> rawHeaders = new ArrayList<>();
+        for (int column = 0; column < columnCount; column++) {
+            rawHeaders.add(safeCell(cellText(
+                    sheet, headerRow.getRowNum(), column, formatter,
+                    mergedRegions)));
+        }
+        List<String> headers = validateHeaders(rawHeaders);
+        List<Map<String, String>> rows = new ArrayList<>();
+        for (int index = headerRow.getRowNum() + 1;
+                index <= sheet.getLastRowNum();
+                index++) {
+            Row workbookRow = sheet.getRow(index);
+            if (workbookRow == null) continue;
+            Map<String, String> row = new LinkedHashMap<>();
+            for (int column = 0; column < headers.size(); column++) {
+                row.put(headers.get(column), safeCell(cellText(
+                        sheet, index, column, formatter, mergedRegions)));
+            }
+            if (row.values().stream().anyMatch(value -> !value.isBlank())) {
+                rows.add(Map.copyOf(row));
+            }
+        }
+        return new SheetRows(headers, List.copyOf(rows));
     }
 
     private ParsedImport parsePdf(byte[] bytes) throws IOException {
@@ -1150,12 +1213,54 @@ public class AuraImportService {
         return null;
     }
 
-    private String cellText(Cell cell, DataFormatter formatter) {
+    private String cellText(
+            Sheet sheet,
+            int rowIndex,
+            int columnIndex,
+            DataFormatter formatter,
+            List<CellRangeAddress> mergedRegions) {
+        Row row = sheet.getRow(rowIndex);
+        Cell cell = row == null ? null : row.getCell(columnIndex);
+        if (cell == null || cell.getCellType() == CellType.BLANK) {
+            for (CellRangeAddress region : mergedRegions) {
+                if (region.isInRange(rowIndex, columnIndex)) {
+                    Row anchorRow = sheet.getRow(region.getFirstRow());
+                    cell = anchorRow == null
+                            ? null
+                            : anchorRow.getCell(region.getFirstColumn());
+                    break;
+                }
+            }
+        }
         if (cell == null) return "";
         if (cell.getCellType() == CellType.FORMULA) {
-            return cell.getCellFormula();
+            throw new AuraStateException(
+                    "Formula cells are not accepted. Replace formulas with their displayed values before importing.");
         }
         return formatter.formatCellValue(cell);
+    }
+
+    private List<String> normalizedHeaders(List<String> headers) {
+        return headers.stream().map(this::normalizeHeader).toList();
+    }
+
+    private List<Map<String, String>> remapRows(
+            SheetRows sheet,
+            List<String> canonicalHeaders) {
+        if (sheet.headers().equals(canonicalHeaders)) {
+            return sheet.rows();
+        }
+        List<Map<String, String>> remapped = new ArrayList<>();
+        for (Map<String, String> source : sheet.rows()) {
+            Map<String, String> target = new LinkedHashMap<>();
+            for (int index = 0; index < canonicalHeaders.size(); index++) {
+                target.put(
+                        canonicalHeaders.get(index),
+                        source.getOrDefault(sheet.headers().get(index), ""));
+            }
+            remapped.add(Map.copyOf(target));
+        }
+        return List.copyOf(remapped);
     }
 
     private ParsedImport parsed(
@@ -1327,5 +1432,10 @@ public class AuraImportService {
             String selectedSource,
             boolean ocrRequired,
             List<String> warnings) {
+    }
+
+    private record SheetRows(
+            List<String> headers,
+            List<Map<String, String>> rows) {
     }
 }
