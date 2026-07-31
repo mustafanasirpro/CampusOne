@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -79,7 +80,23 @@ public class AuraScenarioRepository {
             String scenarioType,
             Map<String, Object> input,
             int affectedSessions,
+            int clashesAdded,
+            int clashesRemoved,
+            String baselineScore,
+            String projectedScore,
+            boolean feasible,
+            int candidateCount,
+            String terminationReason,
             String recommendation) {
+        Map<String, Object> metrics = new LinkedHashMap<>();
+        metrics.put("affectedSessions", affectedSessions);
+        metrics.put("clashesAdded", clashesAdded);
+        metrics.put("clashesRemoved", clashesRemoved);
+        metrics.put("baselineScore", baselineScore);
+        metrics.put("projectedScore", projectedScore);
+        metrics.put("feasible", feasible);
+        metrics.put("candidateCount", candidateCount);
+        metrics.put("terminationReason", terminationReason);
         jdbc.update("""
                 INSERT INTO aura_what_if_runs (
                     id, university_id, term_id, source_version_id,
@@ -98,10 +115,7 @@ public class AuraScenarioRepository {
                 .addValue("userId", userId)
                 .addValue("scenarioType", scenarioType)
                 .addValue("scenarioInput", json(input))
-                .addValue("metrics", json(Map.of(
-                        "affectedSessions", affectedSessions,
-                        "clashesAdded", 0,
-                        "clashesRemoved", 0)))
+                .addValue("metrics", json(metrics))
                 .addValue("recommendation", recommendation));
         return id;
     }
@@ -115,6 +129,14 @@ public class AuraScenarioRepository {
                         AS clashes_added,
                     COALESCE((result_metrics->>'clashesRemoved')::INTEGER, 0)
                         AS clashes_removed,
+                    result_metrics->>'baselineScore' AS baseline_score,
+                    result_metrics->>'projectedScore' AS projected_score,
+                    COALESCE((result_metrics->>'feasible')::BOOLEAN, FALSE)
+                        AS feasible,
+                    COALESCE((result_metrics->>'candidateCount')::INTEGER, 0)
+                        AS candidate_count,
+                    result_metrics->>'terminationReason'
+                        AS termination_reason,
                     recommendation, created_at, completed_at
                 FROM aura_what_if_runs WHERE id = :id
                 """, params().addValue("id", id), this::mapWhatIf)
@@ -130,6 +152,14 @@ public class AuraScenarioRepository {
                         AS clashes_added,
                     COALESCE((result_metrics->>'clashesRemoved')::INTEGER, 0)
                         AS clashes_removed,
+                    result_metrics->>'baselineScore' AS baseline_score,
+                    result_metrics->>'projectedScore' AS projected_score,
+                    COALESCE((result_metrics->>'feasible')::BOOLEAN, FALSE)
+                        AS feasible,
+                    COALESCE((result_metrics->>'candidateCount')::INTEGER, 0)
+                        AS candidate_count,
+                    result_metrics->>'terminationReason'
+                        AS termination_reason,
                     recommendation, created_at, completed_at
                 FROM aura_what_if_runs WHERE term_id = :termId
                 ORDER BY created_at DESC LIMIT 100
@@ -268,6 +298,11 @@ public class AuraScenarioRepository {
                 uuid(rs, "source_version_id"), rs.getString("scenario_type"),
                 rs.getString("status"), rs.getInt("affected_sessions"),
                 rs.getInt("clashes_added"), rs.getInt("clashes_removed"),
+                rs.getString("baseline_score"),
+                rs.getString("projected_score"),
+                rs.getBoolean("feasible"),
+                rs.getInt("candidate_count"),
+                rs.getString("termination_reason"),
                 rs.getString("recommendation"), instant(rs, "created_at"),
                 instant(rs, "completed_at"));
     }
@@ -285,8 +320,10 @@ public class AuraScenarioRepository {
 
     private String resourceColumn(String type) {
         return switch (type) {
-            case "ROOM_UNAVAILABLE", "ROOM_CLOSURE", "FACILITY_OUTAGE" -> "room_id";
-            case "INSTRUCTOR_UNAVAILABLE", "INSTRUCTOR_ABSENCE" -> "instructor_id";
+            case "ROOM_UNAVAILABLE", "ROOM_CLOSURE", "FACILITY_OUTAGE",
+                    "FACILITY_REMOVED" -> "room_id";
+            case "INSTRUCTOR_UNAVAILABLE", "INSTRUCTOR_ABSENCE",
+                    "INSTRUCTOR_REPLACED" -> "instructor_id";
             case "TIMESLOT_REMOVED", "TIMESLOT_CANCELLATION", "UNIVERSITY_EVENT" -> "timeslot_id";
             case "SECTION_RESTRICTION" -> "section_id";
             default -> null;
