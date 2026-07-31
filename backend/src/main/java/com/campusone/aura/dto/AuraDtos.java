@@ -44,6 +44,7 @@ public final class AuraDtos {
             LocalDate startsOn,
             LocalDate endsOn,
             String status,
+            String timezone,
             Instant createdAt,
             Instant updatedAt,
             long version) {
@@ -62,6 +63,7 @@ public final class AuraDtos {
             UUID departmentId,
             String code,
             String name,
+            int numberOfSemesters,
             boolean active,
             long version) {
     }
@@ -77,6 +79,7 @@ public final class AuraDtos {
             UUID programId,
             String code,
             int admissionYear,
+            Integer expectedGraduationYear,
             boolean active,
             long version) {
     }
@@ -94,6 +97,11 @@ public final class AuraDtos {
             String code,
             String displayName,
             int studentCount,
+            UUID termId,
+            Integer semesterNumber,
+            int hardDailyLoad,
+            int preferredDailyLoad,
+            UUID homeBuildingId,
             boolean active,
             long version) {
     }
@@ -110,9 +118,16 @@ public final class AuraDtos {
             UUID id,
             UUID universityId,
             UUID userId,
+            UUID departmentId,
+            String employeeCode,
             String displayName,
             String email,
             int maxHoursPerWeek,
+            int hardDailyLoad,
+            int preferredWeeklyLoad,
+            int preferredDailyLoad,
+            int maximumConsecutiveSlots,
+            UUID homeBuildingId,
             boolean active,
             long version) {
     }
@@ -130,7 +145,10 @@ public final class AuraDtos {
             UUID id,
             UUID universityId,
             String building,
+            UUID buildingId,
+            String roomCode,
             String name,
+            String displayName,
             int capacity,
             String roomType,
             List<String> facilities,
@@ -149,10 +167,13 @@ public final class AuraDtos {
     public record TimeslotResponse(
             UUID id,
             UUID universityId,
+            UUID termId,
             int dayOfWeek,
             LocalTime startsAt,
             LocalTime endsAt,
             String label,
+            Integer slotOrder,
+            String slotType,
             boolean active,
             long version) {
     }
@@ -228,6 +249,12 @@ public final class AuraDtos {
             UUID instructorId,
             String instructorName,
             int expectedStudents,
+            String offeringCode,
+            Integer maximumEnrollment,
+            boolean combinedSections,
+            String parallelGroup,
+            String electiveGroup,
+            String notes,
             String status,
             long version) {
     }
@@ -252,7 +279,24 @@ public final class AuraDtos {
             String roomType,
             int requiredCapacity,
             String notes,
+            List<Integer> allowedDays,
+            List<Integer> prohibitedDays,
+            List<Integer> preferredDays,
+            LocalTime preferredStartTime,
+            LocalTime preferredEndTime,
+            int minimumDaySeparation,
+            int maximumOccurrencesPerDay,
+            boolean sameRoomPreferred,
+            UUID fixedRoomId,
+            UUID fixedTimeslotId,
+            boolean pinned,
+            UUID teachingGroupId,
+            UUID linkedRequirementId,
+            boolean lectureBeforeLinked,
+            String weekPattern,
+            List<Integer> customWeeks,
             List<String> requiredFacilities,
+            boolean active,
             long version) {
     }
 
@@ -526,6 +570,28 @@ public final class AuraDtos {
                     null, null, "EVERY_WEEK", List.of(), List.of(),
                     false, false, false, false);
         }
+
+        public SessionResponse withScenarioRestrictions(
+                boolean scenarioInstructorUnavailable,
+                boolean scenarioRoomUnavailable,
+                boolean scenarioSectionUnavailable,
+                boolean scenarioCalendarException) {
+            return new SessionResponse(
+                    id, versionId, offeringId, meetingRequirementId,
+                    courseCode, courseTitle, sectionId, sectionName,
+                    instructorId, instructorName, roomId, roomName, roomType,
+                    timeslotId, dayOfWeek, startsAt, endsAt, locked, source,
+                    occurrenceIndex, sessionsPerWeek, durationSlots,
+                    contiguousSlotsAvailable, requiredCapacity,
+                    requiredRoomType, roomCapacity, requiredFacilities,
+                    roomFacilities, timeslotType, roomActive, instructorActive,
+                    sectionActive, fixedRoomId, fixedTimeslotId, weekPattern,
+                    customWeeks, hardConflictOfferingIds,
+                    instructorUnavailable || scenarioInstructorUnavailable,
+                    roomUnavailable || scenarioRoomUnavailable,
+                    sectionUnavailable || scenarioSectionUnavailable,
+                    calendarException || scenarioCalendarException);
+        }
     }
 
     public record ClashResponse(
@@ -618,6 +684,11 @@ public final class AuraDtos {
     public record VersionComparisonResponse(
             UUID baseVersionId,
             UUID comparedVersionId,
+            String baseScore,
+            String comparedScore,
+            Integer hardScoreDelta,
+            Integer mediumScoreDelta,
+            Integer softScoreDelta,
             int totalOccurrences,
             int changedOccurrences,
             int addedOccurrences,
