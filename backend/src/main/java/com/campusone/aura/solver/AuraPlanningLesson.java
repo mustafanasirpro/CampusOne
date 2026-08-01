@@ -49,6 +49,9 @@ public class AuraPlanningLesson {
     private Set<UUID> studentUserIds = Set.of();
     private Set<UUID> hardConflictOfferingIds = Set.of();
     private Map<String, AuraTravelRule> travelRules = Map.of();
+    private Set<String> calendarBlockedAssignments = Set.of();
+    private UUID parentRoomId;
+    private UUID parentTimeslotId;
 
     @PlanningVariable(valueRangeProviderRefs = "roomRange")
     private AuraRoomFact room;
@@ -351,6 +354,49 @@ public class AuraPlanningLesson {
 
     public Set<UUID> getHardConflictOfferingIds() {
         return hardConflictOfferingIds;
+    }
+
+    public void setCalendarBlockedAssignments(
+            Set<String> calendarBlockedAssignments) {
+        this.calendarBlockedAssignments = calendarBlockedAssignments == null
+                ? Set.of()
+                : Set.copyOf(calendarBlockedAssignments);
+    }
+
+    public boolean isCalendarBlocked() {
+        return room != null
+                && timeslot != null
+                && calendarBlockedAssignments.contains(
+                        assignmentKey(room.id(), timeslot.id()));
+    }
+
+    public void setParentAssignment(UUID roomId, UUID timeslotId) {
+        this.parentRoomId = roomId;
+        this.parentTimeslotId = timeslotId;
+    }
+
+    public boolean differsFromParentAssignment() {
+        return parentAssignmentChanges() > 0;
+    }
+
+    public int parentAssignmentChanges() {
+        if (parentRoomId == null && parentTimeslotId == null) {
+            return 0;
+        }
+        int changes = 0;
+        if (parentRoomId != null
+                && (room == null || !parentRoomId.equals(room.id()))) {
+            changes++;
+        }
+        if (parentTimeslotId != null
+                && (timeslot == null || !parentTimeslotId.equals(timeslot.id()))) {
+            changes++;
+        }
+        return changes;
+    }
+
+    public static String assignmentKey(UUID roomId, UUID timeslotId) {
+        return roomId + ":" + timeslotId;
     }
 
     public boolean sharesSectionWith(AuraPlanningLesson other) {
