@@ -18,11 +18,13 @@ public class AuraConstraintProvider implements ConstraintProvider {
                 sectionDoubleBooked(factory),
                 combinedSectionDoubleBooked(factory),
                 studentDoubleBooked(factory),
+                duplicateTeachingGroupAttendance(factory),
                 hardOfferingConflict(factory),
                 instructorUnavailable(factory),
                 roomUnavailable(factory),
                 sectionUnavailable(factory),
                 studentUnavailable(factory),
+                calendarExceptionAssignment(factory),
                 instructorAvoid(factory),
                 roomAvoid(factory),
                 sectionAvoid(factory),
@@ -53,7 +55,90 @@ public class AuraConstraintProvider implements ConstraintProvider {
                 preferredDay(factory),
                 preferredTimeWindow(factory),
                 sameRoomPreference(factory),
-                spreadSectionMeetings(factory)
+                spreadSectionMeetings(factory),
+                instructorIdleGap(factory),
+                sectionIdleGap(factory),
+                studentIdleGap(factory),
+                sectionBuildingStability(factory),
+                undesirableTimeAssignment(factory),
+                repairParentAssignmentStability(factory)
+        };
+    }
+
+    Constraint constraintByName(ConstraintFactory factory, String name) {
+        return switch (name) {
+            case "Room double-booked" -> roomDoubleBooked(factory);
+            case "Instructor double-booked" -> instructorDoubleBooked(factory);
+            case "Section double-booked" -> sectionDoubleBooked(factory);
+            case "Combined section double-booked" ->
+                combinedSectionDoubleBooked(factory);
+            case "Registered student double-booked" ->
+                studentDoubleBooked(factory);
+            case "Duplicate teaching-group attendance" ->
+                duplicateTeachingGroupAttendance(factory);
+            case "Hard offering conflict" -> hardOfferingConflict(factory);
+            case "Instructor unavailable" -> instructorUnavailable(factory);
+            case "Room unavailable" -> roomUnavailable(factory);
+            case "Section unavailable" -> sectionUnavailable(factory);
+            case "Registered student unavailable" -> studentUnavailable(factory);
+            case "Calendar exception assignment" ->
+                calendarExceptionAssignment(factory);
+            case "Room capacity" -> roomTooSmall(factory);
+            case "Room type match" -> roomTypeMismatch(factory);
+            case "Required room facilities" -> missingRequiredFacility(factory);
+            case "Instructional contiguous block" ->
+                instructionalContiguousBlock(factory);
+            case "Allowed and prohibited days" ->
+                allowedAndProhibitedDays(factory);
+            case "Fixed room assignment" -> fixedRoomAssignment(factory);
+            case "Fixed timeslot assignment" ->
+                fixedTimeslotAssignment(factory);
+            case "Pinned requirement has an assignment" ->
+                validPinnedAssignment(factory);
+            case "Maximum occurrences per day" ->
+                maximumOccurrencesPerDay(factory);
+            case "Minimum day separation" -> minimumDaySeparation(factory);
+            case "Lecture before linked meeting" ->
+                lectureBeforeLinkedMeeting(factory);
+            case "Impossible building travel" ->
+                impossibleBuildingTravel(factory);
+            case "Instructor weekly hard load" ->
+                instructorWeeklyHardLoad(factory);
+            case "Instructor daily hard load" ->
+                instructorDailyHardLoad(factory);
+            case "Section daily hard load" -> sectionDailyHardLoad(factory);
+            case "Instructor avoid timeslot" -> instructorAvoid(factory);
+            case "Room avoid timeslot" -> roomAvoid(factory);
+            case "Section avoid timeslot" -> sectionAvoid(factory);
+            case "Registered student avoid timeslot" -> studentAvoid(factory);
+            case "Difficult building travel" -> difficultBuildingTravel(factory);
+            case "Instructor preferred weekly load" ->
+                instructorWeeklyPreferredLoad(factory);
+            case "Instructor preferred daily load" ->
+                instructorDailyPreferredLoad(factory);
+            case "Section preferred daily load" ->
+                sectionDailyPreferredLoad(factory);
+            case "Instructor preferred timeslot" ->
+                instructorPreferred(factory);
+            case "Room preferred timeslot" -> roomPreferred(factory);
+            case "Section preferred timeslot" -> sectionPreferred(factory);
+            case "Registered student preferred timeslot" ->
+                studentPreferred(factory);
+            case "Preferred day" -> preferredDay(factory);
+            case "Preferred time window" -> preferredTimeWindow(factory);
+            case "Same room preference" -> sameRoomPreference(factory);
+            case "Spread section meetings" -> spreadSectionMeetings(factory);
+            case "Instructor idle gaps" -> instructorIdleGap(factory);
+            case "Section idle gaps" -> sectionIdleGap(factory);
+            case "Registered student idle gaps" -> studentIdleGap(factory);
+            case "Section building stability" ->
+                sectionBuildingStability(factory);
+            case "Undesirable time fairness" ->
+                undesirableTimeAssignment(factory);
+            case "Repair parent assignment stability" ->
+                repairParentAssignmentStability(factory);
+            default -> throw new IllegalArgumentException(
+                    "Unknown AURA constraint: " + name);
         };
     }
 
@@ -102,6 +187,23 @@ public class AuraConstraintProvider implements ConstraintProvider {
                         HardMediumSoftScore.ONE_HARD,
                         AuraPlanningLesson::sharedStudentCount)
                 .asConstraint("Registered student double-booked");
+    }
+
+    private Constraint duplicateTeachingGroupAttendance(
+            ConstraintFactory factory) {
+        return factory.forEachUniquePair(
+                        AuraPlanningLesson.class,
+                        Joiners.equal(AuraPlanningLesson::getOfferingId),
+                        Joiners.equal(AuraPlanningLesson::getMeetingType))
+                .filter((left, right) -> left.getTeachingGroup() != null
+                        && right.getTeachingGroup() != null
+                        && !left.getTeachingGroup().equalsIgnoreCase(
+                                right.getTeachingGroup())
+                        && left.sharedStudentCount(right) > 0)
+                .penalize(
+                        HardMediumSoftScore.ONE_HARD,
+                        AuraPlanningLesson::sharedStudentCount)
+                .asConstraint("Duplicate teaching-group attendance");
     }
 
     private Constraint hardOfferingConflict(ConstraintFactory factory) {
@@ -181,6 +283,13 @@ public class AuraConstraintProvider implements ConstraintProvider {
                                         lesson.getDurationSlots()))
                 .penalize(HardMediumSoftScore.ONE_HARD)
                 .asConstraint("Registered student unavailable");
+    }
+
+    private Constraint calendarExceptionAssignment(ConstraintFactory factory) {
+        return factory.forEach(AuraPlanningLesson.class)
+                .filter(AuraPlanningLesson::isCalendarBlocked)
+                .penalize(HardMediumSoftScore.ONE_HARD)
+                .asConstraint("Calendar exception assignment");
     }
 
     private Constraint instructorAvoid(ConstraintFactory factory) {
@@ -702,5 +811,105 @@ public class AuraConstraintProvider implements ConstraintProvider {
                                 == right.getTimeslot().dayOfWeek())
                 .penalize(HardMediumSoftScore.ONE_SOFT)
                 .asConstraint("Spread section meetings");
+    }
+
+    private Constraint instructorIdleGap(ConstraintFactory factory) {
+        return factory.forEachUniquePair(
+                        AuraPlanningLesson.class,
+                        Joiners.equal(AuraPlanningLesson::getInstructorId))
+                .filter((left, right) -> hasIdleGap(left, right))
+                .penalize(
+                        HardMediumSoftScore.ONE_SOFT,
+                        AuraConstraintProvider::idleGapUnits)
+                .asConstraint("Instructor idle gaps");
+    }
+
+    private Constraint sectionIdleGap(ConstraintFactory factory) {
+        return factory.forEachUniquePair(
+                        AuraPlanningLesson.class,
+                        Joiners.equal(AuraPlanningLesson::getSectionId))
+                .filter((left, right) -> hasIdleGap(left, right))
+                .penalize(
+                        HardMediumSoftScore.ONE_SOFT,
+                        AuraConstraintProvider::idleGapUnits)
+                .asConstraint("Section idle gaps");
+    }
+
+    private Constraint studentIdleGap(ConstraintFactory factory) {
+        return factory.forEachUniquePair(AuraPlanningLesson.class)
+                .filter((left, right) -> left.sharedStudentCount(right) > 0
+                        && hasIdleGap(left, right))
+                .penalize(
+                        HardMediumSoftScore.ONE_SOFT,
+                        (left, right) -> idleGapUnits(left, right)
+                                * left.sharedStudentCount(right))
+                .asConstraint("Registered student idle gaps");
+    }
+
+    private Constraint sectionBuildingStability(ConstraintFactory factory) {
+        return factory.forEachUniquePair(
+                        AuraPlanningLesson.class,
+                        Joiners.equal(AuraPlanningLesson::getSectionId))
+                .filter((left, right) -> left.getRoom() != null
+                        && right.getRoom() != null
+                        && left.getRoom().building() != null
+                        && right.getRoom().building() != null
+                        && !left.getRoom().building().equalsIgnoreCase(
+                                right.getRoom().building()))
+                .penalize(HardMediumSoftScore.ONE_SOFT)
+                .asConstraint("Section building stability");
+    }
+
+    private Constraint undesirableTimeAssignment(ConstraintFactory factory) {
+        return factory.forEach(AuraPlanningLesson.class)
+                .filter(lesson -> lesson.getTimeslot() != null
+                        && (lesson.getTimeslot().startsAt()
+                                    .isBefore(java.time.LocalTime.of(8, 0))
+                                || lesson.getEffectiveEndTime()
+                                    .isAfter(java.time.LocalTime.of(18, 0))))
+                .penalize(HardMediumSoftScore.ONE_SOFT)
+                .asConstraint("Undesirable time fairness");
+    }
+
+    private Constraint repairParentAssignmentStability(
+            ConstraintFactory factory) {
+        return factory.forEach(AuraPlanningLesson.class)
+                .filter(AuraPlanningLesson::differsFromParentAssignment)
+                .penalize(
+                        HardMediumSoftScore.ONE_SOFT,
+                        AuraPlanningLesson::parentAssignmentChanges)
+                .asConstraint("Repair parent assignment stability");
+    }
+
+    private boolean hasIdleGap(
+            AuraPlanningLesson left,
+            AuraPlanningLesson right) {
+        return left.getTimeslot() != null
+                && right.getTimeslot() != null
+                && left.getTimeslot().dayOfWeek()
+                    == right.getTimeslot().dayOfWeek()
+                && left.overlapsWeeks(right)
+                && !overlaps(left, right)
+                && idleGapMinutes(left, right) > 0;
+    }
+
+    private static int idleGapUnits(
+            AuraPlanningLesson left,
+            AuraPlanningLesson right) {
+        return Math.max(1, (idleGapMinutes(left, right) + 29) / 30);
+    }
+
+    private static int idleGapMinutes(
+            AuraPlanningLesson left,
+            AuraPlanningLesson right) {
+        if (left.getTimeslot().startsAt()
+                .isBefore(right.getTimeslot().startsAt())) {
+            return (int) Duration.between(
+                    left.getEffectiveEndTime(),
+                    right.getTimeslot().startsAt()).toMinutes();
+        }
+        return (int) Duration.between(
+                right.getEffectiveEndTime(),
+                left.getTimeslot().startsAt()).toMinutes();
     }
 }
