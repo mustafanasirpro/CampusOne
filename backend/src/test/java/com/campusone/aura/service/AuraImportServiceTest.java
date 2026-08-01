@@ -26,6 +26,9 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -141,6 +144,76 @@ class AuraImportServiceTest {
         assertThat(response.ocrRequired()).isTrue();
         assertThat(response.warnings()).anyMatch(message ->
                 message.startsWith("OCR_REQUIRED"));
+    }
+
+    @Test
+    void previewWorkbook_combinesCompatibleVisibleSheetsAndCarriesMergedValues()
+            throws Exception {
+        stubScope();
+        byte[] workbookBytes;
+        try (Workbook workbook = new XSSFWorkbook();
+                ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            var first = workbook.createSheet("Morning");
+            var firstHeader = first.createRow(0);
+            firstHeader.createCell(0).setCellValue("Course");
+            firstHeader.createCell(1).setCellValue("Section");
+            first.createRow(1).createCell(0).setCellValue("CS101");
+            first.getRow(1).createCell(1).setCellValue("A");
+            first.createRow(2).createCell(1).setCellValue("B");
+            first.addMergedRegion(new CellRangeAddress(1, 2, 0, 0));
+
+            var second = workbook.createSheet("Evening");
+            var secondHeader = second.createRow(0);
+            secondHeader.createCell(0).setCellValue("course");
+            secondHeader.createCell(1).setCellValue("section");
+            second.createRow(1).createCell(0).setCellValue("CS202");
+            second.getRow(1).createCell(1).setCellValue("C");
+            workbook.write(output);
+            workbookBytes = output.toByteArray();
+        }
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "schedule.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                workbookBytes);
+
+        var response = service.preview(
+                USER_ID, TERM_ID, "TIMETABLE", "All visible sheets", file);
+
+        assertThat(response.sources())
+                .containsExactly("Morning", "Evening", "All visible sheets");
+        assertThat(response.totalRows()).isEqualTo(3);
+        assertThat(response.rows().stream()
+                        .map(row -> row.get("Course"))
+                        .toList())
+                .containsExactly("CS101", "CS101", "CS202");
+    }
+
+    @Test
+    void previewWorkbook_rejectsFormulaCellsInsteadOfImportingExecutableContent()
+            throws Exception {
+        stubScope();
+        byte[] workbookBytes;
+        try (Workbook workbook = new XSSFWorkbook();
+                ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            var sheet = workbook.createSheet("Rooms");
+            var header = sheet.createRow(0);
+            header.createCell(0).setCellValue("Code");
+            sheet.createRow(1).createCell(0).setCellFormula(
+                    "HYPERLINK(\"https://example.invalid\",\"Open\")");
+            workbook.write(output);
+            workbookBytes = output.toByteArray();
+        }
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "rooms.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                workbookBytes);
+
+        assertThatThrownBy(() -> service.preview(
+                USER_ID, TERM_ID, "ROOMS", "Rooms", file))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessageContaining("Formula cells are not accepted");
     }
 
     @Test
