@@ -14,6 +14,7 @@ import com.campusone.aura.repository.AuraResolutionRepository.SuggestionTarget;
 import com.campusone.common.exception.ResourceNotFoundException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -203,6 +204,14 @@ public class AuraResolutionService {
                 caseId, request.suggestionId());
         try {
             if (suggestion.offeringId() != null) {
+                repository.lockResolutionCapacity(
+                        suggestion.offeringId(),
+                        java.util.stream.Stream.of(
+                                        suggestion.lectureGroupId(),
+                                        suggestion.labGroupId(),
+                                        suggestion.tutorialGroupId())
+                                .filter(Objects::nonNull)
+                                .toList());
                 OfferingCandidate currentCandidate = repository
                         .parallelOfferingCandidates(registration).stream()
                         .filter(candidate -> candidate.offeringId().equals(
@@ -211,12 +220,26 @@ public class AuraResolutionService {
                         .orElseThrow(() -> unavailableAlternative());
                 requireStillSafe(
                         currentCandidate.clashFree(),
-                        currentCandidate.remainingCapacity());
+                        currentCandidate.remainingCapacity(),
+                        currentCandidate.registrationCompatible());
+                if (!Objects.equals(
+                            currentCandidate.lectureGroupId(),
+                            suggestion.lectureGroupId())
+                        || !Objects.equals(
+                            currentCandidate.labGroupId(),
+                            suggestion.labGroupId())
+                        || !Objects.equals(
+                            currentCandidate.tutorialGroupId(),
+                            suggestion.tutorialGroupId())) {
+                    throw unavailableAlternative();
+                }
                 repository.applyOfferingTransfer(
                         caseId, resolutionCase.registrationId(), suggestion,
                         request.version(), registration.version(),
                         userId, request.reason().trim());
             } else {
+                repository.lockResolutionCapacity(
+                        registration.offeringId(), List.of(suggestion.groupId()));
                 GroupCandidate groupCandidate = repository
                         .alternateGroupCandidates(registration).stream()
                         .filter(candidate -> candidate.groupId().equals(
@@ -225,7 +248,8 @@ public class AuraResolutionService {
                         .orElseThrow(() -> unavailableAlternative());
                 requireStillSafe(
                         groupCandidate.clashFree(),
-                        groupCandidate.remainingCapacity());
+                        groupCandidate.remainingCapacity(),
+                        true);
                 repository.applyGroupTransfer(
                         caseId, resolutionCase.registrationId(), suggestion,
                         groupCandidate.groupType(), request.version(),
@@ -273,8 +297,11 @@ public class AuraResolutionService {
         return suggestion;
     }
 
-    private void requireStillSafe(boolean clashFree, int remainingCapacity) {
-        if (!clashFree || remainingCapacity <= 0) {
+    private void requireStillSafe(
+            boolean clashFree,
+            int remainingCapacity,
+            boolean registrationCompatible) {
+        if (!clashFree || remainingCapacity <= 0 || !registrationCompatible) {
             throw new AuraStateException(
                     "This alternative is no longer safe. Analyze the case again.");
         }
