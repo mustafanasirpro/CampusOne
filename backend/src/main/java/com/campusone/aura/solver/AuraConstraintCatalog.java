@@ -68,7 +68,9 @@ public final class AuraConstraintCatalog {
         return switch (profile) {
             case FAST_FEASIBLE -> 0;
             case COMPACT -> switch (name) {
-                case "Same room preference", "Preferred time window" -> 4;
+                case "Same room preference", "Preferred time window",
+                        "Instructor idle gaps", "Section idle gaps",
+                        "Registered student idle gaps" -> 4;
                 case "Spread section meetings" -> 0;
                 default -> 1;
             };
@@ -84,7 +86,8 @@ public final class AuraConstraintCatalog {
             };
             case QUALITY -> 3;
             case REPAIR -> name.equals("Same room preference")
-                    || name.equals("Spread section meetings") ? 8 : 2;
+                    || name.equals("Spread section meetings")
+                    || name.equals("Repair parent assignment stability") ? 8 : 2;
             case WHAT_IF -> 1;
             default -> 1;
         };
@@ -107,11 +110,13 @@ public final class AuraConstraintCatalog {
                 "Section double-booked",
                 "Combined section double-booked",
                 "Registered student double-booked",
+                "Duplicate teaching-group attendance",
                 "Hard offering conflict",
                 "Instructor unavailable",
                 "Room unavailable",
                 "Section unavailable",
                 "Registered student unavailable",
+                "Calendar exception assignment",
                 "Room capacity",
                 "Room type match",
                 "Required room facilities",
@@ -144,7 +149,13 @@ public final class AuraConstraintCatalog {
                 "Preferred day",
                 "Preferred time window",
                 "Same room preference",
-                "Spread section meetings");
+                "Spread section meetings",
+                "Instructor idle gaps",
+                "Section idle gaps",
+                "Registered student idle gaps",
+                "Section building stability",
+                "Undesirable time fairness",
+                "Repair parent assignment stability");
         return Map.copyOf(values);
     }
 
