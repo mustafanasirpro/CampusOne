@@ -6,6 +6,7 @@ import com.campusone.aura.dto.AuraDtos.SessionResponse;
 import com.campusone.aura.repository.AuraJdbcRepository.DetectedClash;
 import com.campusone.aura.repository.AuraJdbcRepository.ClashDetectionContext;
 import com.campusone.aura.repository.AuraJdbcRepository.LinkageRule;
+import com.campusone.aura.repository.AuraJdbcRepository.TeachingGroupContext;
 import com.campusone.aura.repository.AuraJdbcRepository.TravelContextRule;
 import java.time.LocalTime;
 import java.util.List;
@@ -227,6 +228,35 @@ class AuraClashDetectorTest {
         assertThat(detector.detect(List.of(lecture, lab), context))
                 .extracting(DetectedClash::clashType)
                 .contains("LINKED_ACTIVITY_ORDER");
+    }
+
+    @Test
+    void detect_duplicateTeachingGroupAttendance_reportsOneRootClash() {
+        UUID offering = UUID.randomUUID();
+        UUID student = UUID.randomUUID();
+        SessionResponse first = contextualSession(
+                UUID.randomUUID(), offering, UUID.randomUUID(),
+                ROOM_ID, INSTRUCTOR_ID, SECTION_ID, 1,
+                LocalTime.of(9, 0), LocalTime.of(10, 0));
+        SessionResponse second = contextualSession(
+                UUID.randomUUID(), offering, UUID.randomUUID(),
+                OTHER_ROOM_ID, UUID.randomUUID(), UUID.randomUUID(), 2,
+                LocalTime.of(11, 0), LocalTime.of(12, 0));
+        ClashDetectionContext context = new ClashDetectionContext(
+                Map.of(first.id(), Set.of(student), second.id(), Set.of(student)),
+                Set.of(), Set.of(), Map.of(), Map.of(), List.of(),
+                Map.of(
+                        first.id(), new TeachingGroupContext(
+                                UUID.randomUUID(), "LAB"),
+                        second.id(), new TeachingGroupContext(
+                                UUID.randomUUID(), "LAB")));
+
+        assertThat(detector.detect(List.of(first, second), context))
+                .filteredOn(clash -> "DUPLICATE_TEACHING_GROUP_ATTENDANCE"
+                        .equals(clash.clashType()))
+                .singleElement()
+                .satisfies(clash -> assertThat(clash.affectedStudents())
+                        .containsExactly(student));
     }
 
     private SessionResponse session(
