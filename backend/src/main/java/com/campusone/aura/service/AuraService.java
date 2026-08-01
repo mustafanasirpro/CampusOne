@@ -773,6 +773,7 @@ public class AuraService {
             throw new AuraStateException(
                     "A generation run is already active for this term.");
         }
+        validateGenerationBudget(repository.generationComplexity(termId));
         int terminationSeconds = request.terminationSeconds() == null
                 ? 30
                 : Math.max(1, Math.min(request.terminationSeconds(), 300));
@@ -797,10 +798,19 @@ public class AuraService {
             throw new AuraStateException(
                     "A generation run is already active for this term.");
         }
+        repository.insertTermAudit(
+                termId,
+                userId,
+                "GENERATION_QUEUED",
+                "GENERATION_RUN",
+                runId,
+                "Queued timetable generation using the "
+                        + profile.toLowerCase(Locale.ROOT) + " profile.");
         FutureTask<Void> task = new FutureTask<>(() -> {
             executeGeneration(
                     runId,
                     termId,
+                    universityId,
                     userId,
                     terminationSeconds,
                     request.notes(),
@@ -836,7 +846,21 @@ public class AuraService {
             future.cancel(true);
         }
         repository.cancelRun(runId);
-        return getRun(userId, runId);
+        GenerationRunResponse cancelled = getRun(userId, runId);
+        repository.insertTermAudit(
+                cancelled.termId(),
+                userId,
+                "GENERATION_CANCELLED",
+                "GENERATION_RUN",
+                runId,
+                "Cancelled an active timetable generation run.");
+        notificationService.notifyUniversityAdmins(
+                universityId,
+                userId,
+                "Timetable generation cancelled",
+                "An active timetable generation run was cancelled.",
+                runId);
+        return cancelled;
     }
 
     public List<TimetableVersionResponse> listVersions(
@@ -886,6 +910,7 @@ public class AuraService {
             throw new AuraStateException(
                     "Each meeting requirement must contain exactly its required weekly occurrences before publishing.");
         }
+        refreshClashes(versionId);
         long openHardClashes = repository.countOpenHardClashes(versionId);
         if (openHardClashes > 0) {
             throw new AuraStateException(
@@ -902,6 +927,10 @@ public class AuraService {
                 "Published timetable version " + version.versionNumber() + ".");
         notificationService.notifyTimetablePublished(
                 repository.activeStudentUserIds(version.termId()),
+                userId,
+                versionId);
+        notificationService.notifyInstructorsTimetablePublished(
+                repository.activeInstructorUserIds(version.termId()),
                 userId,
                 versionId);
         return getVersion(userId, versionId);
@@ -930,6 +959,33 @@ public class AuraService {
         return getVersion(userId, cloneId);
     }
 
+    @Transactional
+    public TimetableVersionResponse createRollbackDraft(
+            UUID userId,
+            UUID sourceVersionId,
+            AuraDtos.CloneVersionRequest request) {
+        TimetableVersionResponse source = getVersion(userId, sourceVersionId);
+        if ("DRAFT".equals(source.status())) {
+            throw new AuraStateException(
+                    "Choose a published, superseded, or archived version to prepare a rollback.");
+        }
+        UUID draftId = repository.cloneVersion(
+                UUID.randomUUID(),
+                sourceVersionId,
+                repository.nextVersionNumber(source.termId()),
+                request.notes(),
+                userId,
+                "ROLLBACK");
+        refreshClashes(draftId);
+        repository.insertVersionAudit(
+                draftId,
+                userId,
+                "ROLLBACK_DRAFT_CREATED",
+                "Prepared a review draft from historical version "
+                        + source.versionNumber() + ".");
+        return getVersion(userId, draftId);
+    }
+
     public AuraDtos.VersionComparisonResponse compareVersions(
             UUID userId,
             UUID baseVersionId,
@@ -956,9 +1012,15 @@ public class AuraService {
         int removed = (int) changes.stream()
                 .filter(change -> change.afterSessionId() == null)
                 .count();
+        ScoreDelta scoreDelta = scoreDelta(base.score(), compared.score());
         return new AuraDtos.VersionComparisonResponse(
                 baseVersionId,
                 comparedVersionId,
+                base.score(),
+                compared.score(),
+                scoreDelta == null ? null : scoreDelta.hard(),
+                scoreDelta == null ? null : scoreDelta.medium(),
+                scoreDelta == null ? null : scoreDelta.soft(),
                 keys.size(),
                 changes.size(),
                 added,
@@ -1258,6 +1320,7 @@ public class AuraService {
     private void executeGeneration(
             UUID runId,
             UUID termId,
+            UUID universityId,
             UUID userId,
             int terminationSeconds,
             String notes,
@@ -1276,6 +1339,7 @@ public class AuraService {
                     repository.solverSectionAvailability(termId),
                     repository.solverStudentAvailability(termId),
                     repository.solverTravelRules(termId),
+                    repository.solverCalendarBlocks(termId),
                     terminationSeconds,
                     AuraConstraintCatalog.weights(
                             profile,
@@ -1290,6 +1354,21 @@ public class AuraService {
                     result.assignments(),
                     result.candidateCount(),
                     result.terminationReason());
+            repository.insertTermAudit(
+                    termId,
+                    userId,
+                    "GENERATION_COMPLETED",
+                    "GENERATION_RUN",
+                    runId,
+                    "Completed timetable generation with "
+                            + result.assignments().size()
+                            + " scheduled occurrence(s).");
+            notificationService.notifyUniversityAdmins(
+                    universityId,
+                    userId,
+                    "Timetable generation completed",
+                    "A generated timetable is ready for review.",
+                    runId);
         } catch (RuntimeException exception) {
             LOG.error(
                     "AURA generation run {} failed safely: {}",
@@ -1300,6 +1379,19 @@ public class AuraService {
                 repository.markRunFailed(
                         runId,
                         "Generation failed before a valid timetable could be saved.");
+                repository.insertTermAudit(
+                        termId,
+                        userId,
+                        "GENERATION_FAILED",
+                        "GENERATION_RUN",
+                        runId,
+                        "Timetable generation failed before a valid version was saved.");
+                notificationService.notifyUniversityAdmins(
+                        universityId,
+                        userId,
+                        "Timetable generation needs attention",
+                        "A generation run ended before a reviewable timetable was created.",
+                        runId);
             } catch (RuntimeException statusException) {
                 LOG.error(
                         "AURA generation run {} status could not be updated: {}",
@@ -1308,6 +1400,28 @@ public class AuraService {
             }
         } finally {
             runningRuns.remove(runId);
+        }
+    }
+
+    private void validateGenerationBudget(
+            AuraJdbcRepository.GenerationComplexity complexity) {
+        if (complexity == null) {
+            return;
+        }
+        long estimatedBytes;
+        try {
+            estimatedBytes = complexity.estimatedWorkingBytes();
+        } catch (ArithmeticException exception) {
+            throw new AuraStateException(
+                    "This timetable is too large to generate safely in one run. Reduce the participating scope.");
+        }
+        long availableBudget = Math.max(
+                64L * 1024L * 1024L,
+                Runtime.getRuntime().maxMemory() / 2L);
+        if (complexity.occurrences() > 10_000
+                || estimatedBytes > availableBudget) {
+            throw new AuraStateException(
+                    "This timetable exceeds the safe generation memory budget. Reduce the participating sections or split the term.");
         }
     }
 
@@ -1335,6 +1449,25 @@ public class AuraService {
             case MEDIUM -> score.mediumScore();
             case SOFT -> score.softScore();
         };
+    }
+
+    private ScoreDelta scoreDelta(String baseScore, String comparedScore) {
+        if (baseScore == null || baseScore.isBlank()
+                || comparedScore == null || comparedScore.isBlank()) {
+            return null;
+        }
+        try {
+            var base = ai.timefold.solver.core.api.score.buildin.hardmediumsoft
+                    .HardMediumSoftScore.parseScore(baseScore);
+            var compared = ai.timefold.solver.core.api.score.buildin.hardmediumsoft
+                    .HardMediumSoftScore.parseScore(comparedScore);
+            return new ScoreDelta(
+                    compared.hardScore() - base.hardScore(),
+                    compared.mediumScore() - base.mediumScore(),
+                    compared.softScore() - base.softScore());
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     private Map<String, VersionSessionSnapshot> snapshotsByOccurrence(
@@ -1678,6 +1811,9 @@ public class AuraService {
                     "Availability must be UNAVAILABLE, AVOID, or PREFERRED.");
         }
         return normalized;
+    }
+
+    private record ScoreDelta(int hard, int medium, int soft) {
     }
 
     private String checksum(String value) {
