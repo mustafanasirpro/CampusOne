@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.campusone.aura.dto.AuraRegistrationDtos;
 import com.campusone.aura.dto.AuraRegistrationDtos.PersonalTimetableEntry;
 import com.campusone.aura.dto.AuraRegistrationDtos.StudentRegistrationResponse;
+import com.campusone.aura.exception.AuraStateException;
 import com.campusone.aura.repository.AuraJdbcRepository;
 import com.campusone.aura.repository.AuraJdbcRepository.ScopedResource;
 import com.campusone.aura.repository.AuraRegistrationRepository;
@@ -68,6 +69,12 @@ class AuraRegistrationServiceTest {
                 null, OFFERING_ID, "LAB")).thenReturn(true);
         when(registrationRepository.groupMatchesOfferingAndType(
                 null, OFFERING_ID, "TUTORIAL")).thenReturn(true);
+        when(registrationRepository.registrationGroupsComplete(
+                OFFERING_ID, null, null, null)).thenReturn(true);
+        when(registrationRepository.equivalentOfferingCompatible(
+                OFFERING_ID, null, TERM_ID)).thenReturn(true);
+        when(registrationRepository.registrationCapacityAvailable(
+                OFFERING_ID, null, null, null, null)).thenReturn(true);
         when(registrationRepository.findRegistration(any()))
                 .thenReturn(Optional.of(registration("REPEATER")));
 
@@ -77,6 +84,78 @@ class AuraRegistrationServiceTest {
         assertThat(response.registrationType()).isEqualTo("REPEATER");
         verify(registrationRepository).insertRegistration(
                 any(), eq(UNIVERSITY_ID), eq(ACTOR_ID), eq(request), eq("REPEATER"));
+    }
+
+    @Test
+    void createRegistration_rejectsDuplicateParallelAttendance() {
+        stubAdminTermScope();
+        var request = request("REPEATER");
+        when(registrationRepository.studentBelongsToUniversity(
+                STUDENT_ID, UNIVERSITY_ID)).thenReturn(true);
+        when(registrationRepository.offeringBelongsToTerm(OFFERING_ID, TERM_ID))
+                .thenReturn(true);
+        when(registrationRepository.equivalentOfferingCompatible(
+                OFFERING_ID, null, TERM_ID)).thenReturn(true);
+        when(registrationRepository.sectionBelongsToTermUniversity(
+                null, TERM_ID, UNIVERSITY_ID)).thenReturn(true);
+        when(registrationRepository.groupMatchesOfferingAndType(
+                null, OFFERING_ID, "LECTURE")).thenReturn(true);
+        when(registrationRepository.groupMatchesOfferingAndType(
+                null, OFFERING_ID, "LAB")).thenReturn(true);
+        when(registrationRepository.groupMatchesOfferingAndType(
+                null, OFFERING_ID, "TUTORIAL")).thenReturn(true);
+        when(registrationRepository.registrationGroupsComplete(
+                OFFERING_ID, null, null, null)).thenReturn(true);
+        when(registrationRepository.hasActiveParallelRegistration(
+                TERM_ID, STUDENT_ID, OFFERING_ID)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.createRegistration(ACTOR_ID, request))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessageContaining("parallel offering");
+
+        verify(registrationRepository, never()).insertRegistration(
+                any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void createRegistration_rejectsFullOfferingOrTeachingGroup() {
+        stubValidRegistrationRequest();
+        var request = request("PRIMARY_SECTION");
+        when(registrationRepository.registrationCapacityAvailable(
+                OFFERING_ID, null, null, null, null)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createRegistration(ACTOR_ID, request))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessageContaining("reached capacity");
+
+        verify(registrationRepository, never()).insertRegistration(
+                any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void createRegistration_requiresConfiguredTeachingGroups() {
+        stubAdminTermScope();
+        var request = request("PRIMARY_SECTION");
+        when(registrationRepository.studentBelongsToUniversity(
+                STUDENT_ID, UNIVERSITY_ID)).thenReturn(true);
+        when(registrationRepository.offeringBelongsToTerm(OFFERING_ID, TERM_ID))
+                .thenReturn(true);
+        when(registrationRepository.equivalentOfferingCompatible(
+                OFFERING_ID, null, TERM_ID)).thenReturn(true);
+        when(registrationRepository.sectionBelongsToTermUniversity(
+                null, TERM_ID, UNIVERSITY_ID)).thenReturn(true);
+        when(registrationRepository.groupMatchesOfferingAndType(
+                null, OFFERING_ID, "LECTURE")).thenReturn(true);
+        when(registrationRepository.groupMatchesOfferingAndType(
+                null, OFFERING_ID, "LAB")).thenReturn(true);
+        when(registrationRepository.groupMatchesOfferingAndType(
+                null, OFFERING_ID, "TUTORIAL")).thenReturn(true);
+        when(registrationRepository.registrationGroupsComplete(
+                OFFERING_ID, null, null, null)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.createRegistration(ACTOR_ID, request))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessageContaining("required lecture");
     }
 
     @Test
@@ -157,6 +236,7 @@ class AuraRegistrationServiceTest {
                         LocalDate.of(2026, 9, 7),
                         LocalDate.of(2026, 9, 28),
                         "PUBLISHED",
+                        "Asia/Karachi",
                         Instant.parse("2026-01-01T00:00:00Z"),
                         Instant.parse("2026-01-01T00:00:00Z"),
                         0L)));
@@ -191,6 +271,26 @@ class AuraRegistrationServiceTest {
                 null,
                 null,
                 null);
+    }
+
+    private void stubValidRegistrationRequest() {
+        stubAdminTermScope();
+        when(registrationRepository.studentBelongsToUniversity(
+                STUDENT_ID, UNIVERSITY_ID)).thenReturn(true);
+        when(registrationRepository.offeringBelongsToTerm(OFFERING_ID, TERM_ID))
+                .thenReturn(true);
+        when(registrationRepository.equivalentOfferingCompatible(
+                OFFERING_ID, null, TERM_ID)).thenReturn(true);
+        when(registrationRepository.sectionBelongsToTermUniversity(
+                null, TERM_ID, UNIVERSITY_ID)).thenReturn(true);
+        when(registrationRepository.groupMatchesOfferingAndType(
+                null, OFFERING_ID, "LECTURE")).thenReturn(true);
+        when(registrationRepository.groupMatchesOfferingAndType(
+                null, OFFERING_ID, "LAB")).thenReturn(true);
+        when(registrationRepository.groupMatchesOfferingAndType(
+                null, OFFERING_ID, "TUTORIAL")).thenReturn(true);
+        when(registrationRepository.registrationGroupsComplete(
+                OFFERING_ID, null, null, null)).thenReturn(true);
     }
 
     private void stubAdminTermScope() {
