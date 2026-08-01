@@ -1,5 +1,6 @@
 package com.campusone.aura.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -13,6 +14,7 @@ import com.campusone.aura.dto.AuraDtos.SessionResponse;
 import com.campusone.aura.exception.AuraStateException;
 import com.campusone.aura.repository.AuraJdbcRepository;
 import com.campusone.aura.repository.AuraJdbcRepository.ScopedResource;
+import com.campusone.aura.repository.AuraJdbcRepository.VersionSessionSnapshot;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -104,6 +106,36 @@ class AuraServiceTest {
                 .hasMessage("A generation run is already active for this term.");
 
         verify(repository, never()).insertRun(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    @Test
+    void startGeneration_rejectsProblemThatExceedsSafeOccurrenceBudget() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.TERM,
+                TERM_ID,
+                UNIVERSITY_ID)).thenReturn(true);
+        when(readinessValidator.validate(TERM_ID)).thenReturn(ready());
+        when(repository.generationComplexity(TERM_ID)).thenReturn(
+                new AuraJdbcRepository.GenerationComplexity(
+                        10_001, 1, 1));
+
+        assertThatThrownBy(() -> service.startGeneration(
+                USER_ID,
+                TERM_ID,
+                new AuraDtos.GenerateTimetableRequest(30, "large run")))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessageContaining("safe generation memory budget");
+
+        verify(repository, never()).createGenerationRun(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
@@ -373,6 +405,120 @@ class AuraServiceTest {
                 org.mockito.ArgumentMatchers.any());
     }
 
+    @Test
+    void compareVersions_reportsStructuralAndScoreDelta() {
+        UUID comparedVersionId = UUID.fromString(
+                "30000000-0000-4000-8000-000000000002");
+        UUID requirementId = UUID.fromString(
+                "31000000-0000-4000-8000-000000000001");
+        UUID comparedRoomId = UUID.fromString(
+                "71000000-0000-4000-8000-000000000004");
+        UUID instructorId = UUID.fromString(
+                "71000000-0000-4000-8000-000000000003");
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION, VERSION_ID, UNIVERSITY_ID))
+                .thenReturn(true);
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION, comparedVersionId, UNIVERSITY_ID))
+                .thenReturn(true);
+        when(repository.findVersion(VERSION_ID)).thenReturn(Optional.of(
+                new TimetableVersionResponse(
+                        VERSION_ID, TERM_ID, null, 1, "DRAFT",
+                        "0hard/-2medium/-8soft", null, NOW, null)));
+        when(repository.findVersion(comparedVersionId)).thenReturn(Optional.of(
+                new TimetableVersionResponse(
+                        comparedVersionId, TERM_ID, null, 2, "DRAFT",
+                        "0hard/-1medium/-3soft", null, NOW, null)));
+        when(repository.versionSessionSnapshots(VERSION_ID)).thenReturn(List.of(
+                new VersionSessionSnapshot(
+                        SESSION_ID, requirementId, 1, ROOM_ID, TIMESLOT_ID,
+                        instructorId, SECTION_ID)));
+        when(repository.versionSessionSnapshots(comparedVersionId)).thenReturn(
+                List.of(new VersionSessionSnapshot(
+                        UUID.randomUUID(), requirementId, 1, comparedRoomId,
+                        TIMESLOT_ID, instructorId, SECTION_ID)));
+
+        var comparison = service.compareVersions(
+                USER_ID, VERSION_ID, comparedVersionId);
+
+        assertThat(comparison.changedOccurrences()).isEqualTo(1);
+        assertThat(comparison.hardScoreDelta()).isZero();
+        assertThat(comparison.mediumScoreDelta()).isEqualTo(1);
+        assertThat(comparison.softScoreDelta()).isEqualTo(5);
+    }
+
+    @Test
+    void createRollbackDraft_rejectsAnEditableDraftAsSource() {
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION, VERSION_ID, UNIVERSITY_ID))
+                .thenReturn(true);
+        when(repository.findVersion(VERSION_ID))
+                .thenReturn(Optional.of(version("DRAFT")));
+
+        assertThatThrownBy(() -> service.createRollbackDraft(
+                USER_ID,
+                VERSION_ID,
+                new AuraDtos.CloneVersionRequest("Rollback review")))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessageContaining("published, superseded, or archived");
+
+        verify(repository, never()).cloneVersion(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void createRollbackDraft_clonesHistoricalVersionAndRevalidatesClashes() {
+        UUID rollbackId = UUID.fromString(
+                "30000000-0000-4000-8000-000000000099");
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION, VERSION_ID, UNIVERSITY_ID))
+                .thenReturn(true);
+        when(repository.resourceBelongsToUniversity(
+                ScopedResource.VERSION, rollbackId, UNIVERSITY_ID))
+                .thenReturn(true);
+        when(repository.findVersion(VERSION_ID))
+                .thenReturn(Optional.of(version("SUPERSEDED")));
+        when(repository.findVersion(rollbackId)).thenReturn(Optional.of(
+                new TimetableVersionResponse(
+                        rollbackId, TERM_ID, VERSION_ID, 2, "DRAFT",
+                        "0hard/0medium/0soft", "Rollback review", NOW, null)));
+        when(repository.nextVersionNumber(TERM_ID)).thenReturn(2);
+        when(repository.cloneVersion(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(VERSION_ID),
+                org.mockito.ArgumentMatchers.eq(2),
+                org.mockito.ArgumentMatchers.eq("Rollback review"),
+                org.mockito.ArgumentMatchers.eq(USER_ID),
+                org.mockito.ArgumentMatchers.eq("ROLLBACK")))
+                .thenReturn(rollbackId);
+        when(repository.listSessions(rollbackId)).thenReturn(List.of());
+        when(repository.clashDetectionContext(rollbackId))
+                .thenReturn(AuraJdbcRepository.ClashDetectionContext.empty());
+        when(clashDetector.detect(
+                org.mockito.ArgumentMatchers.eq(List.of()),
+                org.mockito.ArgumentMatchers.eq(
+                        AuraJdbcRepository.ClashDetectionContext.empty())))
+                .thenReturn(List.of());
+
+        TimetableVersionResponse result = service.createRollbackDraft(
+                USER_ID,
+                VERSION_ID,
+                new AuraDtos.CloneVersionRequest("Rollback review"));
+
+        assertThat(result.id()).isEqualTo(rollbackId);
+        verify(repository).replaceClashes(rollbackId, List.of());
+        verify(repository).insertVersionAudit(
+                rollbackId,
+                USER_ID,
+                "ROLLBACK_DRAFT_CREATED",
+                "Prepared a review draft from historical version 1.");
+    }
+
     private ReadinessResponse ready() {
         return new ReadinessResponse(
                 TERM_ID,
@@ -394,6 +540,7 @@ class AuraServiceTest {
                 LocalDate.of(2026, 9, 1),
                 LocalDate.of(2026, 12, 31),
                 "DRAFT",
+                "Asia/Karachi",
                 NOW,
                 NOW,
                 0L);
