@@ -24,8 +24,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -46,6 +48,7 @@ public class AuraRepairService {
     private final AuraJdbcRepository coreRepository;
     private final AuraOperationsRepository repository;
     private final AuraService auraService;
+    private final AuraNotificationService notificationService;
     private final Clock clock;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -54,11 +57,13 @@ public class AuraRepairService {
             AuraJdbcRepository coreRepository,
             AuraOperationsRepository repository,
             AuraService auraService,
+            AuraNotificationService notificationService,
             Clock clock) {
         this.authorization = authorization;
         this.coreRepository = coreRepository;
         this.repository = repository;
         this.auraService = auraService;
+        this.notificationService = notificationService;
         this.clock = clock;
     }
 
@@ -163,6 +168,7 @@ public class AuraRepairService {
         if (plan.moves().isEmpty()) {
             throw new AuraStateException("This preview has no safe repair to apply.");
         }
+        Set<UUID> affectedOfferings = new LinkedHashSet<>();
         for (RepairMove move : plan.moves()) {
             SessionResponse current = coreRepository.findSession(move.sessionId())
                     .filter(session -> session.versionId().equals(plan.draftVersionId()))
@@ -172,6 +178,7 @@ public class AuraRepairService {
                 throw new AuraStateException(
                         "The repair draft changed after preview. Create a new preview.");
             }
+            affectedOfferings.add(current.offeringId());
             auraService.applyMove(actorId, move.sessionId(),
                     new AuraDtos.ManualMoveRequest(
                             move.proposedRoomId(), move.proposedTimeslotId(), plan.reason()));
@@ -184,6 +191,12 @@ public class AuraRepairService {
                 UUID.randomUUID(), "SUCCESS",
                 Map.of("sessionsMoved", plan.impact().sessionsMoved(),
                         "disruptionScore", plan.impact().disruptionScore()));
+        repository.activeStudentUserIdsForOfferings(affectedOfferings)
+                .forEach(studentId -> notificationService.notifyStudent(
+                        studentId,
+                        "A timetable adjustment is being reviewed",
+                        "A proposed timetable change may affect one of your registered courses.",
+                        plan.draftVersionId()));
         return response(repository.findRepairPlan(planId, universityId)
                 .orElseThrow(() -> notFound("Repair plan")), null);
     }
