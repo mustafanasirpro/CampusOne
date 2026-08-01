@@ -8,6 +8,7 @@ import ai.timefold.solver.core.config.solver.SolverConfig;
 import ai.timefold.solver.core.config.solver.termination.TerminationConfig;
 import ai.timefold.solver.core.config.score.director.ScoreDirectorFactoryConfig;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverAssignment;
+import com.campusone.aura.repository.AuraJdbcRepository.SolverCalendarBlock;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverInstructorAvailability;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverRequirement;
 import com.campusone.aura.repository.AuraJdbcRepository.SolverRoomAvailability;
@@ -82,6 +83,7 @@ public class AuraSolverService {
                 sectionAvailability,
                 studentAvailability,
                 travelRules,
+                List.of(),
                 terminationSeconds,
                 Map.of(),
                 0L);
@@ -96,6 +98,7 @@ public class AuraSolverService {
             List<SolverSectionAvailability> sectionAvailability,
             List<SolverStudentAvailability> studentAvailability,
             List<SolverTravelRuleInput> travelRules,
+            List<SolverCalendarBlock> calendarBlocks,
             int terminationSeconds,
             Map<String, HardMediumSoftScore> constraintWeights,
             long randomSeed) {
@@ -150,6 +153,7 @@ public class AuraSolverService {
                         (left, right) -> left));
         List<AuraPlanningLesson> lessons =
                 expandLessons(requirements, travelRuleFacts);
+        applyCalendarBlocks(lessons, calendarBlocks);
         seedInitialAssignments(
                 lessons,
                 roomFacts,
@@ -183,6 +187,7 @@ public class AuraSolverService {
                                 1,
                                 terminationSeconds)));
 
+        long startedAt = System.nanoTime();
         AuraTimetableSolution solved =
                 SolverFactory.<AuraTimetableSolution>create(solverConfig)
                         .buildSolver()
@@ -202,13 +207,62 @@ public class AuraSolverService {
             throw new IllegalStateException(
                     "The solver stopped before assigning every required occurrence.");
         }
+        HardMediumSoftScore finalScore = solved.getScore() == null
+                ? HardMediumSoftScore.ZERO
+                : solved.getScore();
+        long elapsedMillis = java.util.concurrent.TimeUnit.NANOSECONDS
+                .toMillis(System.nanoTime() - startedAt);
+        String terminationReason = finalScore.hardScore() >= 0
+                ? "TIME_LIMIT_FEASIBLE"
+                : "TIME_LIMIT_WITH_HARD_CONSTRAINTS";
         return new SolverResult(
-                solved.getScore() == null
-                        ? "0hard/0medium/0soft"
-                        : solved.getScore().toString(),
+                finalScore.toString(),
                 assignments,
                 lessons.size(),
-                "COMPLETED");
+                terminationReason,
+                elapsedMillis);
+    }
+
+    public SolverResult solve(
+            List<SolverRequirement> requirements,
+            List<SolverRoom> rooms,
+            List<SolverTimeslot> timeslots,
+            List<SolverInstructorAvailability> instructorAvailability,
+            List<SolverRoomAvailability> roomAvailability,
+            List<SolverSectionAvailability> sectionAvailability,
+            List<SolverStudentAvailability> studentAvailability,
+            List<SolverTravelRuleInput> travelRules,
+            int terminationSeconds,
+            Map<String, HardMediumSoftScore> constraintWeights,
+            long randomSeed) {
+        return solve(
+                requirements,
+                rooms,
+                timeslots,
+                instructorAvailability,
+                roomAvailability,
+                sectionAvailability,
+                studentAvailability,
+                travelRules,
+                List.of(),
+                terminationSeconds,
+                constraintWeights,
+                randomSeed);
+    }
+
+    private void applyCalendarBlocks(
+            List<AuraPlanningLesson> lessons,
+            List<SolverCalendarBlock> calendarBlocks) {
+        Map<UUID, Set<String>> blocksByRequirement = calendarBlocks.stream()
+                .collect(Collectors.groupingBy(
+                        SolverCalendarBlock::requirementId,
+                        Collectors.mapping(
+                                block -> AuraPlanningLesson.assignmentKey(
+                                        block.roomId(), block.timeslotId()),
+                                Collectors.toUnmodifiableSet())));
+        lessons.forEach(lesson -> lesson.setCalendarBlockedAssignments(
+                blocksByRequirement.getOrDefault(
+                        lesson.getRequirementId(), Set.of())));
     }
 
     private List<AuraPlanningLesson> expandLessons(
@@ -324,6 +378,15 @@ public class AuraSolverService {
                             room.id(), timeslot.id()))) {
                         continue;
                     }
+                    lesson.setRoom(room);
+                    lesson.setTimeslot(timeslot);
+                    if (lesson.isCalendarBlocked()) {
+                        lesson.setRoom(null);
+                        lesson.setTimeslot(null);
+                        continue;
+                    }
+                    lesson.setRoom(null);
+                    lesson.setTimeslot(null);
                     InitialAssignment candidate = new InitialAssignment(
                             room, timeslot);
                     if (fallback == null) {
@@ -505,10 +568,24 @@ public class AuraSolverService {
             String score,
             List<SolverAssignment> assignments,
             int candidateCount,
-            String terminationReason) {
+            String terminationReason,
+            long solverTimeMillis) {
 
         public SolverResult(String score, List<SolverAssignment> assignments) {
-            this(score, assignments, assignments.size(), "COMPLETED");
+            this(
+                    score,
+                    assignments,
+                    assignments.size(),
+                    "TIME_LIMIT_FEASIBLE",
+                    0L);
+        }
+
+        public SolverResult(
+                String score,
+                List<SolverAssignment> assignments,
+                int candidateCount,
+                String terminationReason) {
+            this(score, assignments, candidateCount, terminationReason, 0L);
         }
     }
 }
