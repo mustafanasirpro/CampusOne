@@ -160,6 +160,43 @@ class AuraResolutionServiceTest {
     }
 
     @Test
+    void apply_rejectsOfferingThatNeedsUnassignedTeachingGroups() {
+        when(authorizationService.requireAdminUniversity(ADMIN_ID))
+                .thenReturn(UNIVERSITY_ID);
+        when(repository.findCase(CASE_ID))
+                .thenReturn(Optional.of(caseResponse("APPROVED", 1)));
+        when(repository.findRegistrationScope(REGISTRATION_ID))
+                .thenReturn(Optional.of(registration(USER_ID)));
+        SuggestionTarget suggestion = new SuggestionTarget(
+                SUGGESTION_ID, "SECTION_TRANSFER", TARGET_OFFERING_ID,
+                UUID.randomUUID(), null, true);
+        when(repository.findSuggestion(CASE_ID, SUGGESTION_ID))
+                .thenReturn(Optional.of(suggestion));
+        when(repository.parallelOfferingCandidates(
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(
+                        new OfferingCandidate(
+                                TARGET_OFFERING_ID, "SECTION_TRANSFER",
+                                "CS101-B", "Programming", UUID.randomUUID(),
+                                "BSCS-1B", 8, true, false)));
+
+        assertThatThrownBy(() -> service.apply(
+                ADMIN_ID, CASE_ID,
+                new AuraResolutionDtos.ResolutionDecisionRequest(
+                        SUGGESTION_ID, "Apply transfer", 1)))
+                .isInstanceOf(AuraStateException.class)
+                .hasMessageContaining("no longer safe");
+
+        verify(repository, never()).applyOfferingTransfer(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void apply_movesOnlyStudentToSafeAlternateLabGroup() {
         UUID groupId = UUID.randomUUID();
         when(authorizationService.requireAdminUniversity(ADMIN_ID))
@@ -183,6 +220,8 @@ class AuraResolutionServiceTest {
                 new AuraResolutionDtos.ResolutionDecisionRequest(
                         SUGGESTION_ID, "Use the safe lab group", 1));
 
+        verify(repository).lockResolutionCapacity(
+                OFFERING_ID, List.of(groupId));
         verify(repository).applyGroupTransfer(
                 CASE_ID, REGISTRATION_ID,
                 new SuggestionTarget(
@@ -197,6 +236,46 @@ class AuraResolutionServiceTest {
                 org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void apply_transfersOfferingAndAllRequiredGroupsAtomically() {
+        UUID sectionId = UUID.randomUUID();
+        UUID lectureGroupId = UUID.randomUUID();
+        UUID labGroupId = UUID.randomUUID();
+        UUID tutorialGroupId = UUID.randomUUID();
+        SuggestionTarget suggestion = new SuggestionTarget(
+                SUGGESTION_ID, "SECTION_TRANSFER", TARGET_OFFERING_ID,
+                sectionId, null, lectureGroupId, labGroupId,
+                tutorialGroupId, true);
+        OfferingCandidate candidate = new OfferingCandidate(
+                TARGET_OFFERING_ID, "SECTION_TRANSFER", "CS101-B",
+                "Programming", sectionId, "BSCS-1B", 8, true, true,
+                lectureGroupId, labGroupId, tutorialGroupId);
+        when(authorizationService.requireAdminUniversity(ADMIN_ID))
+                .thenReturn(UNIVERSITY_ID);
+        when(repository.findCase(CASE_ID))
+                .thenReturn(Optional.of(caseResponse("APPROVED", 1)),
+                        Optional.of(caseResponse("APPLIED", 2)));
+        when(repository.findRegistrationScope(REGISTRATION_ID))
+                .thenReturn(Optional.of(registration(USER_ID)));
+        when(repository.findSuggestion(CASE_ID, SUGGESTION_ID))
+                .thenReturn(Optional.of(suggestion));
+        when(repository.parallelOfferingCandidates(
+                org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(candidate));
+
+        service.apply(
+                ADMIN_ID, CASE_ID,
+                new AuraResolutionDtos.ResolutionDecisionRequest(
+                        SUGGESTION_ID, "Move the complete registration", 1));
+
+        verify(repository).lockResolutionCapacity(
+                TARGET_OFFERING_ID,
+                List.of(lectureGroupId, labGroupId, tutorialGroupId));
+        verify(repository).applyOfferingTransfer(
+                CASE_ID, REGISTRATION_ID, suggestion, 1, 0, ADMIN_ID,
+                "Move the complete registration");
     }
 
     @Test
