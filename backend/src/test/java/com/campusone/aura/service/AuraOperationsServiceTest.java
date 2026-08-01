@@ -150,4 +150,39 @@ class AuraOperationsServiceTest {
                 new AuraOperationsDtos.ActiveStateRequest(false, 0, "Unavailable")))
                 .hasMessageContaining("Scheduling resource");
     }
+
+    @Test
+    void deleteStudentAvailability_isUniversityScopedAndOptimistic() {
+        UUID availability = UUID.randomUUID();
+        when(repository.studentAvailabilityTerm(availability, UNIVERSITY))
+                .thenReturn(Optional.of(TERM));
+        when(repository.deleteStudentAvailability(availability, UNIVERSITY, 3))
+                .thenReturn(true);
+
+        service.deleteStudentAvailability(ACTOR, availability, 3);
+
+        verify(repository).deleteStudentAvailability(availability, UNIVERSITY, 3);
+        verify(repository).insertAudit(
+                org.mockito.ArgumentMatchers.eq(UNIVERSITY),
+                org.mockito.ArgumentMatchers.eq(TERM),
+                org.mockito.ArgumentMatchers.eq(ACTOR),
+                org.mockito.ArgumentMatchers.eq("STUDENT_AVAILABILITY_DELETED"),
+                org.mockito.ArgumentMatchers.eq("STUDENT_AVAILABILITY"),
+                org.mockito.ArgumentMatchers.eq(availability),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq("SUCCESS"),
+                org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    @Test
+    void deleteStudentAvailability_rejectsGuessedCrossUniversityId() {
+        UUID availability = UUID.randomUUID();
+        when(repository.studentAvailabilityTerm(availability, UNIVERSITY))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() ->
+                service.deleteStudentAvailability(ACTOR, availability, 0))
+                .hasMessageContaining("Student availability");
+    }
 }
