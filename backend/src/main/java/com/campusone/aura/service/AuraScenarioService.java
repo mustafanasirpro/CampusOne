@@ -13,7 +13,9 @@ import com.campusone.aura.repository.AuraJdbcRepository;
 import com.campusone.aura.repository.AuraJdbcRepository.DetectedClash;
 import com.campusone.aura.repository.AuraJdbcRepository.ScopedResource;
 import com.campusone.aura.repository.AuraScenarioRepository;
+import com.campusone.aura.solver.AuraConstraintCatalog;
 import com.campusone.common.exception.ResourceNotFoundException;
+import ai.timefold.solver.core.api.score.buildin.hardmediumsoft.HardMediumSoftScore;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -34,10 +36,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuraScenarioService {
 
     private static final Set<String> WHAT_IF_TYPES = Set.of(
-            "ROOM_UNAVAILABLE", "INSTRUCTOR_UNAVAILABLE", "SECTION_ADDED",
-            "OFFERING_ADDED", "ENROLLMENT_CHANGED", "TIMESLOT_REMOVED",
-            "LAB_DURATION_CHANGED", "INSTRUCTOR_REPLACED", "REGISTRATION_ADDED",
-            "TRAVEL_RULE_CHANGED", "EXCEPTION_ADDED", "FACILITY_REMOVED");
+            "ROOM_UNAVAILABLE", "INSTRUCTOR_UNAVAILABLE",
+            "TIMESLOT_REMOVED", "FACILITY_REMOVED");
     private static final Set<String> EMERGENCY_TYPES = Set.of(
             "ROOM_CLOSURE", "INSTRUCTOR_ABSENCE", "UNIVERSITY_EVENT",
             "TIMESLOT_CANCELLATION", "FACILITY_OUTAGE", "SECTION_RESTRICTION");
@@ -47,18 +47,21 @@ public class AuraScenarioService {
     private final AuraScenarioRepository scenarioRepository;
     private final AuraClashDetector clashDetector;
     private final AuraService auraService;
+    private final AuraSolverService solverService;
 
     public AuraScenarioService(
             AuraAuthorizationService authorizationService,
             AuraJdbcRepository repository,
             AuraScenarioRepository scenarioRepository,
             AuraClashDetector clashDetector,
-            AuraService auraService) {
+            AuraService auraService,
+            AuraSolverService solverService) {
         this.authorizationService = authorizationService;
         this.repository = repository;
         this.scenarioRepository = scenarioRepository;
         this.clashDetector = clashDetector;
         this.auraService = auraService;
+        this.solverService = solverService;
     }
 
     @Transactional
@@ -74,14 +77,37 @@ public class AuraScenarioService {
         validateResourceScope(scenarioType, resourceId, universityId);
         int affected = scenarioRepository.countAffectedSessions(
                 request.sourceVersionId(), scenarioType, resourceId);
-        String recommendation = affected == 0
-                ? "The current timetable has no directly affected sessions. Review readiness before applying this input change."
-                : affected + " session" + (affected == 1 ? " is" : "s are")
-                        + " directly affected. Create a repair draft before changing live scheduling data.";
+        TimetableVersionResponse sourceVersion = repository
+                .findVersion(request.sourceVersionId())
+                .orElseThrow(() -> notFound(
+                        "AURA timetable version was not found."));
+        ScenarioComparison comparison = compareScenario(
+                termId, request.sourceVersionId(), sourceVersion.score(),
+                scenarioType, resourceId);
+        String recommendation;
+        if (!comparison.simulated()) {
+            recommendation = affected == 0
+                    ? "This planning-data change has no direct session mapping. Run readiness and generation in an isolated draft before applying it."
+                    : affected + " session" + (affected == 1 ? " is" : "s are")
+                            + " directly affected. Use an isolated repair draft to validate the full scheduling impact.";
+        } else if (!comparison.feasible()) {
+            recommendation = "The simulated change cannot produce a complete clash-free timetable with the current resources.";
+        } else if (comparison.clashesAdded() == 0) {
+            recommendation = "The simulated change adds no hard clashes to the current timetable.";
+        } else {
+            recommendation = comparison.clashesAdded() + " new hard clash"
+                    + (comparison.clashesAdded() == 1 ? " is" : "es are")
+                    + " projected. Create and review a repair draft before applying the change.";
+        }
         UUID id = scenarioRepository.insertCompletedWhatIf(
                 UUID.randomUUID(), universityId, termId,
                 request.sourceVersionId(), userId, scenarioType,
-                request.scenarioInput(), affected, recommendation);
+                request.scenarioInput(), affected,
+                comparison.clashesAdded(), comparison.clashesRemoved(),
+                comparison.baselineScore(), comparison.projectedScore(),
+                comparison.feasible(), comparison.candidateCount(),
+                comparison.terminationReason(),
+                recommendation);
         repository.insertVersionAudit(
                 request.sourceVersionId(), userId, "WHAT_IF_COMPLETED",
                 "Completed a non-destructive " + scenarioType + " simulation.");
@@ -296,6 +322,121 @@ public class AuraScenarioService {
         }
     }
 
+    private ScenarioComparison compareScenario(
+            UUID termId,
+            UUID versionId,
+            String baselineScore,
+            String scenarioType,
+            UUID resourceId) {
+        List<SessionResponse> baselineSessions = repository.listSessions(versionId);
+        var context = repository.clashDetectionContext(versionId);
+        Set<String> baseline = clashDetector.detect(
+                        baselineSessions, context).stream()
+                .map(this::clashFingerprint)
+                .collect(java.util.stream.Collectors.toSet());
+        List<SessionResponse> projectedSessions = baselineSessions.stream()
+                .map(session -> applyScenarioRestriction(
+                        session, scenarioType, resourceId))
+                .toList();
+        Set<String> projected = clashDetector.detect(
+                        projectedSessions, context).stream()
+                .map(this::clashFingerprint)
+                .collect(java.util.stream.Collectors.toSet());
+        var requirements = repository.solverRequirements(termId);
+        var rooms = repository.solverRooms(termId);
+        var timeslots = repository.solverTimeslots(termId);
+        var instructorAvailability = new ArrayList<>(
+                repository.solverInstructorAvailability(termId));
+        if (Set.of("ROOM_UNAVAILABLE", "FACILITY_REMOVED")
+                .contains(scenarioType)) {
+            rooms = rooms.stream()
+                    .filter(room -> !room.id().equals(resourceId))
+                    .toList();
+        } else if ("TIMESLOT_REMOVED".equals(scenarioType)) {
+            timeslots = timeslots.stream()
+                    .filter(slot -> !slot.id().equals(resourceId))
+                    .toList();
+        } else if ("INSTRUCTOR_UNAVAILABLE".equals(scenarioType)) {
+            timeslots.forEach(slot -> instructorAvailability.add(
+                    new AuraJdbcRepository.SolverInstructorAvailability(
+                            resourceId, slot.id(), "UNAVAILABLE")));
+        }
+        int occurrenceCount = requirements.stream()
+                .mapToInt(AuraJdbcRepository.SolverRequirement::sessionsPerWeek)
+                .sum();
+        if (rooms.isEmpty() || timeslots.isEmpty()) {
+            return new ScenarioComparison(
+                    true,
+                    (int) projected.stream()
+                            .filter(key -> !baseline.contains(key)).count(),
+                    (int) baseline.stream()
+                            .filter(key -> !projected.contains(key)).count(),
+                    baselineScore,
+                    null,
+                    false,
+                    occurrenceCount,
+                    rooms.isEmpty()
+                            ? "NO_ELIGIBLE_ROOMS"
+                            : "NO_ELIGIBLE_TIMESLOTS");
+        }
+        AuraSolverService.SolverResult result = solverService.solve(
+                requirements,
+                rooms,
+                timeslots,
+                instructorAvailability,
+                repository.solverRoomAvailability(termId),
+                repository.solverSectionAvailability(termId),
+                repository.solverStudentAvailability(termId),
+                repository.solverTravelRules(termId),
+                repository.solverCalendarBlocks(termId),
+                10,
+                AuraConstraintCatalog.weights(
+                        AuraConstraintCatalog.WHAT_IF,
+                        repository.constraintWeights(
+                                termId, AuraConstraintCatalog.WHAT_IF)),
+                0L);
+        boolean feasible = HardMediumSoftScore
+                .parseScore(result.score()).hardScore() >= 0;
+        return new ScenarioComparison(
+                true,
+                (int) projected.stream().filter(key -> !baseline.contains(key)).count(),
+                (int) baseline.stream().filter(key -> !projected.contains(key)).count(),
+                baselineScore,
+                result.score(),
+                feasible,
+                result.candidateCount(),
+                result.terminationReason());
+    }
+
+    private SessionResponse applyScenarioRestriction(
+            SessionResponse session,
+            String scenarioType,
+            UUID resourceId) {
+        boolean instructor = "INSTRUCTOR_UNAVAILABLE".equals(scenarioType)
+                && resourceId.equals(session.instructorId());
+        boolean room = Set.of(
+                        "ROOM_UNAVAILABLE", "FACILITY_REMOVED")
+                .contains(scenarioType)
+                && resourceId.equals(session.roomId());
+        boolean calendar = "TIMESLOT_REMOVED".equals(scenarioType)
+                && resourceId.equals(session.timeslotId());
+        return session.withScenarioRestrictions(
+                instructor, room, false, calendar);
+    }
+
+    private String clashFingerprint(DetectedClash clash) {
+        String left = clash.primarySessionId().toString();
+        String right = clash.secondarySessionId() == null
+                ? ""
+                : clash.secondarySessionId().toString();
+        if (left.compareTo(right) > 0) {
+            String swap = left;
+            left = right;
+            right = swap;
+        }
+        return clash.clashType() + ':' + left + ':' + right;
+    }
+
     private String normalize(String value, Set<String> supported, String message) {
         String normalized = value.trim().toUpperCase(Locale.ROOT).replace('-', '_');
         if (!supported.contains(normalized)) throw new AuraStateException(message);
@@ -315,4 +456,14 @@ public class AuraScenarioService {
             boolean feasible,
             List<EmergencyMove> moves,
             String message) { }
+
+    private record ScenarioComparison(
+            boolean simulated,
+            int clashesAdded,
+            int clashesRemoved,
+            String baselineScore,
+            String projectedScore,
+            boolean feasible,
+            int candidateCount,
+            String terminationReason) { }
 }
