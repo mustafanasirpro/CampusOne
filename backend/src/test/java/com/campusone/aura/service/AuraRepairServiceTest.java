@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 
 import com.campusone.aura.dto.AuraOperationsDtos;
 import com.campusone.aura.dto.AuraOperationsDtos.RepairImpact;
+import com.campusone.aura.dto.AuraOperationsDtos.RepairMove;
 import com.campusone.aura.exception.AuraStateException;
 import com.campusone.aura.repository.AuraJdbcRepository;
 import com.campusone.aura.repository.AuraOperationsRepository;
@@ -15,7 +16,11 @@ import com.campusone.aura.repository.AuraOperationsRepository.RepairSourceState;
 import com.campusone.common.exception.ResourceNotFoundException;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,6 +43,7 @@ class AuraRepairServiceTest {
     @Mock AuraJdbcRepository coreRepository;
     @Mock AuraOperationsRepository repository;
     @Mock AuraService auraService;
+    @Mock AuraNotificationService notificationService;
 
     private AuraRepairService service;
 
@@ -45,6 +51,7 @@ class AuraRepairServiceTest {
     void setUp() {
         service = new AuraRepairService(
                 authorization, coreRepository, repository, auraService,
+                notificationService,
                 Clock.fixed(NOW, ZoneOffset.UTC));
         when(authorization.requireAdminUniversity(ACTOR)).thenReturn(UNIVERSITY);
     }
@@ -102,5 +109,63 @@ class AuraRepairServiceTest {
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void apply_notifiesAffectedRegisteredStudentsAfterReviewedMove()
+            throws Exception {
+        UUID planId = UUID.randomUUID();
+        UUID draftId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        UUID offeringId = UUID.randomUUID();
+        UUID originalRoom = UUID.randomUUID();
+        UUID originalSlot = UUID.randomUUID();
+        UUID proposedRoom = UUID.randomUUID();
+        UUID proposedSlot = UUID.randomUUID();
+        UUID studentId = UUID.randomUUID();
+        String token = "review-token";
+        String hash = HexFormat.of().formatHex(
+                MessageDigest.getInstance("SHA-256")
+                        .digest(token.getBytes(StandardCharsets.UTF_8)));
+        RepairMove move = new RepairMove(
+                sessionId, originalRoom, originalSlot,
+                proposedRoom, proposedSlot, 1, 10);
+        RepairImpact impact = new RepairImpact(
+                1, 1, 1, 1, 1, 0, 1, 0, 1, 10);
+        var preview = new RepairPlanRow(
+                planId, UNIVERSITY, TERM, VERSION, draftId, ACTOR,
+                "SESSION", sessionId, "PREVIEWED", 3, 2, 2, 3,
+                List.of(move), impact, hash, "Move session",
+                NOW.plusSeconds(300), null);
+        var applied = new RepairPlanRow(
+                planId, UNIVERSITY, TERM, VERSION, draftId, ACTOR,
+                "SESSION", sessionId, "APPLIED", 3, 2, 2, 3,
+                List.of(move), impact, hash, "Move session",
+                NOW.plusSeconds(300), NOW);
+        when(repository.lockRepairPlan(planId, UNIVERSITY))
+                .thenReturn(Optional.of(preview));
+        when(coreRepository.findSession(sessionId)).thenReturn(Optional.of(
+                new com.campusone.aura.dto.AuraDtos.SessionResponse(
+                        sessionId, draftId, offeringId, UUID.randomUUID(),
+                        "CS101", "Programming", UUID.randomUUID(), "Section A",
+                        UUID.randomUUID(), "Instructor", originalRoom, "Room A",
+                        "CLASSROOM", originalSlot, 1, LocalTime.of(9, 0),
+                        LocalTime.of(10, 0), false, "REPAIR")));
+        when(repository.activeStudentUserIdsForOfferings(
+                org.mockito.ArgumentMatchers.anyCollection()))
+                .thenReturn(List.of(studentId));
+        when(repository.findRepairPlan(planId, UNIVERSITY))
+                .thenReturn(Optional.of(applied));
+
+        service.apply(
+                ACTOR,
+                planId,
+                new AuraOperationsDtos.ApplyRepairRequest(token));
+
+        verify(notificationService).notifyStudent(
+                studentId,
+                "A timetable adjustment is being reviewed",
+                "A proposed timetable change may affect one of your registered courses.",
+                draftId);
     }
 }
