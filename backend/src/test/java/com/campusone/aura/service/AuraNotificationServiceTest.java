@@ -1,6 +1,7 @@
 package com.campusone.aura.service;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doThrow;
 
 import com.campusone.moderation.repository.ModeratorRepository;
 import com.campusone.notification.entity.NotificationTargetType;
@@ -49,5 +50,41 @@ class AuraNotificationServiceTest {
                 NotificationTargetType.AURA_TIMETABLE,
                 version,
                 "/timetable");
+    }
+
+    @Test
+    void notifyInstructors_usesInstructorRouteAndDoesNotPropagateFailure() {
+        UUID actor = UUID.randomUUID();
+        UUID instructor = UUID.randomUUID();
+        UUID version = UUID.randomUUID();
+        AuraNotificationService service = new AuraNotificationService(
+                notificationService,
+                moderatorRepository,
+                userRepository,
+                "");
+        LinkedHashSet<UUID> recipients =
+                new LinkedHashSet<>(List.of(instructor));
+        doThrow(new IllegalStateException("notification storage unavailable"))
+                .when(notificationService)
+                .createBulkNotifications(
+                        recipients,
+                        NotificationType.AURA_UPDATE,
+                        "Your teaching timetable is available",
+                        "The latest published teaching timetable is ready to view.",
+                        NotificationTargetType.AURA_TIMETABLE,
+                        version,
+                        "/instructor-timetable");
+
+        service.notifyInstructorsTimetablePublished(
+                List.of(instructor, actor, instructor), actor, version);
+
+        verify(notificationService).createBulkNotifications(
+                recipients,
+                NotificationType.AURA_UPDATE,
+                "Your teaching timetable is available",
+                "The latest published teaching timetable is ready to view.",
+                NotificationTargetType.AURA_TIMETABLE,
+                version,
+                "/instructor-timetable");
     }
 }
