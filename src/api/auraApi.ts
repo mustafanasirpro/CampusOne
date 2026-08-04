@@ -16,6 +16,7 @@ import type {
   AuraImportValidation,
   AuraMeetingRequirement,
   AuraMetrics,
+  AuraMutationResponse,
   AuraOffering,
   AuraProgram,
   AuraReadiness,
@@ -28,6 +29,7 @@ import type {
   AuraTerm,
   AuraSetupReferences,
   AuraStudentRegistration,
+  AuraStudentAvailability,
   AuraPersonalTimetable,
   AuraTimeslot,
   AuraTimetableVersion,
@@ -53,6 +55,16 @@ import type {
   CreateAuraTermRequest,
   CreateAuraTimeslotRequest,
   PageResponse,
+  UpdateAuraBatchRequest,
+  UpdateAuraInstructorRequest,
+  UpdateAuraMeetingRequirementRequest,
+  UpdateAuraOfferingRequest,
+  UpdateAuraProgramRequest,
+  UpdateAuraRoomRequest,
+  UpdateAuraSectionRequest,
+  UpdateAuraTermRequest,
+  UpdateAuraTimeslotRequest,
+  UpsertAuraStudentAvailabilityRequest,
 } from "@/types/aura";
 
 const adminAuraPath = "/admin/aura";
@@ -85,6 +97,13 @@ export function createAuraTerm(request: CreateAuraTermRequest) {
   });
 }
 
+export function updateAuraTerm(id: string, request: UpdateAuraTermRequest) {
+  return apiRequest<AuraMutationResponse>(`${adminAuraPath}/terms/${id}`, {
+    body: JSON.stringify(request),
+    method: "PATCH",
+  });
+}
+
 export function getAuraSetupReferences(signal?: AbortSignal) {
   return apiRequest<AuraSetupReferences>(`${adminAuraPath}/setup-references`, {
     signal,
@@ -95,6 +114,16 @@ export function createAuraProgram(request: CreateAuraProgramRequest) {
   return apiRequest<AuraProgram>(`${adminAuraPath}/programs`, {
     body: JSON.stringify(request),
     method: "POST",
+  });
+}
+
+export function updateAuraProgram(
+  id: string,
+  request: UpdateAuraProgramRequest,
+) {
+  return apiRequest<AuraMutationResponse>(`${adminAuraPath}/programs/${id}`, {
+    body: JSON.stringify(request),
+    method: "PATCH",
   });
 }
 
@@ -112,6 +141,13 @@ export function createAuraBatch(request: CreateAuraBatchRequest) {
   });
 }
 
+export function updateAuraBatch(id: string, request: UpdateAuraBatchRequest) {
+  return apiRequest<AuraMutationResponse>(`${adminAuraPath}/batches/${id}`, {
+    body: JSON.stringify(request),
+    method: "PATCH",
+  });
+}
+
 export function listAuraBatches(programId?: string, signal?: AbortSignal) {
   return apiRequest<AuraBatch[]>(
     `${adminAuraPath}/batches${queryString({ programId })}`,
@@ -123,6 +159,16 @@ export function createAuraSection(request: CreateAuraSectionRequest) {
   return apiRequest<AuraSection>(`${adminAuraPath}/sections`, {
     body: JSON.stringify(request),
     method: "POST",
+  });
+}
+
+export function updateAuraSection(
+  id: string,
+  request: UpdateAuraSectionRequest,
+) {
+  return apiRequest<AuraMutationResponse>(`${adminAuraPath}/sections/${id}`, {
+    body: JSON.stringify(request),
+    method: "PATCH",
   });
 }
 
@@ -140,10 +186,27 @@ export function createAuraInstructor(request: CreateAuraInstructorRequest) {
   });
 }
 
+export function updateAuraInstructor(
+  id: string,
+  request: UpdateAuraInstructorRequest,
+) {
+  return apiRequest<AuraMutationResponse>(
+    `${adminAuraPath}/instructors/${id}`,
+    { body: JSON.stringify(request), method: "PATCH" },
+  );
+}
+
 export function createAuraRoom(request: CreateAuraRoomRequest) {
   return apiRequest<AuraRoom>(`${adminAuraPath}/rooms`, {
     body: JSON.stringify(request),
     method: "POST",
+  });
+}
+
+export function updateAuraRoom(id: string, request: UpdateAuraRoomRequest) {
+  return apiRequest<AuraMutationResponse>(`${adminAuraPath}/rooms/${id}`, {
+    body: JSON.stringify(request),
+    method: "PATCH",
   });
 }
 
@@ -154,10 +217,30 @@ export function createAuraTimeslot(request: CreateAuraTimeslotRequest) {
   });
 }
 
+export function updateAuraTimeslot(
+  id: string,
+  request: UpdateAuraTimeslotRequest,
+) {
+  return apiRequest<AuraMutationResponse>(`${adminAuraPath}/timeslots/${id}`, {
+    body: JSON.stringify(request),
+    method: "PATCH",
+  });
+}
+
 export function createAuraOffering(request: CreateAuraOfferingRequest) {
   return apiRequest<AuraOffering>(`${adminAuraPath}/offerings`, {
     body: JSON.stringify(request),
     method: "POST",
+  });
+}
+
+export function updateAuraOffering(
+  id: string,
+  request: UpdateAuraOfferingRequest,
+) {
+  return apiRequest<AuraMutationResponse>(`${adminAuraPath}/offerings/${id}`, {
+    body: JSON.stringify(request),
+    method: "PATCH",
   });
 }
 
@@ -167,6 +250,43 @@ export function createAuraMeetingRequirement(
   return apiRequest<AuraMeetingRequirement>(
     `${adminAuraPath}/meeting-requirements`,
     { body: JSON.stringify(request), method: "POST" },
+  );
+}
+
+export function updateAuraMeetingRequirement(
+  id: string,
+  request: UpdateAuraMeetingRequirementRequest,
+) {
+  return apiRequest<AuraMutationResponse>(
+    `${adminAuraPath}/meeting-requirements/${id}`,
+    { body: JSON.stringify(request), method: "PATCH" },
+  );
+}
+
+export function listAuraStudentAvailability(
+  termId: string,
+  studentUserId?: string,
+  signal?: AbortSignal,
+) {
+  return apiRequest<AuraStudentAvailability[]>(
+    `${adminAuraPath}/terms/${termId}/student-availability${queryString({ studentUserId })}`,
+    { signal },
+  );
+}
+
+export function upsertAuraStudentAvailability(
+  request: UpsertAuraStudentAvailabilityRequest,
+) {
+  return apiRequest<AuraStudentAvailability>(
+    `${adminAuraPath}/student-availability`,
+    { body: JSON.stringify(request), method: "POST" },
+  );
+}
+
+export function deleteAuraStudentAvailability(id: string, version: number) {
+  return apiRequest<void>(
+    `${adminAuraPath}/student-availability/${id}${queryString({ version })}`,
+    { method: "DELETE" },
   );
 }
 
@@ -284,6 +404,16 @@ export function cloneAuraVersion(versionId: string, notes?: string) {
   return apiRequest<AuraTimetableVersion>(
     `${adminAuraPath}/versions/${versionId}/clone`,
     { body: JSON.stringify({ notes }), method: "POST" },
+  );
+}
+
+export function createAuraRollbackDraft(versionId: string, notes?: string) {
+  return apiRequest<AuraTimetableVersion>(
+    `${adminAuraPath}/versions/${versionId}/rollback-draft`,
+    {
+      method: "POST",
+      body: JSON.stringify({ notes: notes ?? null }),
+    },
   );
 }
 
