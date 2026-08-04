@@ -84,6 +84,10 @@ export function AuraOperationsPanel({
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
+  const [editingBuildingId, setEditingBuildingId] = useState<string | null>(null);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingConflictId, setEditingConflictId] = useState<string | null>(null);
+  const [editingTravelId, setEditingTravelId] = useState<string | null>(null);
   const [buildingForm, setBuildingForm] = useState({ code: "", name: "" });
   const [groupForm, setGroupForm] = useState({
     capacity: "40",
@@ -246,12 +250,28 @@ export function AuraOperationsPanel({
             disabled={!buildingForm.code.trim() || !buildingForm.name.trim()}
             loading={busy === "building"}
             onClick={() => void mutate("building", async () => {
-              await createAuraBuilding({ ...buildingForm, minimumTransitionMinutes: 5 });
+              const existing = buildings.find((item) => item.id === editingBuildingId);
+              if (existing) {
+                await updateAuraBuilding(existing.id, {
+                  ...existing,
+                  code: buildingForm.code,
+                  name: buildingForm.name,
+                });
+              } else {
+                await createAuraBuilding({ ...buildingForm, minimumTransitionMinutes: 5 });
+              }
+              setEditingBuildingId(null);
               setBuildingForm({ code: "", name: "" });
             })}
-          >Save building</Button>
+          >{editingBuildingId ? "Save building changes" : "Save building"}</Button>
           <ManagedSummary
             busy={busy}
+            onEdit={(id) => {
+              const item = buildings.find((entry) => entry.id === id);
+              if (!item) return;
+              setEditingBuildingId(id);
+              setBuildingForm({ code: item.code, name: item.name });
+            }}
             items={buildings.map((item) => ({ active: item.active, id: item.id, label: `${item.code} · ${item.name}` }))}
             onToggle={(id) => {
               const item = buildings.find((entry) => entry.id === id);
@@ -272,12 +292,40 @@ export function AuraOperationsPanel({
             disabled={!groupForm.offeringId || !groupForm.code.trim() || !groupForm.displayName.trim()}
             loading={busy === "group"}
             onClick={() => void mutate("group", async () => {
-              await createAuraTeachingGroup({ ...groupForm, active: true, capacity: Number(groupForm.capacity) || null });
+              const existing = groups.find((item) => item.id === editingGroupId);
+              const request = {
+                active: existing?.active ?? true,
+                capacity: Number(groupForm.capacity) || null,
+                code: groupForm.code,
+                displayName: groupForm.displayName,
+                groupType: groupForm.groupType,
+                offeringId: groupForm.offeringId,
+              };
+              if (existing) {
+                await updateAuraTeachingGroup(existing.id, {
+                  ...request,
+                  version: existing.version,
+                });
+              }
+              else await createAuraTeachingGroup(request);
+              setEditingGroupId(null);
               setGroupForm((old) => ({ ...old, code: "", displayName: "" }));
             })}
-          >Save teaching group</Button>
+          >{editingGroupId ? "Save teaching group changes" : "Save teaching group"}</Button>
           <ManagedSummary
             busy={busy}
+            onEdit={(id) => {
+              const item = groups.find((entry) => entry.id === id);
+              if (!item) return;
+              setEditingGroupId(id);
+              setGroupForm({
+                capacity: item.capacity == null ? "" : String(item.capacity),
+                code: item.code,
+                displayName: item.displayName,
+                groupType: item.groupType,
+                offeringId: item.offeringId,
+              });
+            }}
             items={groups.map((item) => ({ active: item.active, id: item.id, label: `${item.code} · ${item.displayName}` }))}
             onToggle={(id) => {
               const item = groups.find((entry) => entry.id === id);
@@ -294,12 +342,39 @@ export function AuraOperationsPanel({
             disabled={!conflictForm.leftOfferingId || !conflictForm.rightOfferingId || conflictForm.leftOfferingId === conflictForm.rightOfferingId || !conflictForm.reason.trim()}
             loading={busy === "conflict"}
             onClick={() => void mutate("conflict", async () => {
-              await createAuraOfferingConflict({ ...conflictForm, active: true, severity: "HARD", source: "MANUAL", termId });
+              const existing = conflicts.find((item) => item.id === editingConflictId);
+              const request = {
+                active: existing?.active ?? true,
+                leftOfferingId: conflictForm.leftOfferingId,
+                reason: conflictForm.reason,
+                rightOfferingId: conflictForm.rightOfferingId,
+                severity: existing?.severity ?? "HARD" as const,
+                source: existing?.source ?? "MANUAL",
+                termId,
+              };
+              if (existing) {
+                await updateAuraOfferingConflict(existing.id, {
+                  ...request,
+                  version: existing.version,
+                });
+              }
+              else await createAuraOfferingConflict(request);
+              setEditingConflictId(null);
               setConflictForm({ leftOfferingId: "", reason: "", rightOfferingId: "" });
             })}
-          >Save hard conflict</Button>
+          >{editingConflictId ? "Save conflict changes" : "Save hard conflict"}</Button>
           <ManagedSummary
             busy={busy}
+            onEdit={(id) => {
+              const item = conflicts.find((entry) => entry.id === id);
+              if (!item) return;
+              setEditingConflictId(id);
+              setConflictForm({
+                leftOfferingId: item.leftOfferingId,
+                reason: item.reason,
+                rightOfferingId: item.rightOfferingId,
+              });
+            }}
             items={conflicts.map((item) => ({ active: item.active, id: item.id, label: `${item.severity} · ${item.reason}` }))}
             onToggle={(id) => {
               const item = conflicts.find((entry) => entry.id === id);
@@ -316,12 +391,37 @@ export function AuraOperationsPanel({
             disabled={!travelForm.fromBuilding || !travelForm.toBuilding || travelForm.fromBuilding === travelForm.toBuilding}
             loading={busy === "travel"}
             onClick={() => void mutate("travel", async () => {
-              await createAuraTravelRule({ ...travelForm, active: true, difficulty: "NORMAL", minutes: Number(travelForm.minutes) });
+              const existing = travelRules.find((item) => item.id === editingTravelId);
+              const request = {
+                active: existing?.active ?? true,
+                difficulty: existing?.difficulty ?? "NORMAL" as const,
+                fromBuilding: travelForm.fromBuilding,
+                minutes: Number(travelForm.minutes),
+                toBuilding: travelForm.toBuilding,
+              };
+              if (existing) {
+                await updateAuraTravelRule(existing.id, {
+                  ...request,
+                  version: existing.version,
+                });
+              }
+              else await createAuraTravelRule(request);
+              setEditingTravelId(null);
               setTravelForm({ fromBuilding: "", minutes: "10", toBuilding: "" });
             })}
-          >Save travel rule</Button>
+          >{editingTravelId ? "Save travel changes" : "Save travel rule"}</Button>
           <ManagedSummary
             busy={busy}
+            onEdit={(id) => {
+              const item = travelRules.find((entry) => entry.id === id);
+              if (!item) return;
+              setEditingTravelId(id);
+              setTravelForm({
+                fromBuilding: item.fromBuilding,
+                minutes: String(item.minutes),
+                toBuilding: item.toBuilding,
+              });
+            }}
             items={travelRules.map((item) => ({ active: item.active, id: item.id, label: `${item.fromBuilding} → ${item.toBuilding} · ${item.minutes} min` }))}
             onToggle={(id) => {
               const item = travelRules.find((entry) => entry.id === id);
@@ -397,7 +497,24 @@ export function AuraOperationsPanel({
               <Metric label="Open clashes" value={analytics?.unresolvedClashes ?? 0} />
               <Metric label="Repair previews" value={analytics?.repairPlans ?? 0} />
               <Metric label="Room use" value={`${Math.round(analytics?.averageRoomCapacityUtilization ?? 0)}%`} />
+              <Metric label="Student gap" value={`${Math.round(analytics?.averageStudentGapMinutes ?? 0)} min`} />
+              <Metric label="Instructor gap" value={`${Math.round(analytics?.averageInstructorGapMinutes ?? 0)} min`} />
+              <Metric label="Travel time" value={`${Math.round(analytics?.averageTravelMinutes ?? 0)} min`} />
+              <Metric label="Solver candidates" value={analytics?.generationCandidates ?? 0} />
             </div>
+            {Object.keys(analytics?.bottlenecks ?? {}).length ? (
+              <div className="border-t border-slate-100 pt-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  Bottlenecks
+                </p>
+                <Summary
+                  items={Object.entries(analytics?.bottlenecks ?? {}).map(
+                    ([label, count]) =>
+                      `${label.replaceAll("_", " ")} · ${count}`,
+                  )}
+                />
+              </div>
+            ) : null}
             <div className="border-t border-slate-100 pt-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Recent audit trail</p>
               <Summary items={audit.slice(0, 5).map((item) => `${item.actorName} · ${item.action.replaceAll("_", " ")}`)} />
@@ -434,10 +551,12 @@ function Summary({ items }: { items: string[] }) {
 function ManagedSummary({
   busy,
   items,
+  onEdit,
   onToggle,
 }: {
   busy: string | null;
   items: Array<{ active: boolean; id: string; label: string }>;
+  onEdit: (id: string) => void;
   onToggle: (id: string) => void;
 }) {
   if (!items.length) return <EmptyState description="Add the first record when this rule is needed." title="No records yet" />;
@@ -446,9 +565,14 @@ function ManagedSummary({
       {items.slice(0, 5).map((item) => (
         <li className="flex flex-col gap-2 rounded-lg bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between" key={item.id}>
           <span>{item.label}</span>
-          <Button loading={busy?.endsWith(item.id) ?? false} onClick={() => onToggle(item.id)} variant="outline">
-            {item.active ? `Deactivate ${item.label}` : `Activate ${item.label}`}
-          </Button>
+          <span className="flex flex-wrap gap-2">
+            <Button disabled={Boolean(busy)} onClick={() => onEdit(item.id)} variant="outline">
+              Edit
+            </Button>
+            <Button loading={busy?.endsWith(item.id) ?? false} onClick={() => onToggle(item.id)} variant="outline">
+              {item.active ? `Deactivate ${item.label}` : `Activate ${item.label}`}
+            </Button>
+          </span>
         </li>
       ))}
     </ul>
