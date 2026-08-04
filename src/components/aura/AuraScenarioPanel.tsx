@@ -8,7 +8,7 @@ import {
   listAuraWhatIf,
   runAuraWhatIf,
 } from "@/api/auraApi";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, ErrorMessage } from "@/components/common";
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, ErrorMessage, LoadingSpinner } from "@/components/common";
 import type { AuraEmergencyRepair, AuraSession, AuraTimetableVersion, AuraWhatIfResult } from "@/types/aura";
 
 const scenarioOptions = [
@@ -35,6 +35,7 @@ export function AuraScenarioPanel({
   const [reason, setReason] = useState("");
   const [whatIfResults, setWhatIfResults] = useState<AuraWhatIfResult[]>([]);
   const [emergencies, setEmergencies] = useState<AuraEmergencyRepair[]>([]);
+  const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +51,8 @@ export function AuraScenarioPanel({
       setEmergencies(emergency);
     }).catch((requestError: unknown) => {
       if (active) setError(apiMessage(requestError));
+    }).finally(() => {
+      if (active) setLoading(false);
     });
     return () => {
       active = false;
@@ -87,6 +90,7 @@ export function AuraScenarioPanel({
       <CardHeader><CardTitle>Simulation and emergency planning</CardTitle></CardHeader>
       <CardContent className="grid gap-4">
         {error ? <ErrorMessage message={error} /> : null}
+        {loading ? <LoadingSpinner label="Loading scheduling scenarios" /> : null}
         <div className="grid gap-3 lg:grid-cols-3">
           <label className="grid gap-1 text-sm font-medium text-slate-700">
             Scenario
@@ -132,6 +136,11 @@ export function AuraScenarioPanel({
           <div className="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-900">
             <p className="font-semibold">Latest what-if · {whatIfResults[0].scenarioType.replaceAll("_", " ")}</p>
             <p>{whatIfResults[0].affectedSessions} directly affected session{whatIfResults[0].affectedSessions === 1 ? "" : "s"}</p>
+            <p>
+              {whatIfResults[0].feasible ? "Feasible" : "Not feasible"} ·{" "}
+              {whatIfResults[0].baselineScore ?? "No baseline score"} →{" "}
+              {whatIfResults[0].projectedScore ?? "No projected score"}
+            </p>
             <p>{whatIfResults[0].recommendation}</p>
           </div>
         ) : null}
@@ -145,6 +154,12 @@ export function AuraScenarioPanel({
               </div>
             ))}
           </div>
+        ) : !loading && !error && !whatIfResults.length ? (
+          <EmptyState
+            description="Run a what-if analysis to compare an operational change before creating a review draft."
+            icon={<FlaskConical className="size-6" />}
+            title="No scheduling scenarios yet"
+          />
         ) : null}
       </CardContent>
     </Card>
