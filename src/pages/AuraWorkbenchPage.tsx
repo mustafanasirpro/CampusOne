@@ -22,6 +22,7 @@ import {
   listAuraVersions,
   publishAuraVersion,
   startAuraGeneration,
+  updateAuraTerm,
 } from "@/api/auraApi";
 import { getCurrentUserIdentity, type CurrentUserIdentity } from "@/api/userApi";
 import {
@@ -56,6 +57,7 @@ import type {
   AuraSession,
   AuraTerm,
   AuraTimetableVersion,
+  UpdateAuraTermRequest,
 } from "@/types/aura";
 import { useDocumentTitle } from "@/utils/useDocumentTitle";
 
@@ -79,6 +81,18 @@ function formatDate(value: string | null | undefined) {
   );
 }
 
+function termUpdateRequest(term: AuraTerm): UpdateAuraTermRequest {
+  return {
+    code: term.code,
+    endsOn: term.endsOn,
+    name: term.name,
+    startsOn: term.startsOn,
+    status: term.status,
+    timezone: term.timezone,
+    version: term.version,
+  };
+}
+
 export function AuraWorkbenchPage() {
   const [currentUser, setCurrentUser] = useState<CurrentUserIdentity | null>(
     null,
@@ -96,6 +110,9 @@ export function AuraWorkbenchPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingTerm, setIsCreatingTerm] = useState(false);
+  const [isUpdatingTerm, setIsUpdatingTerm] = useState(false);
+  const [termEditForm, setTermEditForm] =
+    useState<UpdateAuraTermRequest | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [generationProfile, setGenerationProfile] =
@@ -115,13 +132,24 @@ export function AuraWorkbenchPage() {
     [selectedVersionId, versions],
   );
 
-  const loadTerms = useCallback(async (signal?: AbortSignal) => {
+  const selectTerm = (termId: string) => {
+    const term = terms.find((candidate) => candidate.id === termId) ?? null;
+    setSelectedTermId(termId);
+    setTermEditForm(term ? termUpdateRequest(term) : null);
+  };
+
+  const loadTerms = useCallback(async (
+    signal?: AbortSignal,
+    preferredTermId?: string,
+  ) => {
     const response = await listAuraTerms(signal);
     setTerms(response.content);
-    setSelectedTermId((current) =>
-      current || response.content.at(0)?.id || "",
-    );
-  }, []);
+    const nextTerm = response.content.find(
+      (term) => term.id === (preferredTermId || selectedTermId),
+    ) ?? response.content.at(0) ?? null;
+    setSelectedTermId(nextTerm?.id ?? "");
+    setTermEditForm(nextTerm ? termUpdateRequest(nextTerm) : null);
+  }, [selectedTermId]);
 
   const loadTermDetails = useCallback(
     async (termId: string, signal?: AbortSignal) => {
@@ -178,7 +206,9 @@ export function AuraWorkbenchPage() {
         const termPage = await listAuraTerms(controller.signal);
         if (!active) return;
         setTerms(termPage.content);
-        setSelectedTermId(termPage.content.at(0)?.id || "");
+        const firstTerm = termPage.content.at(0) ?? null;
+        setSelectedTermId(firstTerm?.id ?? "");
+        setTermEditForm(firstTerm ? termUpdateRequest(firstTerm) : null);
         setError(null);
       })
       .catch((requestError: unknown) => {
@@ -319,8 +349,7 @@ export function AuraWorkbenchPage() {
         universityId: currentUser.university.id,
       });
       setTermForm(defaultTermForm);
-      setSelectedTermId(term.id);
-      await loadTerms();
+      await loadTerms(undefined, term.id);
       showToast({
         title: "Term created",
         message: "AURA is ready for setup data for this term.",
@@ -330,6 +359,25 @@ export function AuraWorkbenchPage() {
       setError(apiMessage(requestError, "The term could not be created."));
     } finally {
       setIsCreatingTerm(false);
+    }
+  };
+
+  const handleUpdateTerm = async () => {
+    if (!selectedTerm || !termEditForm) return;
+    setIsUpdatingTerm(true);
+    setError(null);
+    try {
+      await updateAuraTerm(selectedTerm.id, termEditForm);
+      await loadTerms();
+      showToast({
+        title: "Term updated",
+        message: "The academic term lifecycle and dates are up to date.",
+        variant: "success",
+      });
+    } catch (requestError) {
+      setError(apiMessage(requestError, "The term could not be updated."));
+    } finally {
+      setIsUpdatingTerm(false);
     }
   };
 
@@ -502,7 +550,7 @@ export function AuraWorkbenchPage() {
                 <select
                   aria-label="Academic term"
                   className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                  onChange={(event) => setSelectedTermId(event.target.value)}
+                  onChange={(event) => selectTerm(event.target.value)}
                   value={selectedTermId}
                 >
                   {terms.map((term) => (
@@ -520,6 +568,34 @@ export function AuraWorkbenchPage() {
                       {formatDate(selectedTerm.startsOn)} –{" "}
                       {formatDate(selectedTerm.endsOn)}
                     </p>
+                  </div>
+                ) : null}
+                {selectedTerm && termEditForm ? (
+                  <div className="grid gap-3 rounded-2xl border border-slate-200 p-4 sm:grid-cols-2">
+                    <TermField label="Term code" value={termEditForm.code} onChange={(code) => setTermEditForm((current) => current ? { ...current, code } : current)} />
+                    <TermField label="Term name" value={termEditForm.name} onChange={(name) => setTermEditForm((current) => current ? { ...current, name } : current)} />
+                    <TermField label="Starts on" type="date" value={termEditForm.startsOn} onChange={(startsOn) => setTermEditForm((current) => current ? { ...current, startsOn } : current)} />
+                    <TermField label="Ends on" type="date" value={termEditForm.endsOn} onChange={(endsOn) => setTermEditForm((current) => current ? { ...current, endsOn } : current)} />
+                    <TermField label="Timezone" value={termEditForm.timezone} onChange={(timezone) => setTermEditForm((current) => current ? { ...current, timezone } : current)} />
+                    <label className="grid gap-1 text-sm font-medium text-slate-700">
+                      Status
+                      <select
+                        className="rounded-xl border border-slate-300 px-3 py-2"
+                        onChange={(event) => setTermEditForm((current) => current ? { ...current, status: event.target.value } : current)}
+                        value={termEditForm.status}
+                      >
+                        {["DRAFT", "READY", "ACTIVE", "CLOSED", "ARCHIVED"].map((status) => (
+                          <option key={status} value={status}>{status.replaceAll("_", " ")}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <Button
+                      disabled={!termEditForm.code.trim() || !termEditForm.name.trim() || termEditForm.startsOn >= termEditForm.endsOn}
+                      loading={isUpdatingTerm}
+                      onClick={() => void handleUpdateTerm()}
+                    >
+                      Save term changes
+                    </Button>
                   </div>
                 ) : null}
                 <div className="grid gap-3 sm:grid-cols-5">
@@ -822,6 +898,30 @@ function Metric({ label, value }: { label: string; value: number }) {
       </p>
       <p className="mt-1 text-2xl font-bold text-slate-950">{value}</p>
     </div>
+  );
+}
+
+function TermField({
+  label,
+  onChange,
+  type = "text",
+  value,
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  type?: string;
+  value: string;
+}) {
+  return (
+    <label className="grid gap-1 text-sm font-medium text-slate-700">
+      {label}
+      <input
+        className="rounded-xl border border-slate-300 px-3 py-2"
+        onChange={(event) => onChange(event.target.value)}
+        type={type}
+        value={value}
+      />
+    </label>
   );
 }
 
