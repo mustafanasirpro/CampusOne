@@ -18,6 +18,7 @@ vi.mock("@/api/auraApi", () => ({
   listAuraVersions: vi.fn(),
   publishAuraVersion: vi.fn(),
   startAuraGeneration: vi.fn(),
+  updateAuraTerm: vi.fn(),
 }));
 
 vi.mock("@/api/userApi", () => ({
