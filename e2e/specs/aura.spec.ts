@@ -310,11 +310,14 @@ test("new incomplete term shows readiness blockers and disables generation", asy
   await login(page, e2eUsers.admin.email, e2eUsers.admin.password);
   await page.goto("/admin/aura");
   const suffix = testInfo.project.name === "chromium-mobile" ? "MOBILE" : "DESKTOP";
-  await page.getByLabel("Term code").fill(`E2E-EMPTY-${suffix}`);
-  await page.getByLabel("Term name").fill(`E2E Empty ${suffix}`);
-  await page.getByLabel("Start date").fill("2027-01-01");
-  await page.getByLabel("End date").fill("2027-05-31");
-  await page.getByRole("button", { name: "Create term" }).click();
+  const createTermCard = page.getByRole("heading", {
+    name: "Create academic term",
+  }).locator("..").locator("..");
+  await createTermCard.getByLabel("Term code").fill(`E2E-EMPTY-${suffix}`);
+  await createTermCard.getByLabel("Term name").fill(`E2E Empty ${suffix}`);
+  await createTermCard.getByLabel("Start date").fill("2027-01-01");
+  await createTermCard.getByLabel("End date").fill("2027-05-31");
+  await createTermCard.getByRole("button", { name: "Create term" }).click();
   await expect(page.getByText("Setup needs attention")).toBeVisible();
   await expect(page.getByRole("button", { name: "Generate timetable" }))
     .toBeDisabled();
