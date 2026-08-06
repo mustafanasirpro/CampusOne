@@ -22,6 +22,7 @@ describe("InstructorTimetablePage", () => {
       name: "Fall 2026",
       startsOn: "2026-09-01",
       status: "READY",
+      timezone: "Asia/Karachi",
       universityId: "university-1",
       updatedAt: "2026-07-21T00:00:00Z",
       version: 0,
