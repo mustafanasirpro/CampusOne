@@ -5,7 +5,8 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $backend = Join-Path $root "backend"
 $artifacts = Join-Path $root "test-results"
 $pgBin = "C:\Program Files\PostgreSQL\17\bin"
-$pgData = Join-Path $env:TEMP "campusone-aura-e2e-pg17"
+$pgData = Join-Path $env:TEMP (
+    "campusone-aura-e2e-pg17-" + [Guid]::NewGuid().ToString("N"))
 $pgLog = Join-Path $artifacts "postgres-e2e.log"
 $pgErrorLog = Join-Path $artifacts "postgres-e2e-error.log"
 $pgPort = 55440
@@ -138,6 +139,10 @@ try {
     Stop-LocalProcessTree $backendProcess
     if ($postgresStartedHere) {
         & (Join-Path $pgBin "pg_ctl.exe") -D $pgData -m fast -w stop *> $null
+    }
+    if ((Test-Path $pgData) -and
+        $pgData.StartsWith($env:TEMP, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Remove-Item -LiteralPath $pgData -Recurse -Force
     }
 }
 
