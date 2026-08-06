@@ -3,9 +3,10 @@ param()
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $pgBin = "C:\Program Files\PostgreSQL\17\bin"
-$pgData = Join-Path $env:TEMP "campusone-aura-v36-pg"
+$pgData = Join-Path $env:TEMP (
+    "campusone-aura-v38-pg-" + [Guid]::NewGuid().ToString("N"))
 $pgPort = 55439
-$database = "campusone_aura_v36_upgrade"
+$database = "campusone_aura_v38_upgrade"
 $serverPort = 18084
 $app = $null
 $postgres = $null
@@ -81,10 +82,10 @@ try {
     if ($null -eq $jar) { throw "Package the backend before running upgrade verification." }
 
     $app = Start-Process -FilePath "java" `
-        -ArgumentList @("-jar", $jar.FullName, "--spring.flyway.target=35") `
+        -ArgumentList @("-jar", $jar.FullName, "--spring.flyway.target=37") `
         -WorkingDirectory (Join-Path $root "backend") -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput "test-results/backend-upgrade-v35.log" `
-        -RedirectStandardError "test-results/backend-upgrade-v35-error.log"
+        -RedirectStandardOutput "test-results/backend-upgrade-v37.log" `
+        -RedirectStandardError "test-results/backend-upgrade-v37-error.log"
     Wait-For-Health $app
     $versionBefore = & (Join-Path $pgBin "psql.exe") -h 127.0.0.1 `
         -p $pgPort -U postgres -d $database -tAc `
@@ -94,19 +95,23 @@ try {
 
     $app = Start-Process -FilePath "java" -ArgumentList @("-jar", $jar.FullName) `
         -WorkingDirectory (Join-Path $root "backend") -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput "test-results/backend-upgrade-v36.log" `
-        -RedirectStandardError "test-results/backend-upgrade-v36-error.log"
+        -RedirectStandardOutput "test-results/backend-upgrade-v38.log" `
+        -RedirectStandardError "test-results/backend-upgrade-v38-error.log"
     Wait-For-Health $app
     $versionAfter = & (Join-Path $pgBin "psql.exe") -h 127.0.0.1 `
         -p $pgPort -U postgres -d $database -tAc `
         "SELECT version FROM flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1"
-    if ($versionBefore.Trim() -ne "35" -or $versionAfter.Trim() -ne "36") {
-        throw "Expected a V35 to V36 upgrade."
+    if ($versionBefore.Trim() -ne "37" -or $versionAfter.Trim() -ne "38") {
+        throw "Expected a V37 to V38 upgrade."
     }
-    Write-Output "UPGRADE_FROM=35 UPGRADE_TO=36 HEALTH=PASS"
+    Write-Output "UPGRADE_FROM=37 UPGRADE_TO=38 HEALTH=PASS"
 } finally {
     Stop-Backend $app
     if ($postgresStartedHere) {
         & (Join-Path $pgBin "pg_ctl.exe") -D $pgData -m fast -w stop *> $null
+    }
+    if ((Test-Path $pgData) -and
+        $pgData.StartsWith($env:TEMP, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Remove-Item -LiteralPath $pgData -Recurse -Force
     }
 }
