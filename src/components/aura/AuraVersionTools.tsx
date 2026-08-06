@@ -1,4 +1,4 @@
-import { Archive, Copy, Download, GitCompare, Lock, MoveRight, Repeat2, Unlock } from "lucide-react";
+import { Archive, Copy, Download, GitCompare, History, Lock, MoveRight, Repeat2, Unlock } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { ApiError } from "@/api/apiClient";
@@ -8,6 +8,7 @@ import {
   archiveAuraVersion,
   cloneAuraVersion,
   compareAuraVersions,
+  createAuraRollbackDraft,
   downloadAuraVersion,
   listAuraRooms,
   listAuraTimeslots,
@@ -128,6 +129,21 @@ export function AuraVersionTools({
             <Copy className="size-4" /> Clone to draft
           </Button>
           <Button
+            disabled={draft}
+            loading={pendingAction === "rollback"}
+            onClick={() => void run("rollback", async () => {
+              const rollback = await createAuraRollbackDraft(
+                selectedVersionId,
+                `Rollback review from version ${selectedVersion.versionNumber}`,
+              );
+              await onChanged();
+              onVersionSelected(rollback.id);
+            })}
+            variant="outline"
+          >
+            <History className="size-4" /> Prepare rollback
+          </Button>
+          <Button
             disabled={!draft}
             loading={pendingAction === "archive"}
             onClick={() => void run("archive", async () => {
@@ -178,9 +194,18 @@ export function AuraVersionTools({
             <GitCompare className="size-4" /> Compare
           </Button>
           {comparison ? (
-            <p className="text-sm text-slate-600 lg:col-span-2">
-              {comparison.changedOccurrences} of {comparison.totalOccurrences} occurrences changed · {comparison.addedOccurrences} added · {comparison.removedOccurrences} removed
-            </p>
+            <div className="grid gap-1 text-sm text-slate-600 lg:col-span-2">
+              <p>
+                {comparison.changedOccurrences} of {comparison.totalOccurrences} occurrences changed · {comparison.addedOccurrences} added · {comparison.removedOccurrences} removed
+              </p>
+              {comparison.hardScoreDelta === null ? (
+                <p>Score comparison is unavailable because one version has not been scored.</p>
+              ) : (
+                <p>
+                  Score delta (compared minus selected): {comparison.hardScoreDelta} hard · {comparison.mediumScoreDelta} medium · {comparison.softScoreDelta} soft
+                </p>
+              )}
+            </div>
           ) : null}
         </div>
 
