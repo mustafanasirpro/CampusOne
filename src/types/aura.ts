@@ -83,18 +83,30 @@ export interface AuraScopedTimetable {
 }
 
 export interface AuraAnalytics {
+  averageInstructorGapMinutes: number;
   averageRepairDisruption: number;
   averageRoomCapacityUtilization: number;
+  averageSectionGapMinutes: number;
+  averageStudentGapMinutes: number;
+  averageTravelMinutes: number;
+  bottlenecks: Record<string, number>;
   buildingUtilization: Record<string, number>;
   clashesByType: Record<string, number>;
+  generationCandidates: number;
+  generationDurationSeconds: number;
+  generationSeed: number;
+  hardClashTrend: Record<string, number>;
   impossibleRequirements: number;
+  instructorLoadVariance: number;
   instructorLoads: Record<string, number>;
   repairPlans: number;
   roomUtilization: Record<string, number>;
   sectionLoads: Record<string, number>;
+  sectionLoadVariance: number;
   sessionsByDay: Record<string, number>;
   termId: string;
   unresolvedClashes: number;
+  undesirableSlotFairnessVariance: number;
   versionId: string;
 }
 
@@ -143,7 +155,16 @@ export interface AuraTerm {
   name: string;
   startsOn: string;
   status: string;
+  timezone: string;
   universityId: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface AuraMutationResponse {
+  active: boolean;
+  id: string;
+  resourceType: string;
   updatedAt: string;
   version: number;
 }
@@ -154,6 +175,7 @@ export interface AuraProgram {
   departmentId: string;
   id: string;
   name: string;
+  numberOfSemesters: number;
   universityId: string;
   version: number;
 }
@@ -164,6 +186,7 @@ export interface AuraBatch {
   code: string;
   id: string;
   programId: string;
+  expectedGraduationYear: number | null;
   version: number;
 }
 
@@ -172,8 +195,13 @@ export interface AuraSection {
   batchId: string;
   code: string;
   displayName: string;
+  hardDailyLoad: number;
+  homeBuildingId: string | null;
   id: string;
   studentCount: number;
+  preferredDailyLoad: number;
+  semesterNumber: number | null;
+  termId: string | null;
   version: number;
 }
 
@@ -226,6 +254,7 @@ export interface CreateAuraStudentRegistrationRequest {
 }
 
 export interface AuraPersonalTimetableEntry {
+  cancelledDates: string[];
   courseCode: string;
   courseTitle: string;
   dayOfWeek: number;
@@ -305,10 +334,13 @@ export interface AuraImportApplyResult {
 export interface AuraRoom {
   active: boolean;
   building: string | null;
+  buildingId: string | null;
   capacity: number;
   facilities: string[];
   id: string;
+  displayName: string;
   name: string;
+  roomCode: string | null;
   roomType: string;
   universityId: string;
   version: number;
@@ -320,7 +352,10 @@ export interface AuraTimeslot {
   endsAt: string;
   id: string;
   label: string;
+  slotOrder: number | null;
+  slotType: string;
   startsAt: string;
+  termId: string | null;
   universityId: string;
   version: number;
 }
@@ -346,15 +381,23 @@ export interface AuraAvailability {
 export interface AuraInstructor {
   active: boolean;
   displayName: string;
+  departmentId: string | null;
   email: string | null;
+  employeeCode: string | null;
+  hardDailyLoad: number;
+  homeBuildingId: string | null;
   id: string;
   maxHoursPerWeek: number;
+  maximumConsecutiveSlots: number;
+  preferredDailyLoad: number;
+  preferredWeeklyLoad: number;
   universityId: string;
   userId: string | null;
   version: number;
 }
 
 export interface AuraOffering {
+  combinedSections: boolean;
   courseCode: string;
   courseId: string;
   courseTitle: string;
@@ -362,6 +405,11 @@ export interface AuraOffering {
   id: string;
   instructorId: string;
   instructorName: string;
+  electiveGroup: string | null;
+  maximumEnrollment: number | null;
+  notes: string | null;
+  offeringCode: string | null;
+  parallelGroup: string | null;
   sectionId: string;
   sectionName: string;
   status: string;
@@ -370,15 +418,42 @@ export interface AuraOffering {
 }
 
 export interface AuraMeetingRequirement {
+  active: boolean;
+  allowedDays: number[];
+  customWeeks: number[];
   durationSlots: number;
+  fixedRoomId: string | null;
+  fixedTimeslotId: string | null;
   id: string;
   meetingType: string;
+  lectureBeforeLinked: boolean;
+  linkedRequirementId: string | null;
+  maximumOccurrencesPerDay: number;
+  minimumDaySeparation: number;
   notes: string | null;
   offeringId: string;
   requiredCapacity: number;
   requiredFacilities: string[];
   roomType: string;
+  pinned: boolean;
+  preferredDays: number[];
+  preferredEndTime: string | null;
+  preferredStartTime: string | null;
+  prohibitedDays: number[];
+  sameRoomPreferred: boolean;
   sessionsPerWeek: number;
+  teachingGroupId: string | null;
+  version: number;
+  weekPattern: string;
+}
+
+export interface AuraStudentAvailability {
+  availability: AuraAvailabilityType;
+  id: string;
+  reason: string | null;
+  studentUserId: string;
+  termId: string;
+  timeslotId: string;
   version: number;
 }
 
@@ -497,10 +572,15 @@ export interface AuraVersionSessionChange {
 export interface AuraVersionComparison {
   addedOccurrences: number;
   baseVersionId: string;
+  baseScore: string | null;
   changedOccurrences: number;
   changes: AuraVersionSessionChange[];
   comparedVersionId: string;
+  comparedScore: string | null;
+  hardScoreDelta: number | null;
+  mediumScoreDelta: number | null;
   removedOccurrences: number;
+  softScoreDelta: number | null;
   totalOccurrences: number;
 }
 
@@ -525,6 +605,9 @@ export interface AuraResolutionSuggestion {
   targetGroupId: string | null;
   targetGroupType: string | null;
   targetGroupCode: string | null;
+  targetLectureGroupId: string | null;
+  targetLabGroupId: string | null;
+  targetTutorialGroupId: string | null;
   targetOfferingCode: string | null;
   targetOfferingId: string | null;
   targetSectionId: string | null;
@@ -549,16 +632,21 @@ export interface AuraResolutionCase {
 
 export interface AuraWhatIfResult {
   affectedSessions: number;
+  baselineScore: string | null;
+  candidateCount: number;
   clashesAdded: number;
   clashesRemoved: number;
   completedAt: string | null;
   createdAt: string;
   id: string;
+  feasible: boolean;
+  projectedScore: string | null;
   recommendation: string;
   scenarioType: string;
   sourceVersionId: string;
   status: string;
   termId: string;
+  terminationReason: string | null;
 }
 
 export interface AuraEmergencyRepair {
@@ -607,6 +695,16 @@ export interface CreateAuraTermRequest {
   universityId: string;
 }
 
+export interface UpdateAuraTermRequest {
+  code: string;
+  endsOn: string;
+  name: string;
+  startsOn: string;
+  status: string;
+  timezone: string;
+  version: number;
+}
+
 export interface CreateAuraProgramRequest {
   code: string;
   departmentId: string;
@@ -614,10 +712,27 @@ export interface CreateAuraProgramRequest {
   universityId: string;
 }
 
+export interface UpdateAuraProgramRequest {
+  active: boolean;
+  code: string;
+  departmentId: string;
+  name: string;
+  numberOfSemesters: number;
+  version: number;
+}
+
 export interface CreateAuraBatchRequest {
   admissionYear: number;
   code: string;
   programId: string;
+}
+
+export interface UpdateAuraBatchRequest {
+  active: boolean;
+  admissionYear: number;
+  code: string;
+  expectedGraduationYear?: number;
+  version: number;
 }
 
 export interface CreateAuraSectionRequest {
@@ -627,12 +742,42 @@ export interface CreateAuraSectionRequest {
   studentCount: number;
 }
 
+export interface UpdateAuraSectionRequest {
+  active: boolean;
+  batchId: string;
+  code: string;
+  displayName: string;
+  hardDailyLoad: number;
+  homeBuildingId?: string;
+  preferredDailyLoad: number;
+  semesterNumber?: number;
+  studentCount: number;
+  termId?: string;
+  version: number;
+}
+
 export interface CreateAuraInstructorRequest {
   displayName: string;
   email?: string;
   maxHoursPerWeek: number;
   universityId: string;
   userId?: string;
+}
+
+export interface UpdateAuraInstructorRequest {
+  active: boolean;
+  departmentId?: string;
+  displayName: string;
+  email?: string;
+  employeeCode?: string;
+  hardDailyLoad: number;
+  homeBuildingId?: string;
+  maxHoursPerWeek: number;
+  maximumConsecutiveSlots: number;
+  preferredDailyLoad: number;
+  preferredWeeklyLoad: number;
+  userId?: string;
+  version: number;
 }
 
 export interface CreateAuraRoomRequest {
@@ -644,6 +789,18 @@ export interface CreateAuraRoomRequest {
   universityId: string;
 }
 
+export interface UpdateAuraRoomRequest {
+  active: boolean;
+  buildingId?: string;
+  capacity: number;
+  displayName: string;
+  facilities: string[];
+  name: string;
+  roomCode?: string;
+  roomType: string;
+  version: number;
+}
+
 export interface CreateAuraTimeslotRequest {
   dayOfWeek: number;
   endsAt: string;
@@ -652,12 +809,39 @@ export interface CreateAuraTimeslotRequest {
   universityId: string;
 }
 
+export interface UpdateAuraTimeslotRequest {
+  active: boolean;
+  dayOfWeek: number;
+  endsAt: string;
+  label: string;
+  slotOrder?: number;
+  slotType: string;
+  startsAt: string;
+  termId?: string;
+  version: number;
+}
+
 export interface CreateAuraOfferingRequest {
   courseId: string;
   expectedStudents: number;
   instructorId: string;
   sectionId: string;
   termId: string;
+}
+
+export interface UpdateAuraOfferingRequest {
+  combinedSections: boolean;
+  courseId: string;
+  electiveGroup?: string;
+  expectedStudents: number;
+  instructorId: string;
+  maximumEnrollment?: number;
+  notes?: string;
+  offeringCode?: string;
+  parallelGroup?: string;
+  sectionId: string;
+  status: string;
+  version: number;
 }
 
 export interface CreateAuraMeetingRequirementRequest {
@@ -669,6 +853,42 @@ export interface CreateAuraMeetingRequirementRequest {
   requiredFacilities?: string[];
   roomType: string;
   sessionsPerWeek: number;
+}
+
+export interface UpdateAuraMeetingRequirementRequest {
+  active: boolean;
+  allowedDays: number[];
+  customWeeks?: number[];
+  durationSlots: number;
+  fixedRoomId?: string;
+  fixedTimeslotId?: string;
+  lectureBeforeLinked: boolean;
+  linkedRequirementId?: string;
+  maximumOccurrencesPerDay: number;
+  meetingType: string;
+  minimumDaySeparation: number;
+  notes?: string;
+  pinned: boolean;
+  preferredDays: number[];
+  preferredEndTime?: string;
+  preferredStartTime?: string;
+  prohibitedDays: number[];
+  requiredCapacity: number;
+  requiredFacilities: string[];
+  roomType: string;
+  sameRoomPreferred: boolean;
+  sessionsPerWeek: number;
+  teachingGroupId?: string;
+  version: number;
+  weekPattern: string;
+}
+
+export interface UpsertAuraStudentAvailabilityRequest {
+  availability: AuraAvailabilityType;
+  reason?: string;
+  studentUserId: string;
+  termId: string;
+  timeslotId: string;
 }
 
 export interface AuraCalendarException {
