@@ -290,6 +290,18 @@ export function PersonalTimetablePage() {
                       <p className="text-sm text-slate-600">
                         {session.roomName} · {session.sectionName}
                       </p>
+                      {session.cancelledDates.length ? (
+                        <p className="text-xs text-amber-700 sm:col-span-4">
+                          Calendar exception: no class on{" "}
+                          {session.cancelledDates
+                            .map((date) =>
+                              new Intl.DateTimeFormat(undefined, {
+                                dateStyle: "medium",
+                              }).format(new Date(`${date}T00:00:00`)),
+                            )
+                            .join(", ")}
+                        </p>
+                      ) : null}
                     </div>
                   ))}
                 </CardContent>
