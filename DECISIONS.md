@@ -41,3 +41,7 @@
 | Timetable views | Query only the requested university-scoped dimension; derive student and instructor personal identities from authentication rather than accepting trusted IDs. |
 | Dynamic SQL | Permit dynamic resource columns only through fixed internal enum/allow-list mappings; all user values remain bound parameters. |
 | Verification | Use local PostgreSQL 17 for migration/runtime checks when Docker is unavailable and Playwright for browser-visible critical workflows. |
+| Calendar occurrences | Apply date-aware exception precedence in PostgreSQL so generation facts and exported recurring occurrences use the same rule. |
+| Workbook imports | Preserve selected-sheet parsing, optionally aggregate visible sheets only when normalized headers match, propagate merged values, and reject formulas rather than evaluating them. |
+| Resolution safety | Classify compatible/parallel/equivalent/makeup candidates but do not apply a grouped transfer until lecture/lab/tutorial assignments can be updated atomically. |
+| Comparison | Compare stable occurrence identity and expose compared-minus-selected hard, medium, and soft score deltas when both versions are scored. |
