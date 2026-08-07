@@ -12,6 +12,16 @@
   - linked-instructor and administrator-scoped timetable views;
   - persisted utilization/load/clash analytics and university-scoped audit history;
   - expanded Vitest and PostgreSQL-backed desktop/mobile Playwright coverage.
+  - additive V37 date-aware calendar-exception recurrence semantics;
+  - expanded master-data edit/activation UI and dedicated student availability;
+  - active same-term/same-university solver fact filtering and additional
+    teaching-group, gap, fairness, building-stability, and repair-stability
+    constraints;
+  - calendar-aware multi-format exports and score-delta version comparison;
+  - compatible visible-sheet workbook aggregation, merged-cell propagation,
+    and formula rejection;
+  - expanded resolution candidate classification and resource what-if clash
+    comparisons.
 
 - Native Lost & Found module:
   - authenticated browse, submit, detail, edit, owner lifecycle actions, claims, matches, and admin statistics;
