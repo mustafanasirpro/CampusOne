@@ -12,7 +12,7 @@ Status legend:
 - `[x] IMPLEMENTED AND TESTED`
 - `[!] EXTERNALLY BLOCKED`
 
-Last locally verified: 2026-07-22. See [`AURA_TEST_REPORT.md`](AURA_TEST_REPORT.md)
+Last locally verified: 2026-07-27. See [`AURA_TEST_REPORT.md`](AURA_TEST_REPORT.md)
 for the commands, results, PostgreSQL startup evidence, and remaining test gaps.
 
 ## Repository and safety gates
@@ -29,25 +29,20 @@ for the commands, results, PostgreSQL startup evidence, and remaining test gaps.
 
 ## Academic scheduling domain and setup
 
-- [-] IN PROGRESS — Academic terms: full fields, lifecycle, validation, optimistic locking, CRUD, search, pagination, archive/deactivate, frontend.
-- [-] IN PROGRESS — Academic programs: full fields, department/university isolation, optimistic locking, CRUD, search, pagination, frontend.
-- [-] IN PROGRESS — Batches/cohorts: full fields, lifecycle, CRUD, search, pagination, frontend.
-- [-] IN PROGRESS — Sections: full fields, load policies, building, optimistic locking, CRUD, search, pagination, frontend.
-- [-] IN PROGRESS — Instructors: employee identity, load policies, building, optional user link, optimistic locking, CRUD, search, pagination, frontend.
-- [-] IN PROGRESS — Rooms: room codes, types, capacity, building, optimistic locking, CRUD, search, pagination, frontend.
+- [-] IN PROGRESS — Terms, programs, batches, sections, instructors, and rooms have connected create/update/activation lifecycle, validation, optimistic locking, client search/pagination, and frontend coverage; server-side list pagination remains open.
 - [x] IMPLEMENTED AND TESTED — Normalized room facilities and requirement facility matching across migration, API, setup UI, readiness, and solver hard constraints.
-- [-] IN PROGRESS — Timeslots and breaks: term scope, ordering, overlap validation, instructional/break types, CRUD, frontend.
-- [-] IN PROGRESS — Calendar exceptions for holidays, non-teaching days, events, absences, closures, restrictions, cancellations, and outages have additive schema, scoped CRUD APIs, optimistic locking, and setup UI; generation/repair occurrence handling remains incomplete.
+- [-] IN PROGRESS — Timeslots and breaks have connected create/update/activation lifecycle, term scope, ordering, overlap validation, instructional/break types, client search/pagination, and frontend; server-side list pagination remains open.
+- [-] IN PROGRESS — Calendar exceptions have additive schema, scoped CRUD APIs, optimistic locking, setup UI, solver blocking, detector coverage, and dated export cancellation semantics; dependency-repair occurrence rescheduling remains incomplete.
 - [x] IMPLEMENTED AND TESTED — Instructor availability supports `AVAILABLE`, `UNAVAILABLE`, `AVOID`, and `PREFERRED` in API, readiness, and solver.
 - [x] IMPLEMENTED AND TESTED — Room availability supports `AVAILABLE`, `UNAVAILABLE`, `AVOID`, and `PREFERRED` in API, readiness, and solver.
 - [x] IMPLEMENTED AND TESTED — Section availability supports `AVAILABLE`, `UNAVAILABLE`, `AVOID`, and `PREFERRED` in API, readiness, and solver.
-- [-] IN PROGRESS — Individual student availability is persisted, importable, and enforced by the solver for active registrations; dedicated CRUD UI/API remains incomplete.
+- [x] IMPLEMENTED AND TESTED — Individual student availability has scoped create/list/delete API and setup UI, is importable, and is enforced by the solver for active same-university registrations.
 - [-] IN PROGRESS — Course offerings: sections, enrollment, combined/parallel/elective groups, teaching groups, lifecycle, CRUD, frontend.
 - [-] IN PROGRESS — Meeting requirements: occurrences, contiguous duration, instructor/room needs, day/time rules, groups, week patterns, fixed/pinned assignments, CRUD, frontend.
-- [-] IN PROGRESS — Offering conflicts have normalized database pairs, source/severity validation, atomic imports, and hard-overlap detector support; dedicated CRUD UI remains incomplete.
-- [-] IN PROGRESS — University-scoped building travel-time rules have constrained schema, atomic upsert imports, impossible-travel hard constraints, and difficult-travel medium constraints; dedicated CRUD UI remains incomplete.
+- [x] IMPLEMENTED AND TESTED — Offering conflicts have normalized database pairs, source/severity validation, optimistic updates/activation, setup UI, atomic imports, and hard-overlap solver/detector support.
+- [x] IMPLEMENTED AND TESTED — University-scoped building travel-time rules have constrained schema, optimistic updates/activation, setup UI, atomic upsert imports, impossible-travel hard constraints, and difficult-travel medium constraints.
 - [x] IMPLEMENTED AND TESTED — Persisted, university-scoped constraint profiles support balanced, compact, room-efficient, instructor-friendly, and repair strategies with validated hard/medium/soft weights.
-- [-] IN PROGRESS — The workbench now provides a connected creation workflow for programs, batches, sections, instructors, rooms/facilities, timeslots, offerings, requirements/facilities, availability, and calendar exceptions with loading, error, validation, and submitting states; update/archive flows and remaining domain inputs are incomplete.
+- [-] IN PROGRESS — The workbench provides connected create/update/activation workflows for exposed master data with loading, error, validation, confirmation, search, client pagination, and submitting states; server pagination and a few advanced create-time fields remain open.
 
 ## Revision, readiness, and generation
 
@@ -81,11 +76,11 @@ for the commands, results, PostgreSQL startup evidence, and remaining test gaps.
 - [x] IMPLEMENTED AND TESTED — Instructor daily and weekly hard loads.
 - [x] IMPLEMENTED AND TESTED — Section daily hard load.
 - [x] IMPLEMENTED AND TESTED — Fixed and pinned assignments are enforced by solver, detector, move/swap preflight, localized repair, and emergency repair; browser coverage verifies pin/unpin and repair isolation.
-- [ ] NOT STARTED — Inactive-resource, cross-university, and cross-term prohibition in assembled solver facts.
+- [x] IMPLEMENTED AND TESTED — Solver fact queries prohibit inactive resources and enforce the selected term and authenticated university across rooms, timeslots, instructors, sections, availability, requirements, participating sections, and registrations.
 - [x] IMPLEMENTED AND TESTED — Allowed/prohibited day rules.
-- [-] IN PROGRESS — Linked requirements and lecture-before-linked ordering are hard solver constraints; complete teaching-group policy remains incomplete.
-- [ ] NOT STARTED — Teaching-group consistency and duplicate parallel-attendance prevention.
-- [ ] NOT STARTED — Calendar exceptions, closures, cancellations, restrictions, and facility outages.
+- [-] IN PROGRESS — Linked requirements and lecture-before-linked ordering are hard solver constraints; registration creation validates lecture/lab/tutorial teaching groups, while atomic multi-group transfer remains incomplete.
+- [x] IMPLEMENTED AND TESTED — Duplicate parallel teaching-group attendance is prevented as a hard constraint for registered students.
+- [x] IMPLEMENTED AND TESTED — Calendar exceptions, closures, cancellations, restrictions, and facility outages block affected solver assignments and are represented in occurrence-aware exports.
 - [ ] NOT STARTED — Online/hybrid resource rules.
 - [x] IMPLEMENTED AND TESTED — Odd/even/custom week patterns are persisted and respected by solver overlaps, personal timetables, ICS, and detector overlap logic.
 - [ ] NOT STARTED — Shared specialized-resource collision.
@@ -101,10 +96,10 @@ for the commands, results, PostgreSQL startup evidence, and remaining test gaps.
 - [x] IMPLEMENTED AND TESTED — Preferred days and time windows.
 - [x] IMPLEMENTED AND TESTED — Same-room preference and room stability.
 - [x] IMPLEMENTED AND TESTED — Preferred and hard load balancing for instructors and sections.
-- [ ] NOT STARTED — Gap minimization for students, sections, and instructors.
-- [ ] NOT STARTED — Early/late and undesirable-slot fairness.
-- [-] IN PROGRESS — Difficult-travel penalties are implemented; general building-stability preferences remain incomplete.
-- [ ] NOT STARTED — Parent assignment stability for localized repair.
+- [x] IMPLEMENTED AND TESTED — Gap minimization for students, sections, and instructors is scored in 30-minute units.
+- [x] IMPLEMENTED AND TESTED — Early/late undesirable-slot assignments receive a soft fairness penalty.
+- [x] IMPLEMENTED AND TESTED — Difficult-travel penalties and section building-stability preferences are implemented.
+- [x] IMPLEMENTED AND TESTED — Parent room/timeslot assignment changes receive an explicit repair-stability penalty.
 - [x] IMPLEMENTED AND TESTED — Persisted generation profiles expose validated configurable hard/medium/soft weights and deterministic profile selection.
 
 ## Imports
@@ -114,7 +109,7 @@ for the commands, results, PostgreSQL startup evidence, and remaining test gaps.
 - [x] IMPLEMENTED AND TESTED — XLSX multi-sheet setup, registration, and timetable parsing with preview, source selection, mapping, validation, and apply.
 - [x] IMPLEMENTED AND TESTED — Legacy XLS parsing with preview, mapping, validation, and apply.
 - [x] IMPLEMENTED AND TESTED — Text-based PDF timetable extraction with explicit OCR-required handling for scanned PDFs.
-- [ ] NOT STARTED — Row, grid, multi-sheet, combined-cell, and registration layouts.
+- [-] IN PROGRESS — Header-row CSV/workbook and registration layouts, selected-sheet parsing, compatible visible-sheet aggregation, and merged-cell propagation are implemented; arbitrary visual timetable grids remain incomplete.
 - [x] IMPLEMENTED AND TESTED — Mapping profiles, persisted raw rows, normalized preview, unknown-reference handling, actionable row errors, warnings, and transactional apply.
 - [x] IMPLEMENTED AND TESTED — Imported timetable draft creation and independent clash detection.
 - [x] IMPLEMENTED AND TESTED — Import frontend workflow covering upload, sheet selection, mapping, validation, apply, and results.
@@ -139,13 +134,13 @@ for the commands, results, PostgreSQL startup evidence, and remaining test gaps.
 ## Resolution, moves, and repair
 
 - [x] IMPLEMENTED AND TESTED — Resolution case lifecycle and scoped student/admin APIs.
-- [-] IN PROGRESS — Parallel-offering, alternate lab, and alternate tutorial suggestions are implemented with safe application; compatible section, makeup, equivalent, and registration-adjustment strategies remain incomplete.
-- [ ] NOT STARTED — Capacity, policy, week-pattern, group, duplicate-registration, personal-clash, and institutional-clash validation for transfers.
+- [-] IN PROGRESS — Compatible-section, parallel-offering, equivalent-offering, makeup-session, registration-adjustment, alternate-lab, and alternate-tutorial candidates are classified and ranked; atomic target teaching-group assignment remains incomplete.
+- [-] IN PROGRESS — Capacity, duplicate-registration, personal-clash, and institutional-clash validation are rechecked at transfer apply time; grouped offering transfers are deliberately non-applicable until an atomic group assignment can be represented.
 - [-] IN PROGRESS — Student-only suggestions are ranked by safety and disruption with capacity/clash explanations; complete institutional impact metrics remain incomplete.
 - [x] IMPLEMENTED AND TESTED — Manual move preview/apply is connected end to end for draft versions with stale-version protection, clash refresh, and an audit row.
 - [-] IN PROGRESS — Room/time move, safe swap preview/apply, and pin/unpin with lock reason and audit are implemented; full score delta and version-based undo UI remain incomplete.
 - [-] IN PROGRESS — Automatic localized repair accepts a clash or session, clones an isolated draft, preserves pinned/unaffected sessions, scores bounded room/timeslot alternatives, persists a tokenized preview, rejects stale/expired/tampered apply requests, applies atomically, refreshes clashes, and records audit data. Multi-session dependency neighborhoods, instructor/group alternatives, notifications, and richer impact metrics remain open.
-- [-] IN PROGRESS — Non-destructive what-if records and affected-session analysis are connected to the workbench; full feasibility solving and rich comparison remain incomplete.
+- [-] IN PROGRESS — Non-destructive what-if records and affected-session analysis are connected to the workbench; room, facility, instructor, and timeslot scenarios compute baseline/projected clash deltas, while full Timefold re-solving and rich score comparison remain incomplete.
 - [-] IN PROGRESS — Emergency room/facility and timeslot closures clone only a current published schedule, automatically reassign affected sessions into a review draft, pin unaffected sessions, reject stale sources, refresh clashes, and expose result status. Automatic instructor/section replacement, pre-apply preview, notification, and publication orchestration remain open.
 
 ## Versioning, views, exports, and analytics
@@ -163,9 +158,9 @@ for the commands, results, PostgreSQL startup evidence, and remaining test gaps.
 ## Frontend workbench
 
 - [-] IN PROGRESS — Admin route and dashboard shell at `/admin/aura`.
-- [ ] NOT STARTED — Terms management screen with full lifecycle controls.
-- [ ] NOT STARTED — Setup wizard and CRUD screens for every scheduling input.
-- [ ] NOT STARTED — Offerings, requirements, groups, conflicts, and registrations screens.
+- [x] IMPLEMENTED AND TESTED — Terms management is connected with create, edit, activation, validation, search, and client pagination.
+- [-] IN PROGRESS — Setup lifecycle screens cover every currently exposed scheduling input; server pagination and some advanced create-time fields remain incomplete.
+- [x] IMPLEMENTED AND TESTED — Offerings, requirements, teaching groups, conflicts, and registrations have connected administration screens.
 - [x] IMPLEMENTED AND TESTED — Import upload, sheet selection, preview, mapping, whole-file validation, apply, and result screen.
 - [-] IN PROGRESS — Readiness, generation run, version, session, clash, metrics, and publication views.
 - [-] IN PROGRESS — The version workbench connects move preview/apply, swap, pin/unpin, comparison, archive, and exports; score-delta detail and version-based undo remain incomplete.
@@ -192,17 +187,17 @@ for the commands, results, PostgreSQL startup evidence, and remaining test gaps.
 - [ ] NOT STARTED — `AURA_BACKTEST_REPORT.md` with expected-versus-actual outcomes.
 - [-] IN PROGRESS — Backend domain/service/readiness/solver/clash/authorization/application-context tests include atomic generation persistence, stale-state guards, publication occurrence integrity, notifications, and resolution concurrency; the exhaustive matrix below remains incomplete.
 - [ ] NOT STARTED — Repository, controller, complete migration, ConstraintVerifier-per-constraint, import, registration, personal timetable, resolver, move/swap, repair, simulation, emergency, comparison, export, concurrency, locking, packaged-JAR, and end-to-end API coverage.
-- [x] IMPLEMENTED AND TESTED — Vitest, React Testing Library, user-event, and jsdom cover route protection, workbench/setup/operations states, constraint profiles, imports, personal timetables, and instructor timetables (15 passing tests across 8 files).
+- [x] IMPLEMENTED AND TESTED — Vitest, React Testing Library, user-event, and jsdom cover route protection, workbench/setup/operations states, constraint profiles, imports, registrations, resolutions, scenarios, version tools, personal timetables, and instructor timetables (26 passing tests across 12 files).
 - [-] IN PROGRESS — Playwright runs the packaged Spring Boot application with real PostgreSQL across desktop and mobile (31 passed, 1 intentional desktop skip for the mobile-only assertion), including generation, publication, scoped views, operations, analytics/audit, emergency and localized repair. The exhaustive journey matrix remains incomplete.
 - [x] IMPLEMENTED AND TESTED — Deterministic solver performance checks ran at approximately 300, 1,000, and 5,000 occurrences with complete zero-hard-score results.
 - [-] IN PROGRESS — `AURA_BENCHMARK_REPORT.md` records measured solver time, score, and memory observations; utilization, gap, and repair benchmarking remains incomplete.
 
 ## Verification, deployment, and regression
 
-- [x] IMPLEMENTED AND TESTED — Current backend suite passed after operations, scoped views, repair, scenario, repository, and workbench integration: 607 tests, 0 failures, 0 errors, 13 skipped; AURA contributed 98 tests with one Docker-gated skip.
-- [x] IMPLEMENTED AND TESTED — Frontend lint, TypeScript/Vite production build, and 15 component tests across 8 files passed.
+- [x] IMPLEMENTED AND TESTED — Current backend suite passed after lifecycle, constraint, import, resolution, scenario, repository, export, and comparison integration: 633 tests, 0 failures, 0 errors, 13 skipped; AURA contributed 124 tests with one Docker-gated skip.
+- [x] IMPLEMENTED AND TESTED — Frontend lint, TypeScript/Vite production build, and 26 component tests across 12 files passed.
 - [!] EXTERNALLY BLOCKED — Docker/Testcontainers execution remains unavailable because the Docker Desktop named pipe is absent; equivalent migration and startup coverage was completed with a disposable local PostgreSQL 17 cluster.
-- [x] IMPLEMENTED AND TESTED — Packaged JAR started against disposable PostgreSQL 17.10, applied and validated V1–V36, initialized JPA/Tomcat, and passed health; authenticated runtime flows covered setup, readiness, generation, publication, scoped/personal views, moves, operations, repairs, imports, analytics, audit, export, and authorization.
+- [x] IMPLEMENTED AND TESTED — Packaged JAR started against disposable PostgreSQL 17.10, applied and validated V1–V37, initialized JPA/Tomcat, and passed health; authenticated runtime flows covered setup, readiness, generation, publication, scoped/personal views, moves, operations, repairs, imports, analytics, audit, export, and authorization.
 - [-] IN PROGRESS — Playwright browser E2E executed successfully on Chromium desktop and mobile projects (31 passed, 1 project-specific desktop skip); the exhaustive journey matrix remains incomplete.
 - [x] IMPLEMENTED AND TESTED — The full Maven verification suite passed across AURA and existing CampusOne modules after the current changes; browser-level cross-module regression remains part of the separate E2E gate.
 - [!] EXTERNALLY BLOCKED — Commit and push are intentionally not performed because this task explicitly forbids staging, commits, pushes, merges, and deployment.
@@ -212,20 +207,20 @@ for the commands, results, PostgreSQL startup evidence, and remaining test gaps.
 
 - [x] IMPLEMENTED AND TESTED — Existing CampusOne context, status, decisions, tasks, README, backend README, API, schema, test plan, changelog, verification, benchmark, and acceptance reports describe the verified partial AURA surface.
 - [-] IN PROGRESS — Required existing documents are reconciled with current evidence; full-system documentation cannot be marked complete while product acceptance blockers remain.
-- [ ] NOT STARTED — `AURA_ARCHITECTURE.md`.
-- [ ] NOT STARTED — `AURA_REQUIREMENTS.md`.
-- [ ] NOT STARTED — `AURA_CONSTRAINTS.md`.
-- [ ] NOT STARTED — `AURA_IMPORT_GUIDE.md`.
-- [ ] NOT STARTED — `AURA_RESOLUTION_GUIDE.md`.
-- [ ] NOT STARTED — `AURA_USER_GUIDE.md`.
+- [x] IMPLEMENTED AND TESTED — `AURA_ARCHITECTURE.md`.
+- [x] IMPLEMENTED AND TESTED — `AURA_REQUIREMENTS.md`.
+- [x] IMPLEMENTED AND TESTED — `AURA_CONSTRAINTS.md`.
+- [x] IMPLEMENTED AND TESTED — `AURA_IMPORT_GUIDE.md`.
+- [x] IMPLEMENTED AND TESTED — `AURA_RESOLUTION_GUIDE.md`.
+- [x] IMPLEMENTED AND TESTED — `AURA_USER_GUIDE.md`.
 - [x] IMPLEMENTED AND TESTED — `AURA_TEST_REPORT.md` records the current automated and PostgreSQL verification evidence without overstating browser or production coverage.
-- [ ] NOT STARTED — `AURA_BACKTEST_REPORT.md`.
+- [-] IN PROGRESS — `AURA_BACKTEST_REPORT.md` records verified deterministic scenario families without claiming the incomplete fixtures A–S acceptance matrix.
 - [x] IMPLEMENTED AND TESTED — `AURA_BENCHMARK_REPORT.md` records the measured 300, 1,000, and 5,000 occurrence runs and their limitations.
-- [ ] NOT STARTED — `AURA_DEPLOYMENT_CHECKLIST.md`.
+- [x] IMPLEMENTED AND TESTED — `AURA_DEPLOYMENT_CHECKLIST.md` separates local acceptance from the unauthorized production deployment process.
 
 ## Final completion gates
 
-- [-] IN PROGRESS — A. Setup creation workflows are connected; complete update/deactivate lifecycle parity remains open.
+- [-] IN PROGRESS — A. Setup create/update/activation workflows are connected across exposed master data; server-side pagination and a few advanced create fields remain open.
 - [x] IMPLEMENTED AND TESTED — B. CSV import preview, mapping, validation, and atomic apply are implemented; browser preview/validation is verified.
 - [x] IMPLEMENTED AND TESTED — C. XLSX import is implemented and covered by backend import tests.
 - [x] IMPLEMENTED AND TESTED — D. Text-based PDF import and explicit scanned-PDF `OCR_REQUIRED` handling are implemented and covered by backend tests.
@@ -241,10 +236,10 @@ for the commands, results, PostgreSQL startup evidence, and remaining test gaps.
 - [-] IN PROGRESS — N. Emergency room/facility/timeslot reassignment is connected and browser verified; instructor/section reassignment, preview-before-draft, notifications, and publication orchestration remain open.
 - [x] IMPLEMENTED AND TESTED — O. Stable occurrence-level version comparison is connected and browser verified.
 - [x] IMPLEMENTED AND TESTED — P. Student/instructor personal views and university-scoped admin instructor/section/room/course/offering/program/department/day/week views are connected; supported multi-format exports remain available.
-- [x] IMPLEMENTED AND TESTED — Q. Backend full verification passed for the current implementation (607 tests, 0 failures, 0 errors, 13 skipped; 98 AURA tests, one Docker-gated skip).
-- [x] IMPLEMENTED AND TESTED — R. Frontend lint, production build, and component tests pass (8 files, 15 tests).
+- [x] IMPLEMENTED AND TESTED — Q. Backend full verification passed for the current implementation (633 tests, 0 failures, 0 errors, 13 skipped; 124 AURA tests, one Docker-gated skip).
+- [x] IMPLEMENTED AND TESTED — R. Frontend lint, production build, and component tests pass (12 files, 26 tests).
 - [-] IN PROGRESS — S. Browser E2E passes its expanded desktop/mobile suite (31 passed, 1 intentional desktop skip for mobile-only coverage); the exhaustive requested journey matrix remains partial.
-- [x] IMPLEMENTED AND TESTED — T. Isolated PostgreSQL migration/startup verification completed through V36 with a disposable local PostgreSQL 17 instance; a separate V35→V36 packaged-application upgrade passed. Docker-specific Testcontainers execution remains externally unavailable.
+- [x] IMPLEMENTED AND TESTED — T. Isolated PostgreSQL migration/startup verification completed through V37 with a disposable local PostgreSQL 17 instance; a separate V36→V37 packaged-application upgrade passed. Docker-specific Testcontainers execution remains externally unavailable.
 - [-] IN PROGRESS — U. Deterministic and 300/1,000/5,000 occurrence performance checks pass; the full fixture/backtest matrix and repair metrics remain open.
 - [ ] NOT STARTED — V. Render production verification.
 - [x] IMPLEMENTED AND TESTED — W. Full CampusOne backend regression verification passed all 607 tests, and frontend lint/build/component/browser gates pass after the AURA changes.
