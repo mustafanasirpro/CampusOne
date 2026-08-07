@@ -105,6 +105,8 @@ Additive AURA migrations:
   metadata, deterministic solver seeds, and input checksums.
 - `V36` adds buildings, teaching groups, offering conflicts, travel rules,
   localized-repair plans, audit events, supporting indexes, and revision triggers.
+- `V37` adds date-aware calendar-exception recurrence precedence used by
+  generation, timetable occurrence projection, and exports.
 
-PostgreSQL 17.10 was used to verify a clean V1–V36 migration and a V35→V36
+PostgreSQL 17.10 was used to verify a clean V1–V37 migration and a V36→V37
 upgrade. Prior migrations were not modified.
