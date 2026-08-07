@@ -46,10 +46,10 @@ Full backend verification must be rerun after every subsequent backend change.
 
 Status: substantial implementation verified locally; full product acceptance remains incomplete.
 
-- Backend: 607 tests passed with 13 Docker-gated skips; AURA contributed 98 tests with one skip.
-- Frontend: lint, production build, and 15 component tests across 8 files passed.
+- Backend: 633 tests passed with 13 Docker-gated skips; AURA contributed 124 tests with one skip.
+- Frontend: lint, production build, and 26 component tests across 12 files passed.
 - Browser: isolated PostgreSQL-backed desktop/mobile Playwright suite passed 31 tests with one intentional desktop skip for the mobile-only assertion.
-- Database: PostgreSQL 17.10 verified fresh migrations V1–V36 and an upgrade from V35 to V36.
-- Solver: deterministic 300, 1,000, and 5,000 occurrence checks completed with zero hard score; the largest case has a documented memory warning.
-- Operations, scoped timetable views, linked-instructor access, localized repair, room/timeslot emergency reassignment, analytics, and audit are connected and PostgreSQL/browser verified.
+- Database: PostgreSQL 17.10 verified fresh migrations V1–V37 and an upgrade from V36 to V37.
+- Solver: deterministic 300, 1,000, and 5,000 occurrence checks were rerun after the current constraint changes and completed with zero hard score; the largest case has a documented memory warning.
+- Master-data lifecycle, student availability, calendar-aware exports, expanded resolution classification, resource what-if clash deltas, operations, scoped views, localized repair, room/timeslot emergency reassignment, analytics, and audit are connected and covered at their documented levels.
 - Deployment: not performed. See `AURA_FINAL_ACCEPTANCE_REPORT.md` for evidence and remaining acceptance blockers.
