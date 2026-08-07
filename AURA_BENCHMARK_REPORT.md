@@ -1,20 +1,30 @@
 # AURA Solver Benchmark Report
 
-Measured locally on 2026-07-20 using Java 21 and Timefold Solver Community Edition and retained after the 2026-07-22 completion pass. The later pass did not change solver construction or constraints, and the full solver regression suite remained green. These figures describe this machine and synthetic deterministic inputs; they are not production capacity guarantees.
+Measured locally on 2026-07-27 using Java 21 and Timefold Solver Community
+Edition after the current constraint changes. These figures describe this
+machine and synthetic deterministic inputs; they are not production capacity
+guarantees.
 
 ## Results
 
 | Occurrences | Solver limit | End-to-end elapsed | Score | Approximate memory delta | Acceptance |
 |---:|---:|---:|---|---:|---|
-| 300 | 2 seconds | 1,975 ms | `0hard/0medium/0soft` | 20,598,008 bytes | Complete, zero hard constraints |
-| 1,000 | 2 seconds | 1,217 ms | `0hard/0medium/0soft` | 69,072,104 bytes | Complete, zero hard constraints |
-| 5,000 | 2 seconds | 20,701 ms | `0hard/0medium/0soft` | 2,483,357,744 bytes | Complete, zero hard constraints |
+| 300 | 2 seconds | 2,805 ms | `0hard/0medium/-150soft` | 95,285,648 bytes | Complete, zero hard constraints |
+| 1,000 | 2 seconds | 2,152 ms | `0hard/0medium/-200soft` | 221,093,024 bytes | Complete, zero hard constraints |
+| 5,000 | 2 seconds | 17,237 ms | `0hard/0medium/-500soft` | 1,987,455,008 bytes | Complete, zero hard constraints |
 
 ## Interpretation
 
 A deterministic construction pass now assigns eligible rooms, instructors, and timeslots while respecting known hard occupancy and availability facts before Timefold optimization begins. This removed the incomplete initialization observed for 1,000 occurrences in the earlier implementation.
 
-The 5,000-occurrence case spent about 18.9 seconds initializing the Timefold score and consumed substantial heap despite the two-second solver limit. It completed with no uninitialized assignments and no hard penalty, but the memory result is a scaling warning. Production sizing should use representative university data and explicit container memory limits before enabling this scale.
+The new soft scores reflect undesirable-time and stability preferences in the
+synthetic fixture; acceptance depends on the zero hard score, not a zero soft
+score. The 5,000-occurrence case spent about 15.5 seconds initializing/scoring
+before termination and consumed substantial heap despite the two-second solver
+limit. It completed with no uninitialized assignments and no hard penalty, but
+the memory result remains a scaling warning. Production sizing should use
+representative university data and explicit container memory limits before
+enabling this scale.
 
 ## Reproduction
 
