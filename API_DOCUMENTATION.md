@@ -146,7 +146,7 @@ when creating an academic term, where the backend still verifies admin access.
 | `PATCH` | `/sessions/{sessionId}/swap` | Apply a validated draft-session swap. |
 | `PATCH` | `/sessions/{sessionId}/pin` | Pin or unpin a draft session assignment. |
 | `POST` | `/versions/{versionId}/clone` | Clone a version into an editable draft. |
-| `GET` | `/versions/{versionId}/compare/{otherVersionId}` | Compare stable occurrences across two versions. |
+| `GET` | `/versions/{versionId}/compare/{otherVersionId}` | Compare stable occurrences and hard/medium/soft score deltas across two versions. |
 | `POST` | `/versions/{versionId}/archive` | Archive an editable draft. |
 | `GET` | `/versions/{versionId}/export?format={format}` | Export CSV, XLSX, PDF, JSON, printable HTML, or ICS. |
 | `GET` | `/terms/{termId}/metrics` | Return aggregate generation/version/clash metrics for admin dashboards. |
@@ -161,7 +161,7 @@ when creating an academic term, where the backend still verifies admin access.
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/terms/{termId}/imports/preview` | Upload and preview a bounded CSV, XLSX, XLS, or text PDF import. |
+| `POST` | `/terms/{termId}/imports/preview` | Upload and preview a bounded CSV, XLSX, XLS, or text PDF import. Workbooks may select one visible sheet or aggregate compatible visible sheets; merged values are propagated and formulas are rejected. |
 | `POST` | `/imports/{jobId}/validate` | Validate mappings and normalized source rows. |
 | `POST` | `/imports/{jobId}/apply` | Apply a validated import atomically. |
 | `POST` | `/registrations` | Create a university-scoped student registration. |
