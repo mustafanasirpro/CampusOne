@@ -28,6 +28,13 @@ const GEMINI_BASE = (
 
 const searchCache = new Map<string, TopicImage[]>();
 
+// Our deployed site is https, so an http:// image is blocked as mixed content and
+// never loads. Upgrade every candidate to https (hosts that don't support it just
+// fail onError and we fall through to the next, reliably-https candidate).
+function toHttps(url: string): string {
+  return url.startsWith("http://") ? `https://${url.slice(7)}` : url;
+}
+
 // --- Web search ------------------------------------------------------------
 
 async function searchOpenverse(
@@ -95,21 +102,22 @@ async function searchCandidates(
   if (!key) return [];
   if (searchCache.has(key)) return searchCache.get(key) ?? [];
   const out: TopicImage[] = [];
-  // Openverse direct source image (broad, web-wide, usually fast).
+  // Openverse (broad, web-wide). The thumbnail is served from api.openverse.org
+  // (always https + reliable) so it leads; the original source image follows.
   try {
     const ov = await searchOpenverse(query, signal);
-    if (ov?.url) out.push({ url: ov.url, title: ov.title ?? query });
-    if (ov?.thumbnail && ov.thumbnail !== ov?.url) {
-      out.push({ url: ov.thumbnail, title: ov.title ?? query });
+    const title = ov?.title ?? query;
+    if (ov?.thumbnail) out.push({ url: toHttps(ov.thumbnail), title });
+    if (ov?.url && ov.url !== ov.thumbnail) {
+      out.push({ url: toHttps(ov.url), title });
     }
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
   }
-  // Wikipedia (reliable Wikimedia CDN) — strong fallback, inserted before the
-  // slower Openverse thumbnail proxy.
+  // Wikipedia (reliable Wikimedia CDN, always https) — strong fallback.
   try {
     const wk = await searchWikipedia(query, signal);
-    if (wk) out.splice(1, 0, wk);
+    if (wk) out.splice(1, 0, { ...wk, url: toHttps(wk.url) });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
   }
@@ -194,5 +202,38 @@ export async function collectImageCandidates(
   }
   const searched = await searchCandidates(query, signal);
   out.push(...searched);
+  // Last resort: a free generated illustration (https, no key) so an image beat is
+  // never left blank when web search finds nothing or every source fails to load.
+  if (IMAGE_GEN_ENABLED && !out.some((c) => c.generated)) {
+    out.push({ url: pollinationsUrl(query), title: query, generated: true });
+  }
   return out;
+}
+
+// --- Prefetch --------------------------------------------------------------
+
+const preloaded = new Set<string>();
+
+/**
+ * Warm an image for a beat BEFORE it's shown: resolves the candidates (filling the
+ * search cache) and preloads the first couple of URLs into the browser cache. Fired
+ * while the lesson is still being prepared/played, so by the time the image beat is
+ * revealed it appears instantly instead of starting to load after the lesson ends.
+ * Fire-and-forget; failures are harmless (the UI still tries at reveal time).
+ */
+export function prefetchImage(query: string, generate: boolean): void {
+  if (!query.trim() || typeof Image === "undefined") return;
+  void collectImageCandidates(query, generate)
+    .then((list) => {
+      for (const c of list.slice(0, 2)) {
+        if (preloaded.has(c.url)) continue;
+        preloaded.add(c.url);
+        const img = new Image();
+        img.decoding = "async";
+        img.src = c.url; // kicks off the network fetch into the browser cache
+      }
+    })
+    .catch(() => {
+      // Ignore — the BoardImage component will try again when the beat shows.
+    });
 }
