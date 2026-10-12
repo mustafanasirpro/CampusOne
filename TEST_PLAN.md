@@ -98,7 +98,9 @@ Focused backend tests added:
 - `AuraConstraintProviderTest`
   - independently scores active-registration student overlap, hard offering
     conflicts, student unavailability, odd/even week compatibility,
-    insufficient building travel, and lecture-before-linked ordering.
+    insufficient building travel, lecture-before-linked ordering,
+    duplicate teaching-group attendance, calendar blocking, idle gaps,
+    undesirable-time fairness, building stability, and repair stability.
 - `AuraServiceTest`
   - verifies authenticated-admin university scoping;
   - rejects cross-university term creation;
@@ -126,7 +128,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 ```
 
 It starts an isolated PostgreSQL 17 cluster, verifies packaged application
-health at Flyway target V35, upgrades to V36, verifies health again, and cleans
+health at Flyway target V36, upgrades to V37, verifies health again, and cleans
 up local processes.
 
 ## AURA Exploratory Regression Reference
