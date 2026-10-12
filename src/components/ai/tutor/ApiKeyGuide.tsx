@@ -9,9 +9,9 @@ import {
 import { useState, type ReactNode } from "react";
 
 import {
-  getApiKey,
+  addApiKey,
+  keyCount,
   providerInfo,
-  setApiKey,
   type KeyProvider,
 } from "@/api/apiKeys";
 import { Button } from "@/components/common";
@@ -162,9 +162,10 @@ export function ApiKeyGuide({
   const host = info.consoleUrl.replace(/^https?:\/\//, "");
   const steps = GUIDES[provider](host);
 
-  const [value, setValue] = useState(() => getApiKey(provider));
+  const [value, setValue] = useState("");
   const [reveal, setReveal] = useState(false);
   const [touched, setTouched] = useState(false);
+  const existing = keyCount(provider);
 
   const valid = info.validate(value);
   const showError = touched && value.trim().length > 0 && !valid;
@@ -172,7 +173,7 @@ export function ApiKeyGuide({
   const handleSave = () => {
     setTouched(true);
     if (!valid) return;
-    setApiKey(provider, value);
+    addApiKey(provider, value); // adds to the list (for failover), never replaces
     onSaved();
   };
 
@@ -188,7 +189,9 @@ export function ApiKeyGuide({
           Back
         </button>
         <h2 className="text-lg font-semibold text-slate-800">
-          Get your free {info.name} API key
+          {existing > 0
+            ? `Add another free ${info.name} key`
+            : `Get your free ${info.name} API key`}
         </h2>
         <a
           href={info.consoleUrl}
@@ -202,8 +205,16 @@ export function ApiKeyGuide({
       </div>
 
       <p className="rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 text-sm text-slate-600">
-        {info.purpose} Follow the steps below — each picture shows roughly what
-        you&apos;ll see and marks where to click.
+        {existing > 0 ? (
+          <>
+            You already have {existing} {info.name} key{existing > 1 ? "s" : ""}.
+            Add another so the tutor can switch to it when one hits its free limit —
+            just repeat the steps with a new account (or the same account).{" "}
+          </>
+        ) : (
+          <>{info.purpose} </>
+        )}
+        Each picture shows roughly what you&apos;ll see and marks where to click.
       </p>
 
       <ol className="grid gap-4">
