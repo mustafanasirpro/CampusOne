@@ -1,6 +1,8 @@
-import { Bot, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Bot, GraduationCap, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
+import { paths } from "@/routes/paths";
 import {
   AiChatWorkspace,
   AiUsagePanel,
@@ -48,6 +50,14 @@ export function AiAssistantPage() {
               so you can study with confidence.
             </p>
           </div>
+          <Link
+            to={paths.tutor}
+            className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white ring-1 ring-white/20 transition hover:bg-white/20"
+          >
+            <GraduationCap className="size-4 text-brand-200" />
+            Live Whiteboard Tutor
+            <ArrowRight className="size-4" />
+          </Link>
         </CardContent>
       </Card>
 
