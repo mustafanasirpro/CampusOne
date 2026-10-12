@@ -155,6 +155,11 @@ const AiAssistantPage = lazy(async () => {
   return { default: module.AiAssistantPage };
 });
 
+const TutorPage = lazy(async () => {
+  const module = await import("@/pages/TutorPage");
+  return { default: module.TutorPage };
+});
+
 const SettingsPage = lazy(async () => {
   const module = await import("@/pages/SettingsPage");
   return { default: module.SettingsPage };
@@ -209,6 +214,17 @@ function lazyRoute(element: ReactNode, path: string) {
 }
 
 export const router = createBrowserRouter([
+  {
+    // Standalone offline tutor — no auth, no backend (local Ollama only).
+    path: paths.tutorStandalone,
+    element: (
+      <div className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+          {lazyRoute(<TutorPage />, paths.tutorStandalone)}
+        </div>
+      </div>
+    ),
+  },
   {
     element: <PublicLayout />,
     children: [
@@ -405,6 +421,10 @@ export const router = createBrowserRouter([
           {
             path: paths.assistant,
             element: lazyRoute(<AiAssistantPage />, paths.assistant),
+          },
+          {
+            path: paths.tutor,
+            element: lazyRoute(<TutorPage />, paths.tutor),
           },
           {
             path: "/ai-assistant",
