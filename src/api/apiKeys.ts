@@ -1,7 +1,7 @@
 // Bring-your-own-key (BYOK): every user adds their OWN free API keys, stored only
-// in their browser (localStorage) and sent with each request as the `x-tutor-key`
-// header. The dev proxy forwards that header to the provider — so no one shares
-// anyone else's key, and keys never live in the shipped app. See vite.config.ts.
+// in their browser (localStorage). The browser calls Groq / OpenRouter / Gemini
+// DIRECTLY with the user's key (those APIs allow CORS) — no server, no proxy — so
+// it works on the deployed site, and no one shares anyone else's key.
 
 export type KeyProvider = "groq" | "openrouter" | "gemini";
 
@@ -86,11 +86,18 @@ export function clearApiKey(provider: KeyProvider): void {
 }
 
 /**
- * Header to send the user's own key through the dev proxy. Empty when none is
- * stored (the proxy then falls back to the dev's .env, if any). Keeping this in
- * one place means every request path attaches the key the same way.
+ * `Authorization: Bearer <key>` for a DIRECT browser call to the provider (Groq,
+ * OpenRouter — both allow CORS). Empty when no key is stored. This is how the
+ * deployed site uses each user's own key: no server, no proxy, straight to the
+ * provider. Gemini takes its key as a query param instead — see `geminiKeyParam`.
  */
-export function keyHeader(provider: KeyProvider): Record<string, string> {
+export function authHeader(provider: KeyProvider): Record<string, string> {
   const key = getApiKey(provider);
-  return key ? { "x-tutor-key": key } : {};
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
+/** Gemini passes the key as `?key=` — returns that query fragment (or ""). */
+export function geminiKeyParam(): string {
+  const key = getApiKey("gemini");
+  return key ? `key=${encodeURIComponent(key)}` : "";
 }
