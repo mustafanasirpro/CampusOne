@@ -34,18 +34,20 @@
 
 ## AURA acceptance work
 
-Completed locally on 2026-07-20:
+Completed locally through 2026-07-27:
 
 - [x] Add persisted generation profiles, validated weights, deterministic seeds, and input checksums.
 - [x] Fix PostgreSQL UUID binding and timestamp mapping defects found by the real runtime harness.
-- [x] Configure Vitest/React Testing Library and pass 15 focused frontend tests across 8 files.
+- [x] Configure Vitest/React Testing Library and pass 26 focused frontend tests across 12 files.
 - [x] Configure PostgreSQL-backed Playwright and pass the expanded desktop/mobile suite (31 passed, 1 intentional project-specific skip).
-- [x] Verify fresh V1–V36 and V35→V36 migrations on PostgreSQL 17.
-- [x] Measure deterministic 300, 1,000, and 5,000 occurrence solver scenarios.
+- [x] Verify fresh V1–V37 and V36→V37 migrations on PostgreSQL 17.
+- [x] Rerun deterministic 300, 1,000, and 5,000 occurrence solver scenarios after the current constraint changes.
+- [x] Connect update/activation lifecycle UI for the exposed AURA master data and dedicated student availability.
+- [x] Add calendar-aware recurrence/export behavior, multi-sheet/merged-cell imports, formula rejection, resource what-if clash deltas, and version score deltas.
 
 Still required for full AURA acceptance:
 
-- [ ] Complete every setup entity's update/deactivate lifecycle and UI parity.
+- [ ] Add server-side pagination and complete the remaining advanced create-time setup fields.
 - [ ] Complete remaining independent clash-detector parity and expand localized repair beyond bounded room/timeslot changes.
 - [x] Connect instructor and university-scoped multidimensional timetable views.
 - [x] Connect operational rules, audit, analytics, and bounded room/timeslot emergency reassignment.
