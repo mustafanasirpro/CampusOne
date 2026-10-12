@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  authHeader,
   clearApiKey,
+  geminiKeyParam,
   getApiKey,
   hasApiKey,
-  keyHeader,
   providerInfo,
   setApiKey,
 } from "./apiKeys";
@@ -25,10 +26,16 @@ describe("apiKeys store", () => {
     expect(hasApiKey("groq")).toBe(false);
   });
 
-  it("builds the x-tutor-key header only when a key exists", () => {
-    expect(keyHeader("groq")).toEqual({});
+  it("builds the Authorization header only when a key exists", () => {
+    expect(authHeader("groq")).toEqual({});
     setApiKey("groq", "gsk_xyz");
-    expect(keyHeader("groq")).toEqual({ "x-tutor-key": "gsk_xyz" });
+    expect(authHeader("groq")).toEqual({ Authorization: "Bearer gsk_xyz" });
+  });
+
+  it("builds the Gemini key query param only when a key exists", () => {
+    expect(geminiKeyParam()).toBe("");
+    setApiKey("gemini", "AQ.abc 123");
+    expect(geminiKeyParam()).toBe("key=AQ.abc%20123"); // url-encoded
   });
 
   it("keeps providers independent", () => {
