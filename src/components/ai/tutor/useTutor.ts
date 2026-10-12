@@ -25,6 +25,7 @@ import type {
 
 import { recordLesson } from "./journey";
 import type { DocSlide } from "./pdfSlides";
+import { prefetchImage } from "./topicImage";
 import { streamVision } from "./visionClient";
 
 export type TutorMode = "topic" | "document";
@@ -464,6 +465,13 @@ export function useTutor(): UseTutor {
 
       // Lesson fully prepared — clean it, load it, and start continuous playback.
       pendingRef.current = cleanLesson(buffer);
+      // Kick off image fetches NOW (while playback runs) so pictures are cached and
+      // appear instantly when their beat is revealed — not after the lesson ends.
+      for (const step of pendingRef.current) {
+        if (step.board?.kind === "image" && step.board.query) {
+          prefetchImage(step.board.query, !!step.board.generate);
+        }
+      }
       genDoneRef.current = true;
       ensurePump();
     },
