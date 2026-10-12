@@ -335,10 +335,12 @@ function BoardImage({
 
   const current = candidates?.[index];
 
-  // Per-candidate timeout: a source that hangs (slow proxy) advances to the next.
+  // Per-candidate timeout: a source that hangs (slow/broken) advances to the next.
+  // Shorter for searched images (prefetch usually has them cached already); longer
+  // for a generated image, which legitimately takes several seconds to render.
   useEffect(() => {
     if (!current || loaded) return;
-    const ms = current.generated ? 18000 : 9000;
+    const ms = current.generated ? 15000 : 6000;
     const timer = setTimeout(() => setIndex((i) => i + 1), ms);
     return () => clearTimeout(timer);
   }, [current, loaded]);
