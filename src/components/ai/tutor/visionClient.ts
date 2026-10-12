@@ -7,7 +7,7 @@
 //   OpenRouter → "/openrouter"  (Authorization injected)
 //   Gemini     → "/gemini"      (key query param injected)
 
-import { keyHeader } from "@/api/apiKeys";
+import { authHeader, geminiKeyParam } from "@/api/apiKeys";
 import { SYSTEM_PROMPT, TutorModelError, visionUserText } from "@/api/tutorClient";
 
 export type VisionProvider = "openrouter" | "gemini" | "off";
@@ -24,15 +24,18 @@ const VISION_MODEL =
   (import.meta.env.VITE_VISION_MODEL as string | undefined)?.trim() ||
   (VISION_PROVIDER === "gemini"
     ? "gemini-3.8-flash"
-    : "meta-llama/llama-3.2-11b-vision-instruct:free");
+    : "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free");
 
-const OPENROUTER_PROXY = (
-  (import.meta.env.VITE_OPENROUTER_PROXY as string | undefined)?.trim() ||
-  "/openrouter"
+// Called DIRECTLY from the browser with the user's own key (both allow CORS), so
+// vision works on the deployed site, not just in local dev.
+const OPENROUTER_BASE = (
+  (import.meta.env.VITE_OPENROUTER_BASE as string | undefined)?.trim() ||
+  "https://openrouter.ai"
 ).replace(/\/+$/, "");
 
-const GEMINI_PROXY = (
-  (import.meta.env.VITE_GEMINI_PROXY as string | undefined)?.trim() || "/gemini"
+const GEMINI_BASE = (
+  (import.meta.env.VITE_GEMINI_BASE as string | undefined)?.trim() ||
+  "https://generativelanguage.googleapis.com"
 ).replace(/\/+$/, "");
 
 /** Capture an element (the whiteboard) to a JPEG data URL. */
@@ -69,9 +72,9 @@ async function visionOpenRouter({
 }: VisionArgs): Promise<string> {
   let response: Response;
   try {
-    response = await fetch(`${OPENROUTER_PROXY}/api/v1/chat/completions`, {
+    response = await fetch(`${OPENROUTER_BASE}/api/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...keyHeader("openrouter") },
+      headers: { "Content-Type": "application/json", ...authHeader("openrouter") },
       signal,
       body: JSON.stringify({
         model: VISION_MODEL,
@@ -151,10 +154,10 @@ async function visionGemini({
   let response: Response;
   try {
     response = await fetch(
-      `${GEMINI_PROXY}/v1beta/models/${VISION_MODEL}:generateContent`,
+      `${GEMINI_BASE}/v1beta/models/${VISION_MODEL}:generateContent?${geminiKeyParam()}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...keyHeader("gemini") },
+        headers: { "Content-Type": "application/json" },
         signal,
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
