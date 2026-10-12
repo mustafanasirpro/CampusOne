@@ -9,7 +9,7 @@
 
 import type { LessonDepth, LessonStep, TutorChatMessage } from "@/types/tutor";
 
-import { authHeader } from "./apiKeys";
+import { authHeader, bearer, orderedKeys, rotateKey } from "./apiKeys";
 
 export type TutorProvider = "groq" | "ollama";
 
@@ -511,10 +511,10 @@ async function streamGroq({
   signal,
   onDelta,
 }: StreamOptions): Promise<string> {
-  const postOnce = () =>
+  const postWith = (key: string) =>
     fetch(`${GROQ_BASE}/openai/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...authHeader("groq") },
+      headers: { "Content-Type": "application/json", ...bearer(key) },
       signal,
       body: JSON.stringify({
         model: TUTOR_MODEL,
@@ -522,8 +522,7 @@ async function streamGroq({
         temperature: 0.6,
         top_p: 0.9,
         // Use the full free-tier budget (~1000 output tokens/min) for a thorough,
-        // visual-rich lesson. Auto-retry (below) covers a follow-up that briefly
-        // exceeds the per-minute budget.
+        // visual-rich lesson.
         max_tokens: 1000,
         // Qwen3 reasons by default; "none" makes it answer directly and instantly.
         reasoning_effort: "none",
@@ -531,11 +530,22 @@ async function streamGroq({
       }),
     });
 
+  // Fail over across the user's keys: if one is rate-limited (429) or rejected
+  // (401/403), immediately try the next key. Only if the LAST remaining key is
+  // still rate-limited do we wait for the per-minute reset and retry it.
+  const keys = orderedKeys("groq");
+  const list = keys.length ? keys : [""]; // no key → one attempt that 401s cleanly
   let response: Response;
   try {
-    response = await postOnce();
-    // On a rate limit, wait the server-advised delay (free tier resets per minute)
-    // and retry, so the student almost always gets their answer instead of an error.
+    response = await postWith(list[0]);
+    for (let i = 1; i < list.length; i += 1) {
+      if (response.ok) break;
+      if (response.status === 429 || response.status === 401 || response.status === 403) {
+        rotateKey("groq"); // deprioritise the failing key for next time
+        response = await postWith(list[i]);
+      } else break;
+    }
+    // Last key still throttled → wait out the reset and retry it a couple of times.
     for (let attempt = 0; attempt < 3 && response.status === 429; attempt += 1) {
       const retryAfter = Number(response.headers.get("retry-after"));
       const waitMs = Math.min(
@@ -545,7 +555,7 @@ async function streamGroq({
         65000,
       );
       await abortableSleep(waitMs, signal);
-      response = await postOnce();
+      response = await postWith(list[list.length - 1]);
     }
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
@@ -562,7 +572,7 @@ async function streamGroq({
     }
     if (response.status === 429) {
       throw new TutorModelError(
-        "You’ve hit Groq’s free per-minute limit. Wait about a minute and try again — your key still works, it just needs to cool down.",
+        "All your Groq keys have hit the free per-minute limit. Add another free key under “API keys” to keep going, or wait about a minute.",
       );
     }
     throw new TutorModelError(
@@ -747,13 +757,20 @@ export async function checkTutorModel(): Promise<{
   modelInstalled: boolean;
 }> {
   if (TUTOR_PROVIDER === "groq") {
+    const keys = orderedKeys("groq");
+    if (keys.length === 0) return { running: true, modelInstalled: false };
+    // Ready if ANY of the user's keys is valid (429 = valid but throttled = ok too).
     try {
-      const res = await fetch(`${GROQ_BASE}/openai/v1/models`, {
-        method: "GET",
-        headers: { ...authHeader("groq") },
-      });
-      // 200 = key works; 401/403 = key missing/invalid (treated as "not ready").
-      return { running: true, modelInstalled: res.ok };
+      let reachedServer = false;
+      for (const key of keys) {
+        const res = await fetch(`${GROQ_BASE}/openai/v1/models`, {
+          method: "GET",
+          headers: { ...bearer(key) },
+        });
+        reachedServer = true;
+        if (res.ok || res.status === 429) return { running: true, modelInstalled: true };
+      }
+      return { running: reachedServer, modelInstalled: false };
     } catch {
       return { running: false, modelInstalled: false };
     }
