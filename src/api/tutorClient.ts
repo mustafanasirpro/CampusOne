@@ -535,8 +535,8 @@ async function streamGroq({
   try {
     response = await postOnce();
     // On a rate limit, wait the server-advised delay (free tier resets per minute)
-    // and retry, so the student always gets their answer instead of an error.
-    for (let attempt = 0; attempt < 2 && response.status === 429; attempt += 1) {
+    // and retry, so the student almost always gets their answer instead of an error.
+    for (let attempt = 0; attempt < 3 && response.status === 429; attempt += 1) {
       const retryAfter = Number(response.headers.get("retry-after"));
       const waitMs = Math.min(
         Number.isFinite(retryAfter) && retryAfter > 0
@@ -557,12 +557,12 @@ async function streamGroq({
   if (!response.ok || !response.body) {
     if (response.status === 401 || response.status === 403) {
       throw new TutorModelError(
-        "The Groq API key is missing or invalid. Set GROQ_API_KEY in your .env.",
+        "Your Groq API key is missing or invalid. Open “API keys” and paste a valid free key (starts with gsk_).",
       );
     }
     if (response.status === 429) {
       throw new TutorModelError(
-        "The free tutor is very busy right now. Please wait a few seconds and try again.",
+        "You’ve hit Groq’s free per-minute limit. Wait about a minute and try again — your key still works, it just needs to cool down.",
       );
     }
     throw new TutorModelError(
