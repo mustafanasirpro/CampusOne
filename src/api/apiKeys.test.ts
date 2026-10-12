@@ -1,13 +1,18 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  addApiKey,
   authHeader,
   clearApiKey,
   geminiKeyParam,
   getApiKey,
+  getApiKeys,
   hasApiKey,
+  keyCount,
+  orderedKeys,
   providerInfo,
-  setApiKey,
+  removeApiKey,
+  rotateKey,
 } from "./apiKeys";
 
 beforeEach(() => {
@@ -17,29 +22,55 @@ beforeEach(() => {
 });
 
 describe("apiKeys store", () => {
-  it("saves, reads, and clears a key", () => {
+  it("adds, reads, and clears keys", () => {
     expect(hasApiKey("groq")).toBe(false);
-    setApiKey("groq", "  gsk_abc123  ");
-    expect(getApiKey("groq")).toBe("gsk_abc123"); // trimmed
+    addApiKey("groq", "  gsk_abc123  ");
+    expect(getApiKey("groq")).toBe("gsk_abc123"); // trimmed, first key
     expect(hasApiKey("groq")).toBe(true);
     clearApiKey("groq");
     expect(hasApiKey("groq")).toBe(false);
   });
 
+  it("stores MULTIPLE keys and ignores duplicates", () => {
+    addApiKey("groq", "gsk_one");
+    addApiKey("groq", "gsk_two");
+    addApiKey("groq", "gsk_one"); // duplicate, ignored
+    expect(getApiKeys("groq")).toEqual(["gsk_one", "gsk_two"]);
+    expect(keyCount("groq")).toBe(2);
+  });
+
+  it("removes a single key from the list", () => {
+    addApiKey("groq", "gsk_one");
+    addApiKey("groq", "gsk_two");
+    removeApiKey("groq", "gsk_one");
+    expect(getApiKeys("groq")).toEqual(["gsk_two"]);
+  });
+
+  it("rotates keys for failover", () => {
+    addApiKey("groq", "gsk_a");
+    addApiKey("groq", "gsk_b");
+    addApiKey("groq", "gsk_c");
+    expect(orderedKeys("groq")).toEqual(["gsk_a", "gsk_b", "gsk_c"]);
+    rotateKey("groq");
+    expect(orderedKeys("groq")).toEqual(["gsk_b", "gsk_c", "gsk_a"]);
+    rotateKey("groq");
+    expect(orderedKeys("groq")).toEqual(["gsk_c", "gsk_a", "gsk_b"]);
+  });
+
   it("builds the Authorization header only when a key exists", () => {
     expect(authHeader("groq")).toEqual({});
-    setApiKey("groq", "gsk_xyz");
+    addApiKey("groq", "gsk_xyz");
     expect(authHeader("groq")).toEqual({ Authorization: "Bearer gsk_xyz" });
   });
 
   it("builds the Gemini key query param only when a key exists", () => {
     expect(geminiKeyParam()).toBe("");
-    setApiKey("gemini", "AQ.abc 123");
+    addApiKey("gemini", "AQ.abc 123");
     expect(geminiKeyParam()).toBe("key=AQ.abc%20123"); // url-encoded
   });
 
   it("keeps providers independent", () => {
-    setApiKey("openrouter", "sk-or-v1-abcdefghijklmnop");
+    addApiKey("openrouter", "sk-or-v1-abcdefghijklmnop");
     expect(hasApiKey("openrouter")).toBe(true);
     expect(hasApiKey("groq")).toBe(false);
   });
