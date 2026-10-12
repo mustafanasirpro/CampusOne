@@ -40,6 +40,10 @@ export const paths = {
   search: "/search",
   leaderboard: "/leaderboard",
   assistant: "/ai",
+  tutor: "/ai/tutor",
+  // Standalone, login-free entry for the offline local tutor (talks only to
+  // local Ollama, no backend). Phase 2 folds this into the authed app.
+  tutorStandalone: "/tutor",
   timetable: "/timetable",
   instructorTimetable: "/instructor-timetable",
   admin: "/admin",
