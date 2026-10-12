@@ -41,7 +41,8 @@ export function SlidePanel({
         </span>
       </div>
 
-      {/* Current slide image */}
+      {/* Current slide: a rendered image (PDF) or a slide-styled preview built from
+          the extracted text (PPTX — PowerPoint can't be rasterized in the browser). */}
       <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
         {slide.image ? (
           <img
@@ -50,9 +51,7 @@ export function SlidePanel({
             className="mx-auto max-h-48 w-auto object-contain"
           />
         ) : (
-          <div className="grid h-32 place-items-center text-xs text-slate-400">
-            (no preview)
-          </div>
+          <SlideTextPreview lines={slide.lines} focusLine={focusLine} />
         )}
       </div>
 
@@ -134,5 +133,65 @@ export function SlidePanel({
         )}
       </div>
     </aside>
+  );
+}
+
+/**
+ * A slide-styled thumbnail built from a .pptx slide's extracted text (the first
+ * line as the title, the rest as bullets), since PowerPoint can't be rendered to
+ * an image in the browser. The line currently being taught is highlighted so the
+ * preview tracks the lesson, just like the points list below it.
+ */
+function SlideTextPreview({
+  lines,
+  focusLine,
+}: {
+  lines: string[];
+  focusLine: number | null;
+}) {
+  if (lines.length === 0) {
+    return (
+      <div className="grid h-32 place-items-center px-3 text-center text-xs text-slate-400">
+        This slide is mostly a diagram or image.
+      </div>
+    );
+  }
+  const [title, ...bullets] = lines;
+  const titleActive = focusLine === 1;
+  return (
+    <div className="aspect-[16/10] w-full bg-gradient-to-br from-white to-slate-100 p-3">
+      <div className="flex h-full flex-col overflow-hidden rounded-md bg-white/70 p-3 shadow-inner ring-1 ring-slate-200">
+        <p
+          className={cn(
+            "mb-1.5 line-clamp-2 border-b border-slate-200 pb-1 text-[13px] font-bold leading-tight",
+            titleActive ? "text-amber-700" : "text-slate-800",
+          )}
+        >
+          {title}
+        </p>
+        <ul className="min-h-0 flex-1 space-y-1 overflow-hidden">
+          {bullets.slice(0, 6).map((b, i) => {
+            const active = focusLine === i + 2; // line 1 is the title
+            return (
+              <li
+                key={i}
+                className={cn(
+                  "flex gap-1.5 text-[11px] leading-snug",
+                  active ? "font-semibold text-amber-700" : "text-slate-600",
+                )}
+              >
+                <span className={active ? "text-amber-500" : "text-brand-400"}>•</span>
+                <span className="line-clamp-1">{b}</span>
+              </li>
+            );
+          })}
+          {bullets.length > 6 ? (
+            <li className="pl-3 text-[10px] text-slate-400">
+              +{bullets.length - 6} more…
+            </li>
+          ) : null}
+        </ul>
+      </div>
+    </div>
   );
 }
