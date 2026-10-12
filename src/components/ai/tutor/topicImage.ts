@@ -4,7 +4,7 @@
 //     billing — set VITE_IMAGE_GEN_PROVIDER=gemini + GEMINI_API_KEY).
 // Images are shown via <img src>, so cross-origin display is fine without CORS.
 
-import { keyHeader } from "@/api/apiKeys";
+import { geminiKeyParam } from "@/api/apiKeys";
 
 export interface TopicImage {
   url: string;
@@ -21,8 +21,9 @@ const IMAGE_GEN_PROVIDER =
     ? "gemini"
     : "pollinations";
 
-const GEMINI_PROXY = (
-  (import.meta.env.VITE_GEMINI_PROXY as string | undefined)?.trim() || "/gemini"
+const GEMINI_BASE = (
+  (import.meta.env.VITE_GEMINI_BASE as string | undefined)?.trim() ||
+  "https://generativelanguage.googleapis.com"
 ).replace(/\/+$/, "");
 
 const searchCache = new Map<string, TopicImage[]>();
@@ -138,10 +139,10 @@ async function generateWithGemini(
 ): Promise<string | null> {
   try {
     const res = await fetch(
-      `${GEMINI_PROXY}/v1beta/models/gemini-2.5-flash-image:generateContent`,
+      `${GEMINI_BASE}/v1beta/models/gemini-2.5-flash-image:generateContent?${geminiKeyParam()}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...keyHeader("gemini") },
+        headers: { "Content-Type": "application/json" },
         signal,
         body: JSON.stringify({
           contents: [
