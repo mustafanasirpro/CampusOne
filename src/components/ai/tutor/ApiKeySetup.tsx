@@ -3,16 +3,16 @@ import {
   Check,
   KeyRound,
   Lock,
-  Pencil,
+  Plus,
   Sparkles,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
 
 import {
-  clearApiKey,
-  getApiKey,
+  getApiKeys,
   hasApiKey,
+  removeApiKey,
   PROVIDERS,
   type KeyProvider,
 } from "@/api/apiKeys";
@@ -69,82 +69,101 @@ export function ApiKeySetup({ onDone }: { onDone: () => void }) {
 
       <div className="grid gap-3">
         {PROVIDERS.map((p) => {
-          const added = hasApiKey(p.id);
+          const keys = getApiKeys(p.id);
+          const added = keys.length > 0;
           return (
             <div
               key={p.id}
               className={cn(
-                "flex flex-wrap items-center gap-3 rounded-2xl border bg-white p-4 shadow-sm",
+                "grid gap-3 rounded-2xl border bg-white p-4 shadow-sm",
                 added ? "border-campus-200" : "border-slate-200",
               )}
             >
-              <span
-                className={cn(
-                  "grid size-10 shrink-0 place-items-center rounded-xl",
-                  added ? "bg-campus-50 text-campus-600" : "bg-slate-100 text-slate-400",
-                )}
-              >
-                {added ? <Check className="size-5" /> : <KeyRound className="size-5" />}
-              </span>
+              <div className="flex flex-wrap items-center gap-3">
+                <span
+                  className={cn(
+                    "grid size-10 shrink-0 place-items-center rounded-xl",
+                    added
+                      ? "bg-campus-50 text-campus-600"
+                      : "bg-slate-100 text-slate-400",
+                  )}
+                >
+                  {added ? <Check className="size-5" /> : <KeyRound className="size-5" />}
+                </span>
 
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    {p.name}
-                  </h3>
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
-                      p.required
-                        ? "bg-brand-100 text-brand-700"
-                        : "bg-slate-100 text-slate-500",
-                    )}
-                  >
-                    {p.required ? "Required" : "Optional"}
-                  </span>
-                  {added ? (
-                    <span className="font-mono text-xs text-campus-600">
-                      {mask(getApiKey(p.id))}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-sm font-semibold text-slate-800">{p.name}</h3>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+                        p.required
+                          ? "bg-brand-100 text-brand-700"
+                          : "bg-slate-100 text-slate-500",
+                      )}
+                    >
+                      {p.required ? "Required" : "Optional"}
                     </span>
-                  ) : null}
+                    {added ? (
+                      <span className="rounded-full bg-campus-50 px-2 py-0.5 text-[11px] font-semibold text-campus-600">
+                        {keys.length} key{keys.length > 1 ? "s" : ""}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">{p.purpose}</p>
                 </div>
-                <p className="mt-0.5 text-xs text-slate-500">{p.purpose}</p>
+
+                <Button
+                  variant={added ? "outline" : p.required ? "primary" : "outline"}
+                  size="sm"
+                  onClick={() => setOpenGuide(p.id)}
+                >
+                  <Plus className="size-4" />
+                  {added ? "Add another" : `Add ${p.name} key`}
+                  {added ? null : <ArrowRight className="size-4" />}
+                </Button>
               </div>
 
-              <div className="flex shrink-0 items-center gap-2">
-                {added ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setOpenGuide(p.id)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-600 transition hover:border-brand-300"
+              {/* The list of added keys, each removable. More than one = failover. */}
+              {added ? (
+                <ul className="grid gap-1.5 pl-1">
+                  {keys.map((k, i) => (
+                    <li
+                      key={k}
+                      className="flex items-center gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5"
                     >
-                      <Pencil className="size-3.5" />
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        clearApiKey(p.id);
-                        refresh();
-                      }}
-                      title="Remove this key"
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-400 transition hover:border-red-300 hover:text-red-500"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </>
-                ) : (
-                  <Button
-                    variant={p.required ? "primary" : "outline"}
-                    size="sm"
-                    onClick={() => setOpenGuide(p.id)}
-                  >
-                    Add {p.name} key
-                    <ArrowRight className="size-4" />
-                  </Button>
-                )}
-              </div>
+                      <span className="grid size-5 shrink-0 place-items-center rounded-full bg-white text-[10px] font-bold text-slate-400 ring-1 ring-slate-200">
+                        {i + 1}
+                      </span>
+                      <span className="flex-1 font-mono text-xs text-slate-600">
+                        {mask(k)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          removeApiKey(p.id, k);
+                          refresh();
+                        }}
+                        title="Remove this key"
+                        className="text-slate-400 transition hover:text-red-500"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                  {keys.length > 1 ? (
+                    <li className="pl-1 text-[11px] text-campus-600">
+                      ✓ Failover on — if one key is busy or rate-limited, the tutor
+                      switches to the next automatically.
+                    </li>
+                  ) : p.id === "groq" ? (
+                    <li className="pl-1 text-[11px] text-slate-400">
+                      Tip: add a second key so lessons keep working when this one hits
+                      its free per-minute limit.
+                    </li>
+                  ) : null}
+                </ul>
+              ) : null}
             </div>
           );
         })}
