@@ -345,8 +345,8 @@ set `APP_CORS_ALLOWED_ORIGINS` to the exact deployed frontend origins.
 mvn clean verify
 ```
 
-The latest verified local run completed 607 tests with no failures or errors
-and 13 Docker-gated skips. AURA migrations V1–V36, packaged startup, and
+The latest verified local run completed 633 tests with no failures or errors
+and 13 Docker-gated skips. AURA migrations V1–V37, packaged startup, and
 authenticated critical workflows were also exercised on PostgreSQL 17.10; see
 the repository-level `AURA_TEST_REPORT.md`.
 
