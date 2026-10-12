@@ -418,6 +418,8 @@ bounded localized repair, emergency room/timeslot reassignment, operational
 rules, scoped timetable views, analytics, audit, comparison, exports, and
 publication controls. CSV, XLSX, XLS, and
 text-PDF imports support preview, mapping, validation, and atomic apply.
+Workbook imports support selected visible sheets, compatible visible-sheet
+aggregation, merged values, and formula rejection.
 Authenticated students have scoped registrations, personal week timetables,
 ICS export, clash indicators, and resolution requests. Generation persistence
 and publication use term-revision and optimistic-state guards so stale solver
@@ -433,6 +435,17 @@ desktop/mobile administration and student flows. Measured solver results are
 available in [AURA_BENCHMARK_REPORT.md](AURA_BENCHMARK_REPORT.md), and the
 current acceptance decision is in
 [AURA_FINAL_ACCEPTANCE_REPORT.md](AURA_FINAL_ACCEPTANCE_REPORT.md).
+Architecture, requirements, constraints, imports, resolution, user operations,
+backtests, and deployment checks are documented in:
+
+- [AURA architecture](AURA_ARCHITECTURE.md)
+- [AURA requirements](AURA_REQUIREMENTS.md)
+- [AURA constraints](AURA_CONSTRAINTS.md)
+- [AURA import guide](AURA_IMPORT_GUIDE.md)
+- [AURA resolution guide](AURA_RESOLUTION_GUIDE.md)
+- [AURA user guide](AURA_USER_GUIDE.md)
+- [AURA backtest report](AURA_BACKTEST_REPORT.md)
+- [AURA deployment checklist](AURA_DEPLOYMENT_CHECKLIST.md)
 
 ## Quality Checks
 
