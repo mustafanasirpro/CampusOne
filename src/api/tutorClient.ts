@@ -9,25 +9,32 @@
 
 import type { LessonDepth, LessonStep, TutorChatMessage } from "@/types/tutor";
 
-import { keyHeader } from "./apiKeys";
+import { authHeader } from "./apiKeys";
 
 export type TutorProvider = "groq" | "ollama";
 
+// Default is Groq (bring-your-own-key, hosted) so the tutor works on the deployed
+// site with each user's own free key. Opt into fully-local Ollama with
+// VITE_TUTOR_PROVIDER=ollama.
 export const TUTOR_PROVIDER: TutorProvider =
-  (import.meta.env.VITE_TUTOR_PROVIDER as string | undefined)?.trim() === "groq"
-    ? "groq"
-    : "ollama";
+  (import.meta.env.VITE_TUTOR_PROVIDER as string | undefined)?.trim() === "ollama"
+    ? "ollama"
+    : "groq";
 
 const OLLAMA_PROXY = (
   (import.meta.env.VITE_OLLAMA_PROXY as string | undefined)?.trim() || "/ollama"
 ).replace(/\/+$/, "");
 
-const GROQ_PROXY = (
-  (import.meta.env.VITE_GROQ_PROXY as string | undefined)?.trim() || "/groq"
+// Groq is called DIRECTLY from the browser with the user's own key (Groq allows
+// CORS). No proxy, so it works on the deployed static site, not just `npm run dev`.
+const GROQ_BASE = (
+  (import.meta.env.VITE_GROQ_BASE as string | undefined)?.trim() ||
+  "https://api.groq.com"
 ).replace(/\/+$/, "");
 
 const DEFAULT_MODEL: Record<TutorProvider, string> = {
-  groq: "llama-3.3-70b-versatile",
+  // Used when VITE_TUTOR_MODEL isn't set (e.g. on the deployed site).
+  groq: "qwen/qwen3.8-27b",
   ollama: "qwen3:4b",
 };
 
@@ -505,9 +512,9 @@ async function streamGroq({
   onDelta,
 }: StreamOptions): Promise<string> {
   const postOnce = () =>
-    fetch(`${GROQ_PROXY}/openai/v1/chat/completions`, {
+    fetch(`${GROQ_BASE}/openai/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...keyHeader("groq") },
+      headers: { "Content-Type": "application/json", ...authHeader("groq") },
       signal,
       body: JSON.stringify({
         model: TUTOR_MODEL,
@@ -698,9 +705,9 @@ async function completeOnce(
   signal?: AbortSignal,
 ): Promise<string> {
   if (TUTOR_PROVIDER === "groq") {
-    const res = await fetch(`${GROQ_PROXY}/openai/v1/chat/completions`, {
+    const res = await fetch(`${GROQ_BASE}/openai/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...keyHeader("groq") },
+      headers: { "Content-Type": "application/json", ...authHeader("groq") },
       signal,
       body: JSON.stringify({
         model: TUTOR_MODEL,
@@ -741,9 +748,9 @@ export async function checkTutorModel(): Promise<{
 }> {
   if (TUTOR_PROVIDER === "groq") {
     try {
-      const res = await fetch(`${GROQ_PROXY}/openai/v1/models`, {
+      const res = await fetch(`${GROQ_BASE}/openai/v1/models`, {
         method: "GET",
-        headers: { ...keyHeader("groq") },
+        headers: { ...authHeader("groq") },
       });
       // 200 = key works; 401/403 = key missing/invalid (treated as "not ready").
       return { running: true, modelInstalled: res.ok };
