@@ -37,6 +37,16 @@ function getRecognitionCtor(): SpeechRecognitionCtor | null {
 const TTS_SUPPORTED =
   typeof window !== "undefined" && "speechSynthesis" in window;
 
+function wordsOf(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean),
+  );
+}
+
 export interface UseVoice {
   ttsSupported: boolean;
   sttSupported: boolean;
@@ -89,6 +99,11 @@ export function useVoice(): UseVoice {
   const onUtteranceRef = useRef<((t: string) => void) | null>(null);
   const convLoopRef = useRef<() => void>(() => {});
   const convErrorsRef = useRef(0); // consecutive mic errors (e.g. permission denied)
+  // Echo filter: remember what the tutor just SAID so the always-on mic can ignore
+  // the tutor's own voice coming back through the speakers, while still reacting the
+  // instant the student says something different (true barge-in / Jarvis).
+  const recentSpokenRef = useRef<{ at: number; words: Set<string> }[]>([]);
+  const lastSentRef = useRef(0); // debounce rapid duplicate utterances
 
   // Pick a natural English voice once voices are available.
   useEffect(() => {
@@ -131,6 +146,10 @@ export function useVoice(): UseVoice {
 
   const speak = useCallback((text: string): Promise<void> => {
     if (!TTS_SUPPORTED || !text.trim()) return Promise.resolve();
+    // Remember these words so the always-on mic can discard them as echo.
+    recentSpokenRef.current.push({ at: Date.now(), words: wordsOf(text) });
+    const cutoff = Date.now() - 9000;
+    recentSpokenRef.current = recentSpokenRef.current.filter((e) => e.at >= cutoff);
     return new Promise<void>((resolve) => {
       try {
         window.speechSynthesis.cancel();
@@ -206,9 +225,23 @@ export function useVoice(): UseVoice {
   );
 
   // --- Live voice conversation --------------------------------------------
-  // A self-restarting one-shot recogniser: capture one utterance, fire it, and
-  // (if still enabled) start listening again. The console disables it while the
-  // tutor is speaking/thinking, so the mic never hears the tutor (no echo).
+  // True if the transcript is (mostly) the tutor's own recent speech bouncing back
+  // through the speakers. Short utterances (commands like "stop", "go back") always
+  // pass so they're never swallowed; longer ones are checked against what the tutor
+  // just said. On headphones there's no echo, so this almost never triggers.
+  const isLikelyEcho = useCallback((transcript: string): boolean => {
+    const words = [...wordsOf(transcript)];
+    if (words.length < 4) return false; // let short commands through
+    const spoken = new Set<string>();
+    for (const e of recentSpokenRef.current) for (const w of e.words) spoken.add(w);
+    if (spoken.size === 0) return false;
+    let hits = 0;
+    for (const w of words) if (spoken.has(w)) hits += 1;
+    return hits / words.length >= 0.65;
+  }, []);
+
+  // A continuous recogniser that stays on through the whole session (even while the
+  // tutor speaks) so the student can barge in anytime. It auto-restarts if it drops.
   const convLoop = useCallback(() => {
     if (!sttCtor || !enabledRef.current) return;
     if (recognitionRef.current) {
@@ -220,15 +253,26 @@ export function useVoice(): UseVoice {
     }
     const rec = new sttCtor();
     rec.lang = "en-US";
-    rec.continuous = false;
+    rec.continuous = true; // stay listening even while the tutor is talking
     rec.interimResults = false;
     rec.maxAlternatives = 1;
     rec.onresult = (event) => {
-      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
-      if (transcript && enabledRef.current) {
-        convErrorsRef.current = 0; // a real result → the mic is working
-        onUtteranceRef.current?.(transcript);
+      if (!enabledRef.current) return;
+      // Take the newest final transcript.
+      let transcript = "";
+      const from = event.resultIndex ?? 0;
+      for (let i = from; i < event.results.length; i += 1) {
+        const r = event.results[i];
+        if (r.isFinal) transcript += r[0].transcript;
       }
+      transcript = transcript.trim();
+      if (!transcript) return;
+      convErrorsRef.current = 0; // a real result → the mic is working
+      if (isLikelyEcho(transcript)) return; // the tutor's own voice — ignore it
+      const now = Date.now();
+      if (now - lastSentRef.current < 900) return; // debounce split sentences
+      lastSentRef.current = now;
+      onUtteranceRef.current?.(transcript);
     };
     rec.onerror = () => {
       convErrorsRef.current += 1;
@@ -249,7 +293,7 @@ export function useVoice(): UseVoice {
     } catch {
       setListening(false);
     }
-  }, [sttCtor]);
+  }, [sttCtor, isLikelyEcho]);
   useEffect(() => {
     convLoopRef.current = convLoop;
   }, [convLoop]);
