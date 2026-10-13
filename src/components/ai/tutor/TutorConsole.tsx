@@ -231,18 +231,31 @@ export function TutorConsole() {
     setListeningEnabled,
   } = voice;
 
-  // Route each spoken utterance to the tutor: a topic when idle starts a lesson,
-  // otherwise it's an interruption/answer. Kept in a ref so the recogniser always
-  // calls the latest version (current phase + depth) without re-subscribing.
+  // Route each spoken utterance to the tutor, Jarvis-style. Simple spoken commands
+  // control playback directly; anything else is a question/instruction that
+  // interrupts the tutor immediately. Kept in a ref so the always-on recogniser
+  // always calls the latest version (current phase + depth) without re-subscribing.
   const liveUtterRef = useRef<(t: string) => void>(() => {});
   useEffect(() => {
     liveUtterRef.current = (text: string) => {
       const t = text.trim();
       if (!t) return;
-      if (phase === "idle") startLesson(t, depth);
-      else interrupt(t);
+      const low = t.toLowerCase();
+      if (phase === "idle") {
+        startLesson(t, depth);
+        return;
+      }
+      if (/^(stop|pause|wait|hold on|hang on|one sec|quiet|be quiet|shh+)\b/.test(low)) {
+        stop();
+        return;
+      }
+      if (/^(continue|resume|go on|carry on|keep going|go ahead)\b/.test(low)) {
+        resume();
+        return;
+      }
+      interrupt(t); // a real question/instruction — cuts in and gets answered
     };
-  }, [phase, depth, startLesson, interrupt]);
+  }, [phase, depth, startLesson, interrupt, stop, resume]);
 
   const startLive = () => {
     if (!voiceIsOn) toggleVoice(); // the tutor must speak in live mode
@@ -250,12 +263,12 @@ export function TutorConsole() {
   };
   const endLive = () => stopConversation();
 
-  // Arm the mic only when it's the student's turn: live session on, and the tutor
-  // is neither speaking nor thinking. This is the echo guard — the mic is off
-  // whenever the tutor's voice is playing, so it never hears itself.
+  // Jarvis mode: the mic stays ON the whole live session, even while the tutor
+  // talks, so the student can barge in anytime. The echo filter in useVoice
+  // discards the tutor's own voice coming back through the speakers.
   useEffect(() => {
-    setListeningEnabled(live && !busy && !preparing && !voiceSpeaking);
-  }, [live, busy, preparing, voiceSpeaking, setListeningEnabled]);
+    setListeningEnabled(live);
+  }, [live, setListeningEnabled]);
 
   // End the live session cleanly if the component unmounts.
   useEffect(() => () => stopConversation(), [stopConversation]);
@@ -286,7 +299,6 @@ export function TutorConsole() {
           speaking={voiceSpeaking}
           listening={voice.listening}
           preparing={preparing}
-          busy={busy}
           idle={phase === "idle"}
           onEnd={endLive}
         />
@@ -732,31 +744,32 @@ function LiveVoiceBar({
   speaking,
   listening,
   preparing,
-  busy,
   idle,
   onEnd,
 }: {
   speaking: boolean;
   listening: boolean;
   preparing: boolean;
-  busy: boolean;
   idle: boolean;
   onEnd: () => void;
 }) {
   const state = speaking
     ? "speaking"
-    : preparing || busy
+    : preparing
       ? "thinking"
       : listening
         ? "listening"
         : "waiting";
 
   const copy: Record<string, { label: string; hint: string }> = {
-    speaking: { label: "Tutor is speaking", hint: "Listen — you can reply when it pauses" },
-    thinking: { label: "Thinking…", hint: "Preparing your answer" },
+    speaking: {
+      label: "Tutor is speaking",
+      hint: "Just talk to jump in — say “stop”, or ask anything",
+    },
+    thinking: { label: "Thinking…", hint: "Say “stop” anytime to cut in" },
     listening: {
       label: "Listening — just talk",
-      hint: idle ? "Say a topic, e.g. “Teach me binary search”" : "Ask or answer out loud",
+      hint: idle ? "Say a topic, e.g. “Teach me binary search”" : "Ask, answer, or say “continue”",
     },
     waiting: { label: "Live voice on", hint: "Starting the mic…" },
   };
