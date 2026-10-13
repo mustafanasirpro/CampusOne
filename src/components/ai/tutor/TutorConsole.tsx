@@ -8,6 +8,7 @@ import {
   Gauge,
   GraduationCap,
   Hand,
+  Headphones,
   KeyRound,
   Lightbulb,
   ListChecks,
@@ -219,6 +220,46 @@ export function TutorConsole() {
     .reverse()
     .find((entry) => entry.role === "tutor");
 
+  // --- Live voice conversation (hands-free) ---
+  const {
+    conversing: live,
+    speaking: voiceSpeaking,
+    voiceOn: voiceIsOn,
+    toggleVoice,
+    startConversation,
+    stopConversation,
+    setListeningEnabled,
+  } = voice;
+
+  // Route each spoken utterance to the tutor: a topic when idle starts a lesson,
+  // otherwise it's an interruption/answer. Kept in a ref so the recogniser always
+  // calls the latest version (current phase + depth) without re-subscribing.
+  const liveUtterRef = useRef<(t: string) => void>(() => {});
+  useEffect(() => {
+    liveUtterRef.current = (text: string) => {
+      const t = text.trim();
+      if (!t) return;
+      if (phase === "idle") startLesson(t, depth);
+      else interrupt(t);
+    };
+  }, [phase, depth, startLesson, interrupt]);
+
+  const startLive = () => {
+    if (!voiceIsOn) toggleVoice(); // the tutor must speak in live mode
+    startConversation((t) => liveUtterRef.current(t));
+  };
+  const endLive = () => stopConversation();
+
+  // Arm the mic only when it's the student's turn: live session on, and the tutor
+  // is neither speaking nor thinking. This is the echo guard — the mic is off
+  // whenever the tutor's voice is playing, so it never hears itself.
+  useEffect(() => {
+    setListeningEnabled(live && !busy && !preparing && !voiceSpeaking);
+  }, [live, busy, preparing, voiceSpeaking, setListeningEnabled]);
+
+  // End the live session cleanly if the component unmounts.
+  useEffect(() => () => stopConversation(), [stopConversation]);
+
   if (setupOpen) {
     return (
       <ApiKeySetup
@@ -237,6 +278,17 @@ export function TutorConsole() {
           status={status}
           onRetry={refreshStatus}
           onManageKeys={() => setSetupOpen(true)}
+        />
+      ) : null}
+
+      {live ? (
+        <LiveVoiceBar
+          speaking={voiceSpeaking}
+          listening={voice.listening}
+          preparing={preparing}
+          busy={busy}
+          idle={phase === "idle"}
+          onEnd={endLive}
         />
       ) : null}
 
@@ -295,6 +347,17 @@ export function TutorConsole() {
       {/* Controls */}
       {!started ? (
         <div className="grid gap-4">
+          {voice.sttSupported && !live ? (
+            <button
+              type="button"
+              disabled={!modelReady}
+              onClick={startLive}
+              className="flex items-center justify-center gap-2 rounded-2xl border border-brand-300 bg-gradient-to-r from-brand-50 to-white px-5 py-3 text-sm font-semibold text-brand-700 shadow-sm transition hover:border-brand-400 hover:to-brand-50 disabled:opacity-50"
+            >
+              <Headphones className="size-5" />
+              Start a live voice session — just talk, hands-free
+            </button>
+          ) : null}
           <StartPanel
             value={topicInput}
             onChange={setTopicInput}
@@ -335,6 +398,21 @@ export function TutorConsole() {
           />
           <div className="flex flex-wrap items-center gap-2">
             <SpeedControl value={speed} onChange={handleSpeed} />
+            {voice.sttSupported ? (
+              <Button
+                variant={live ? "primary" : "outline"}
+                size="sm"
+                onClick={live ? endLive : startLive}
+                title={
+                  live
+                    ? "End the live voice session"
+                    : "Talk to the tutor hands-free"
+                }
+              >
+                <Headphones className="size-4" />
+                {live ? "Live voice on" : "Live voice"}
+              </Button>
+            ) : null}
             {busy ? (
               <>
                 <Button variant="outline" size="sm" onClick={stop}>
@@ -646,6 +724,86 @@ function StartPanel({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+function LiveVoiceBar({
+  speaking,
+  listening,
+  preparing,
+  busy,
+  idle,
+  onEnd,
+}: {
+  speaking: boolean;
+  listening: boolean;
+  preparing: boolean;
+  busy: boolean;
+  idle: boolean;
+  onEnd: () => void;
+}) {
+  const state = speaking
+    ? "speaking"
+    : preparing || busy
+      ? "thinking"
+      : listening
+        ? "listening"
+        : "waiting";
+
+  const copy: Record<string, { label: string; hint: string }> = {
+    speaking: { label: "Tutor is speaking", hint: "Listen — you can reply when it pauses" },
+    thinking: { label: "Thinking…", hint: "Preparing your answer" },
+    listening: {
+      label: "Listening — just talk",
+      hint: idle ? "Say a topic, e.g. “Teach me binary search”" : "Ask or answer out loud",
+    },
+    waiting: { label: "Live voice on", hint: "Starting the mic…" },
+  };
+  const info = copy[state];
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm transition-colors",
+        state === "listening"
+          ? "border-red-300 bg-red-50"
+          : state === "speaking"
+            ? "border-brand-300 bg-brand-50"
+            : "border-slate-200 bg-white",
+      )}
+    >
+      <span
+        className={cn(
+          "grid size-11 shrink-0 place-items-center rounded-full text-white",
+          state === "listening"
+            ? "animate-pulse bg-red-500"
+            : state === "speaking"
+              ? "bg-brand-600"
+              : "bg-slate-400",
+        )}
+      >
+        {state === "thinking" ? (
+          <span className="inline-block size-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+        ) : state === "speaking" ? (
+          <Volume2 className="size-5" />
+        ) : (
+          <Mic className="size-5" />
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-brand-600">
+            ● Live voice
+          </span>
+        </div>
+        <p className="text-sm font-semibold text-slate-800">{info.label}</p>
+        <p className="truncate text-xs text-slate-500">{info.hint}</p>
+      </div>
+      <Button variant="outline" size="sm" onClick={onEnd}>
+        <CircleStop className="size-4" />
+        End
+      </Button>
     </div>
   );
 }
