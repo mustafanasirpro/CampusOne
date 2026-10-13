@@ -6,6 +6,7 @@ interface SpeechRecognitionResultLike {
   isFinal: boolean;
 }
 interface SpeechRecognitionEventLike {
+  resultIndex?: number;
   results: ArrayLike<SpeechRecognitionResultLike>;
 }
 interface SpeechRecognitionLike {
@@ -50,6 +51,15 @@ export interface UseVoice {
   setRate: (rate: number) => void;
   startListening: (onResult: (transcript: string) => void) => void;
   stopListening: () => void;
+  // --- Live voice conversation (hands-free) ---
+  /** Whether a live voice session is active. */
+  conversing: boolean;
+  /** Begin a hands-free session; `onUtterance` fires for each spoken utterance. */
+  startConversation: (onUtterance: (transcript: string) => void) => void;
+  /** End the live voice session (stops mic + any speech). */
+  stopConversation: () => void;
+  /** Turn the continuous mic on/off — the console gates this on whose turn it is. */
+  setListeningEnabled: (on: boolean) => void;
 }
 
 export function useVoice(): UseVoice {
@@ -67,10 +77,18 @@ export function useVoice(): UseVoice {
   });
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
+  const [conversing, setConversing] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const preferredVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const rateRef = useRef(1);
+  // Live conversation: a self-restarting recognition loop, gated by `enabledRef`
+  // (the console turns it off while the tutor is talking/thinking, on when it's the
+  // student's turn). `onUtteranceRef` receives each completed utterance.
+  const enabledRef = useRef(false);
+  const onUtteranceRef = useRef<((t: string) => void) | null>(null);
+  const convLoopRef = useRef<() => void>(() => {});
+  const convErrorsRef = useRef(0); // consecutive mic errors (e.g. permission denied)
 
   // Pick a natural English voice once voices are available.
   useEffect(() => {
@@ -187,6 +205,96 @@ export function useVoice(): UseVoice {
     [sttCtor],
   );
 
+  // --- Live voice conversation --------------------------------------------
+  // A self-restarting one-shot recogniser: capture one utterance, fire it, and
+  // (if still enabled) start listening again. The console disables it while the
+  // tutor is speaking/thinking, so the mic never hears the tutor (no echo).
+  const convLoop = useCallback(() => {
+    if (!sttCtor || !enabledRef.current) return;
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {
+        /* ignore */
+      }
+    }
+    const rec = new sttCtor();
+    rec.lang = "en-US";
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.onresult = (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript?.trim();
+      if (transcript && enabledRef.current) {
+        convErrorsRef.current = 0; // a real result → the mic is working
+        onUtteranceRef.current?.(transcript);
+      }
+    };
+    rec.onerror = () => {
+      convErrorsRef.current += 1;
+      setListening(false);
+    };
+    rec.onend = () => {
+      setListening(false);
+      // Keep the mic alive between utterances while it's still the student's turn,
+      // but give up after repeated errors (e.g. the user denied microphone access).
+      if (enabledRef.current && convErrorsRef.current < 4) {
+        setTimeout(() => convLoopRef.current(), 350);
+      }
+    };
+    recognitionRef.current = rec;
+    try {
+      rec.start();
+      setListening(true);
+    } catch {
+      setListening(false);
+    }
+  }, [sttCtor]);
+  useEffect(() => {
+    convLoopRef.current = convLoop;
+  }, [convLoop]);
+
+  const setListeningEnabled = useCallback(
+    (on: boolean) => {
+      if (on === enabledRef.current) return;
+      enabledRef.current = on;
+      if (on) {
+        convErrorsRef.current = 0; // fresh turn — reset the error backoff
+        convLoop();
+      } else {
+        try {
+          recognitionRef.current?.abort();
+        } catch {
+          /* ignore */
+        }
+        setListening(false);
+      }
+    },
+    [convLoop],
+  );
+
+  const startConversation = useCallback(
+    (onUtterance: (t: string) => void) => {
+      onUtteranceRef.current = onUtterance;
+      setConversing(true);
+      // The console's effect arms the mic when it's the student's turn.
+    },
+    [],
+  );
+
+  const stopConversation = useCallback(() => {
+    onUtteranceRef.current = null;
+    enabledRef.current = false;
+    setConversing(false);
+    setListening(false);
+    try {
+      recognitionRef.current?.abort();
+    } catch {
+      /* ignore */
+    }
+    if (TTS_SUPPORTED) window.speechSynthesis.cancel();
+  }, []);
+
   return {
     ttsSupported: TTS_SUPPORTED,
     sttSupported,
@@ -199,5 +307,9 @@ export function useVoice(): UseVoice {
     setRate,
     startListening,
     stopListening,
+    conversing,
+    startConversation,
+    stopConversation,
+    setListeningEnabled,
   };
 }
