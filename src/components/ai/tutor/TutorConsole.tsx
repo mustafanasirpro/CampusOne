@@ -13,6 +13,7 @@ import {
   Lightbulb,
   ListChecks,
   Mic,
+  MicOff,
   Play,
   RotateCcw,
   ScanSearch,
@@ -257,18 +258,26 @@ export function TutorConsole() {
     };
   }, [phase, depth, startLesson, interrupt, stop, resume]);
 
+  // Lets the student silence the mic (e.g. to talk to someone) without ending the
+  // live session — the tutor keeps teaching, it just stops listening.
+  const [micMuted, setMicMuted] = useState(false);
+
   const startLive = () => {
     if (!voiceIsOn) toggleVoice(); // the tutor must speak in live mode
+    setMicMuted(false);
     startConversation((t) => liveUtterRef.current(t));
   };
-  const endLive = () => stopConversation();
+  const endLive = () => {
+    setMicMuted(false);
+    stopConversation();
+  };
 
   // Jarvis mode: the mic stays ON the whole live session, even while the tutor
-  // talks, so the student can barge in anytime. The echo filter in useVoice
-  // discards the tutor's own voice coming back through the speakers.
+  // talks, so the student can barge in anytime — unless they've muted it. The echo
+  // filter in useVoice discards the tutor's own voice coming back through speakers.
   useEffect(() => {
-    setListeningEnabled(live);
-  }, [live, setListeningEnabled]);
+    setListeningEnabled(live && !micMuted);
+  }, [live, micMuted, setListeningEnabled]);
 
   // End the live session cleanly if the component unmounts.
   useEffect(() => () => stopConversation(), [stopConversation]);
@@ -300,6 +309,8 @@ export function TutorConsole() {
           listening={voice.listening}
           preparing={preparing}
           idle={phase === "idle"}
+          muted={micMuted}
+          onToggleMute={() => setMicMuted((m) => !m)}
           onEnd={endLive}
         />
       ) : null}
@@ -745,23 +756,33 @@ function LiveVoiceBar({
   listening,
   preparing,
   idle,
+  muted,
+  onToggleMute,
   onEnd,
 }: {
   speaking: boolean;
   listening: boolean;
   preparing: boolean;
   idle: boolean;
+  muted: boolean;
+  onToggleMute: () => void;
   onEnd: () => void;
 }) {
-  const state = speaking
-    ? "speaking"
-    : preparing
-      ? "thinking"
-      : listening
-        ? "listening"
-        : "waiting";
+  const state = muted
+    ? "muted"
+    : speaking
+      ? "speaking"
+      : preparing
+        ? "thinking"
+        : listening
+          ? "listening"
+          : "waiting";
 
   const copy: Record<string, { label: string; hint: string }> = {
+    muted: {
+      label: "Mic off — you’re muted",
+      hint: "The tutor keeps teaching. Turn the mic on when you want to talk.",
+    },
     speaking: {
       label: "Tutor is speaking",
       hint: "Just talk to jump in — say “stop”, or ask anything",
@@ -779,24 +800,30 @@ function LiveVoiceBar({
     <div
       className={cn(
         "flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm transition-colors",
-        state === "listening"
-          ? "border-red-300 bg-red-50"
-          : state === "speaking"
-            ? "border-brand-300 bg-brand-50"
-            : "border-slate-200 bg-white",
+        state === "muted"
+          ? "border-slate-300 bg-slate-100"
+          : state === "listening"
+            ? "border-red-300 bg-red-50"
+            : state === "speaking"
+              ? "border-brand-300 bg-brand-50"
+              : "border-slate-200 bg-white",
       )}
     >
       <span
         className={cn(
           "grid size-11 shrink-0 place-items-center rounded-full text-white",
-          state === "listening"
-            ? "animate-pulse bg-red-500"
-            : state === "speaking"
-              ? "bg-brand-600"
-              : "bg-slate-400",
+          state === "muted"
+            ? "bg-slate-400"
+            : state === "listening"
+              ? "animate-pulse bg-red-500"
+              : state === "speaking"
+                ? "bg-brand-600"
+                : "bg-slate-400",
         )}
       >
-        {state === "thinking" ? (
+        {state === "muted" ? (
+          <MicOff className="size-5" />
+        ) : state === "thinking" ? (
           <span className="inline-block size-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
         ) : state === "speaking" ? (
           <Volume2 className="size-5" />
@@ -813,6 +840,15 @@ function LiveVoiceBar({
         <p className="text-sm font-semibold text-slate-800">{info.label}</p>
         <p className="truncate text-xs text-slate-500">{info.hint}</p>
       </div>
+      <Button
+        variant={muted ? "primary" : "outline"}
+        size="sm"
+        onClick={onToggleMute}
+        title={muted ? "Turn the mic on" : "Mute the mic"}
+      >
+        {muted ? <MicOff className="size-4" /> : <Mic className="size-4" />}
+        {muted ? "Mic off" : "Mute"}
+      </Button>
       <Button variant="outline" size="sm" onClick={onEnd}>
         <CircleStop className="size-4" />
         End
