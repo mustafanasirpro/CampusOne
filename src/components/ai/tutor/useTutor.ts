@@ -17,6 +17,7 @@ import {
 import type {
   BoardItem,
   LessonDepth,
+  LessonLanguage,
   LessonStep,
   TranscriptEntry,
   TutorChatMessage,
@@ -132,6 +133,9 @@ export interface UseTutor {
   /** Playback speed multiplier (1 = normal). */
   speed: number;
   setSpeed: (value: number) => void;
+  /** Teaching language (English / Roman Urdu / Urdu voice). */
+  language: LessonLanguage;
+  setLanguage: (value: LessonLanguage) => void;
   startLesson: (topic: string, depth?: LessonDepth) => void;
   startLessonFromSource: (
     title: string,
@@ -145,7 +149,10 @@ export interface UseTutor {
   currentSlide: number;
   focusLine: number | null;
   startDocument: (slides: DocSlide[], title: string, depth?: LessonDepth) => void;
+  /** Teach a specific slide now. */
   goToSlide: (index: number) => void;
+  /** Just SHOW a slide without teaching it (free navigation / skip ahead). */
+  viewSlide: (index: number) => void;
   nextSlide: () => void;
   prevSlide: () => void;
   interrupt: (question: string) => void;
@@ -182,6 +189,8 @@ export function useTutor(): UseTutor {
   const [error, setError] = useState<string | null>(null);
   const [preparedCount, setPreparedCount] = useState(0);
   const [speed, setSpeedState] = useState(1);
+  const [language, setLanguageState] = useState<LessonLanguage>("english");
+  const languageRef = useRef<LessonLanguage>("english");
   const [status, setStatus] = useState<TutorModelStatus>({
     checked: false,
     running: false,
@@ -509,6 +518,12 @@ export function useTutor(): UseTutor {
     setSpeedState(value);
   }, []);
 
+  /** Set the teaching language (applies to the next lesson/turn). */
+  const setLanguage = useCallback((value: LessonLanguage) => {
+    languageRef.current = value;
+    setLanguageState(value);
+  }, []);
+
   /** Set (or clear) the voice control used to pace playback by speech. */
   const setVoiceControl = useCallback(
     (control: { speak: (t: string) => Promise<void>; cancel: () => void } | null) => {
@@ -529,7 +544,7 @@ export function useTutor(): UseTutor {
       setTranscript([]);
       setError(null);
       setPhase("teaching");
-      const opening = buildLessonOpeningMessages(trimmed, depth);
+      const opening = buildLessonOpeningMessages(trimmed, depth, languageRef.current);
       historyRef.current = opening;
       turnRef.current = runTurn(opening, false, "done");
     },
@@ -547,7 +562,12 @@ export function useTutor(): UseTutor {
       setTranscript([]);
       setError(null);
       setPhase("teaching");
-      const opening = buildLessonFromSourceMessages(trimmed, sourceText, depth);
+      const opening = buildLessonFromSourceMessages(
+        trimmed,
+        sourceText,
+        depth,
+        languageRef.current,
+      );
       historyRef.current = opening;
       turnRef.current = runTurn(opening, false, "done");
     },
@@ -580,6 +600,7 @@ export function useTutor(): UseTutor {
         slides.length,
         outline,
         docDepthRef.current,
+        languageRef.current,
       );
       historyRef.current = messages;
       turnRef.current = runTurn(messages, false, "done");
@@ -598,9 +619,17 @@ export function useTutor(): UseTutor {
       setDocTitle(docTitleRef.current);
       setMode("document");
       setTopic(docTitleRef.current);
-      teachSlide(0);
+      // Show slide 1 first (don't auto-teach) so the student can read / skip ahead
+      // and press "Teach this slide" when ready.
+      currentSlideRef.current = 0;
+      setCurrentSlide(0);
+      setFocusLine(null);
+      setBoardItems([]);
+      setTranscript([]);
+      setError(null);
+      setPhase("paused");
     },
-    [teachSlide],
+    [],
   );
 
   const goToSlide = useCallback((index: number) => teachSlide(index), [teachSlide]);
@@ -611,6 +640,25 @@ export function useTutor(): UseTutor {
   const prevSlide = useCallback(
     () => teachSlide(currentSlideRef.current - 1),
     [teachSlide],
+  );
+
+  // Free navigation: just SHOW a slide (stop any teaching, clear the board) so the
+  // student can flip through / skip ahead and read before the tutor explains.
+  const viewSlide = useCallback(
+    (index: number) => {
+      const slides = docSlidesRef.current;
+      if (index < 0 || index >= slides.length) return;
+      abortRef.current?.abort();
+      clearPlayback();
+      currentSlideRef.current = index;
+      setCurrentSlide(index);
+      setFocusLine(null);
+      setBoardItems([]);
+      setTranscript([]);
+      setError(null);
+      setPhase("paused"); // "paused" in doc mode = showing a slide, ready to teach
+    },
+    [clearPlayback],
   );
 
   const interrupt = useCallback(
@@ -630,7 +678,10 @@ export function useTutor(): UseTutor {
         ]);
         setPhase("answering");
         setError(null);
-        const messages = [...historyRef.current, studentQuestionMessage(trimmed)];
+        const messages = [
+          ...historyRef.current,
+          studentQuestionMessage(trimmed, languageRef.current),
+        ];
         historyRef.current = messages;
         turnRef.current = runTurn(messages, true, "paused");
         await turnRef.current;
@@ -749,6 +800,8 @@ export function useTutor(): UseTutor {
     preparedCount,
     speed,
     setSpeed,
+    language,
+    setLanguage,
     startLesson,
     startLessonFromSource,
     mode,
@@ -758,6 +811,7 @@ export function useTutor(): UseTutor {
     focusLine,
     startDocument,
     goToSlide,
+    viewSlide,
     nextSlide,
     prevSlide,
     interrupt,
