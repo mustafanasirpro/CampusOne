@@ -4,16 +4,21 @@ import {
   CircleStop,
   Download,
   FastForward,
+  FileText,
   FileUp,
   Gauge,
   GraduationCap,
   Hand,
   Headphones,
   KeyRound,
+  Languages,
   Lightbulb,
   ListChecks,
+  Maximize2,
+  MessageSquare,
   Mic,
   MicOff,
+  Minimize2,
   Play,
   RotateCcw,
   ScanSearch,
@@ -24,14 +29,14 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { captureElement, VISION_ENABLED } from "./visionClient";
 
 import { hasApiKey } from "@/api/apiKeys";
 import { TUTOR_MODEL, TUTOR_PROVIDER } from "@/api/tutorClient";
 import { Button } from "@/components/common";
-import type { LessonDepth } from "@/types/tutor";
+import type { LessonDepth, LessonLanguage } from "@/types/tutor";
 import { cn } from "@/utils/cn";
 
 import { ApiKeySetup } from "./ApiKeySetup";
@@ -56,6 +61,30 @@ const SUGGESTIONS = [
   "What is a derivative in calculus?",
 ];
 
+const LANGUAGES: {
+  value: LessonLanguage;
+  label: string;
+  hint: string;
+  stt: string;
+  tts: string;
+}[] = [
+  { value: "english", label: "English", hint: "Speak & write in English", stt: "en-US", tts: "en-US" },
+  {
+    value: "roman-urdu",
+    label: "Roman Urdu",
+    hint: "Speak & write in Roman Urdu",
+    stt: "ur-PK",
+    tts: "en-US",
+  },
+  {
+    value: "urdu-voice",
+    label: "Urdu voice",
+    hint: "Speaks Urdu, writes Roman Urdu + English terms",
+    stt: "ur-PK",
+    tts: "ur-PK",
+  },
+];
+
 export function TutorConsole() {
   const tutor = useTutor();
   const {
@@ -68,6 +97,8 @@ export function TutorConsole() {
     preparedCount,
     speed,
     setSpeed,
+    language,
+    setLanguage,
     startLesson,
     mode,
     docSlides,
@@ -76,6 +107,7 @@ export function TutorConsole() {
     focusLine,
     startDocument,
     goToSlide,
+    viewSlide,
     nextSlide,
     interrupt,
     askAboutBoard,
@@ -96,7 +128,35 @@ export function TutorConsole() {
   // BYOK gate: the hosted tutor (Groq) needs the user's own free key first.
   const needsKey = TUTOR_PROVIDER === "groq";
   const [setupOpen, setSetupOpen] = useState(() => needsKey && !hasApiKey("groq"));
+  // Layout: fullscreen "theater" mode + collapsible side panels (responsive).
+  const [expanded, setExpanded] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(true);
+  const [showSlides, setShowSlides] = useState(true);
   const boardRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+
+  // Expand to a full-viewport "theater" view. We also try the native Fullscreen
+  // API (so it fills the whole screen where allowed), but the CSS overlay is what
+  // actually drives the layout — so it still works where fullscreen is blocked.
+  const toggleExpanded = () => {
+    const next = !expanded;
+    setExpanded(next);
+    try {
+      if (next) shellRef.current?.requestFullscreen?.().catch(() => undefined);
+      else if (document.fullscreenElement)
+        document.exitFullscreen?.().catch(() => undefined);
+    } catch {
+      /* native fullscreen unavailable — the CSS overlay still works */
+    }
+  };
+  // If the user leaves NATIVE fullscreen (Esc), drop our expanded layout too.
+  useEffect(() => {
+    const onFs = () => {
+      if (!document.fullscreenElement) setExpanded(false);
+    };
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
 
   const boardText = () =>
     boardItems
@@ -169,6 +229,12 @@ export function TutorConsole() {
   const handleSpeed = (value: number) => {
     setSpeed(value);
     voice.setRate(value); // keep spoken pace in sync with the UI speed
+  };
+
+  const handleLanguage = (value: LessonLanguage) => {
+    setLanguage(value);
+    const opt = LANGUAGES.find((l) => l.value === value) ?? LANGUAGES[0];
+    voice.setSpeechLang(opt.stt, opt.tts); // mic + spoken voice follow the language
   };
 
   const handleSaveNotes = () => {
@@ -294,7 +360,14 @@ export function TutorConsole() {
   }
 
   return (
-    <div className="grid gap-4">
+    <div
+      ref={shellRef}
+      className={cn(
+        expanded
+          ? "fixed inset-0 z-40 flex flex-col gap-2 overflow-auto bg-slate-100 p-2 sm:p-3"
+          : "grid gap-4",
+      )}
+    >
       {!modelReady ? (
         <ModelSetupBanner
           status={status}
@@ -315,49 +388,91 @@ export function TutorConsole() {
         />
       ) : null}
 
-      {/* Teaching view: (slides +) whiteboard + the live caption are on screen
-          together; the full history sits in the side rail. */}
+      {/* Board toolbar: status + panel toggles + fullscreen. */}
+      {started ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill phase={preparing ? "preparing" : phase} topic={topic} />
+          <div className="ml-auto flex items-center gap-1.5">
+            {docMode ? (
+              <PanelToggle
+                on={showSlides}
+                onClick={() => setShowSlides((s) => !s)}
+                icon={<FileText className="size-4" />}
+                label="Slides"
+              />
+            ) : null}
+            <PanelToggle
+              on={showTranscript}
+              onClick={() => setShowTranscript((s) => !s)}
+              icon={<MessageSquare className="size-4" />}
+              label="Transcript"
+            />
+            <PanelToggle
+              on={expanded}
+              onClick={toggleExpanded}
+              icon={
+                expanded ? (
+                  <Minimize2 className="size-4" />
+                ) : (
+                  <Maximize2 className="size-4" />
+                )
+              }
+              label={expanded ? "Exit" : "Fullscreen"}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {/* Teaching view: (slides +) whiteboard with a caption overlay + the
+          collapsible transcript rail. Flex so panels can be toggled; responsive. */}
       <div
         className={cn(
-          "grid gap-3 lg:h-[64vh] lg:min-h-[26rem]",
-          docMode
-            ? "xl:grid-cols-[16rem_minmax(0,1fr)_15rem] lg:grid-cols-[14rem_minmax(0,1fr)]"
-            : "lg:grid-cols-[1fr_19rem]",
+          "flex flex-col gap-3 lg:flex-row",
+          expanded
+            ? "lg:min-h-0 lg:flex-1"
+            : docMode
+              ? "lg:h-[66vh] lg:min-h-[26rem]"
+              : "lg:h-[64vh] lg:min-h-[26rem]",
         )}
       >
-        {docMode ? (
+        {docMode && showSlides ? (
           <SlidePanel
             slides={docSlides}
             current={currentSlide}
             title={docTitle}
             focusLine={focusLine}
-            onGoTo={goToSlide}
+            onView={viewSlide}
+            onTeach={goToSlide}
             busy={busy}
+            className="w-full shrink-0 lg:w-72 xl:w-80"
           />
         ) : null}
-        <div className="flex h-[56vh] min-h-[20rem] flex-col gap-2 lg:h-auto">
-          <div ref={boardRef} className="relative min-h-0 flex-1">
-            <Whiteboard
-              items={boardItems}
-              writing={busy && !preparing}
-              preparing={preparing}
-              preparedCount={preparedCount}
-            />
-            <DrawLayer />
-          </div>
+
+        <div
+          ref={boardRef}
+          className="relative min-h-[46vh] flex-1 overflow-hidden rounded-2xl lg:min-h-0"
+        >
+          <Whiteboard
+            items={boardItems}
+            writing={busy && !preparing}
+            preparing={preparing}
+            preparedCount={preparedCount}
+          />
+          <DrawLayer />
           {started && !preparing && currentNarration ? (
-            <NarrationCaption
+            <CaptionOverlay
               text={currentNarration.text}
               answer={currentNarration.answer}
             />
           ) : null}
         </div>
 
-        {/* Side rail: status + full conversation */}
-        <aside className="flex h-[38vh] min-h-[14rem] flex-col gap-2 lg:h-auto">
-          <StatusPill phase={preparing ? "preparing" : phase} topic={topic} />
-          <Transcript transcript={transcript} />
-        </aside>
+        {/* Side rail: full conversation (collapsible). */}
+        {showTranscript ? (
+          <aside className="flex h-[38vh] w-full shrink-0 flex-col gap-2 lg:h-auto lg:w-72 xl:w-80">
+            <Transcript transcript={transcript} />
+          </aside>
+        ) : null}
       </div>
 
       {error ? (
@@ -398,6 +513,8 @@ export function TutorConsole() {
             docBusy={pdfBusy}
             showManageKeys={needsKey}
             onManageKeys={() => setSetupOpen(true)}
+            language={language}
+            onLanguageChange={handleLanguage}
           />
           <LearningJourney
             disabled={!modelReady}
@@ -459,7 +576,7 @@ export function TutorConsole() {
                 Ask about my drawing
               </Button>
             ) : null}
-            {phase === "paused" ? (
+            {phase === "paused" && boardItems.length > 0 ? (
               <Button variant="primary" size="sm" onClick={resume}>
                 <Play className="size-4" />
                 Resume
@@ -468,9 +585,10 @@ export function TutorConsole() {
             {docMode &&
             (phase === "done" || phase === "paused") &&
             !busy &&
+            boardItems.length > 0 &&
             currentSlide < docSlides.length - 1 ? (
               <Button variant="primary" size="sm" onClick={nextSlide}>
-                Next slide
+                Teach next slide
                 <ArrowRight className="size-4" />
               </Button>
             ) : null}
@@ -543,7 +661,9 @@ export function TutorConsole() {
             </Button>
           </div>
 
-          {(phase === "done" || phase === "paused") && !busy ? (
+          {(phase === "done" || phase === "paused") &&
+          !busy &&
+          boardItems.length > 0 ? (
             <FollowUpChips onPick={followUp} />
           ) : null}
 
@@ -574,6 +694,8 @@ function StartPanel({
   docBusy,
   showManageKeys,
   onManageKeys,
+  language,
+  onLanguageChange,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -588,6 +710,8 @@ function StartPanel({
   docBusy: boolean;
   showManageKeys: boolean;
   onManageKeys: () => void;
+  language: LessonLanguage;
+  onLanguageChange: (l: LessonLanguage) => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [startMode, setStartMode] = useState<"topic" | "document">("topic");
@@ -739,6 +863,29 @@ function StartPanel({
             className={cn(
               "rounded-full border px-3 py-1 text-xs font-medium transition",
               depth === option.value
+                ? "border-brand-500 bg-brand-600 text-white"
+                : "border-slate-200 bg-slate-50 text-slate-600 hover:border-brand-300",
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-400">
+          <Languages className="size-3.5" />
+          Language:
+        </span>
+        {LANGUAGES.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            title={option.hint}
+            onClick={() => onLanguageChange(option.value)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-medium transition",
+              language === option.value
                 ? "border-brand-500 bg-brand-600 text-white"
                 : "border-slate-200 bg-slate-50 text-slate-600 hover:border-brand-300",
             )}
@@ -1006,41 +1153,56 @@ function FollowUpChips({ onPick }: { onPick: (instruction: string) => void }) {
   );
 }
 
-function NarrationCaption({
-  text,
-  answer,
+/** A small pill toggle for the board toolbar (slides / transcript / fullscreen). */
+function PanelToggle({
+  on,
+  onClick,
+  icon,
+  label,
 }: {
-  text: string;
-  answer?: boolean;
+  on: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
 }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-pressed={on}
       className={cn(
-        "flex shrink-0 items-start gap-3 rounded-2xl border px-4 py-3 shadow-sm sm:px-5",
-        answer
-          ? "border-amber-300 bg-amber-50"
-          : "border-brand-200 bg-gradient-to-r from-brand-50 to-white",
+        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition",
+        on
+          ? "border-brand-300 bg-brand-50 text-brand-700"
+          : "border-slate-200 bg-white text-slate-500 hover:border-brand-300",
       )}
     >
-      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-600 text-white">
-        <GraduationCap className="size-5" />
-      </span>
-      <div className="min-w-0">
-        <p
-          className={cn(
-            "text-[10px] font-semibold uppercase tracking-wide",
-            answer ? "text-amber-700" : "text-brand-600",
-          )}
-        >
-          {answer ? "Tutor is answering" : "Tutor is saying"}
-        </p>
-        <p
-          key={text}
-          className="tutor-fade-in mt-0.5 max-h-24 overflow-y-auto text-base leading-relaxed text-slate-800 sm:text-lg"
-        >
-          {text}
-        </p>
-      </div>
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  );
+}
+
+/**
+ * A YouTube-style caption: a floating bar pinned to the bottom of the board that
+ * shows ONLY the line the tutor is currently saying, clamped to two lines.
+ */
+function CaptionOverlay({ text, answer }: { text: string; answer?: boolean }) {
+  return (
+    <div
+      data-no-capture="true"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-center px-3 pb-3 sm:px-6 sm:pb-4"
+    >
+      <p
+        key={text}
+        className={cn(
+          "tutor-fade-in line-clamp-2 max-w-3xl rounded-xl px-4 py-2 text-center text-sm font-medium leading-snug text-white shadow-lg sm:text-base",
+          answer ? "bg-amber-900/85" : "bg-slate-900/85",
+        )}
+      >
+        {text}
+      </p>
     </div>
   );
 }
