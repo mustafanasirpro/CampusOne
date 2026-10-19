@@ -38,15 +38,37 @@ const GEMINI_BASE = (
   "https://generativelanguage.googleapis.com"
 ).replace(/\/+$/, "");
 
-/** Capture an element (the whiteboard) to a JPEG data URL. */
+/**
+ * Capture the whiteboard (plus the student's drawing) to a JPEG data URL for the
+ * vision model. We EXCLUDE anything marked `data-no-capture` (the draw toolbar) so
+ * the image is clean, then composite the drawing canvas on top ourselves — some
+ * browsers don't reliably serialise a live `<canvas>` through html-to-image, which
+ * is why the tutor sometimes couldn't "see" what was drawn.
+ */
 export async function captureElement(el: HTMLElement): Promise<string> {
-  const { toJpeg } = await import("html-to-image");
-  return toJpeg(el, {
-    quality: 0.85,
+  const { toCanvas } = await import("html-to-image");
+  const base = await toCanvas(el, {
     backgroundColor: "#ffffff",
-    pixelRatio: 1.5,
+    pixelRatio: 2,
     cacheBust: true,
+    filter: (node) =>
+      !(node instanceof HTMLElement && node.dataset.noCapture === "true"),
   });
+
+  // Draw the student's strokes on top, scaled to the captured image, so they're
+  // crisp and unmistakable to the model.
+  const draw = el.querySelector<HTMLCanvasElement>("canvas[data-draw-layer]");
+  if (draw && draw.width > 0 && draw.height > 0) {
+    const ctx = base.getContext("2d");
+    if (ctx) {
+      try {
+        ctx.drawImage(draw, 0, 0, base.width, base.height);
+      } catch {
+        // Tainted/again cross-origin — ignore; the base capture still stands.
+      }
+    }
+  }
+  return base.toDataURL("image/jpeg", 0.9);
 }
 
 interface VisionArgs {
