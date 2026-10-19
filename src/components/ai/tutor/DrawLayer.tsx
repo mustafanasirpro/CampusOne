@@ -67,7 +67,7 @@ export function DrawLayer() {
     if (ctx && last.current) {
       ctx.globalCompositeOperation = erasing ? "destination-out" : "source-over";
       ctx.strokeStyle = color;
-      ctx.lineWidth = erasing ? 22 : 3;
+      ctx.lineWidth = erasing ? 24 : 4.5; // a touch thicker so the tutor sees it clearly
       ctx.beginPath();
       ctx.moveTo(last.current.x, last.current.y);
       ctx.lineTo(p.x, p.y);
@@ -91,6 +91,8 @@ export function DrawLayer() {
     <>
       <canvas
         ref={canvasRef}
+        data-draw-layer="true"
+        data-no-capture="true"
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
@@ -102,7 +104,10 @@ export function DrawLayer() {
       />
 
       {/* Toolbar */}
-      <div className="absolute right-2 top-2 z-20 flex items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1 shadow-sm backdrop-blur">
+      <div
+        data-no-capture="true"
+        className="absolute right-2 top-2 z-20 flex items-center gap-1 rounded-xl border border-slate-200 bg-white/95 p-1 shadow-sm backdrop-blur"
+      >
         {active ? (
           <>
             {COLORS.map((c) => (
