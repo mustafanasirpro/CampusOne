@@ -1,6 +1,13 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useEffect, useRef } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  GraduationCap,
+  Highlighter,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/common";
 import { cn } from "@/utils/cn";
 
 import type { DocSlide } from "./pdfSlides";
@@ -11,17 +18,24 @@ export function SlidePanel({
   current,
   title,
   focusLine,
-  onGoTo,
+  onView,
+  onTeach,
   busy,
+  className,
 }: {
   slides: DocSlide[];
   current: number;
   title: string;
   focusLine: number | null;
-  onGoTo: (index: number) => void;
+  /** Just show a slide (free navigation). */
+  onView: (index: number) => void;
+  /** Start teaching a slide. */
+  onTeach: (index: number) => void;
   busy: boolean;
+  className?: string;
 }) {
   const activeRef = useRef<HTMLLIElement>(null);
+  const [jump, setJump] = useState("");
 
   useEffect(() => {
     activeRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -30,9 +44,23 @@ export function SlidePanel({
   const slide = slides[current];
   if (!slide) return null;
 
+  const go = (i: number) => {
+    if (i >= 0 && i < slides.length && !busy) onView(i);
+  };
+  const submitJump = () => {
+    const n = Number(jump);
+    if (Number.isFinite(n)) go(Math.round(n) - 1);
+    setJump("");
+  };
+
   return (
-    <aside className="flex h-[40vh] min-h-[16rem] flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm lg:h-auto">
-      <div className="flex items-center justify-between px-1">
+    <aside
+      className={cn(
+        "flex h-[46vh] min-h-[18rem] flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm lg:h-auto",
+        className,
+      )}
+    >
+      <div className="flex items-center justify-between gap-2 px-1">
         <span className="truncate text-xs font-semibold text-slate-600" title={title}>
           {title}
         </span>
@@ -41,56 +69,71 @@ export function SlidePanel({
         </span>
       </div>
 
-      {/* Current slide: a rendered image (PDF) or a slide-styled preview built from
-          the extracted text (PPTX — PowerPoint can't be rasterized in the browser). */}
-      <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
-        {slide.image ? (
-          <img
-            src={slide.image}
-            alt={`Slide ${current + 1}`}
-            className="mx-auto max-h-48 w-auto object-contain"
-          />
-        ) : (
-          <SlideTextPreview lines={slide.lines} focusLine={focusLine} />
-        )}
+      {/* Current slide — shown in FULL (a rendered PDF page, or a slide-styled
+          preview for PPTX). You can highlight directly on it. */}
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">
+        <div className="absolute inset-0 overflow-auto">
+          {slide.image ? (
+            <img
+              src={slide.image}
+              alt={`Slide ${current + 1}`}
+              className="mx-auto h-auto w-full object-contain"
+            />
+          ) : (
+            <SlideTextPreview lines={slide.lines} focusLine={focusLine} />
+          )}
+        </div>
+        <SlideHighlighter key={current} />
       </div>
 
-      {/* Nav */}
+      {/* Nav — free navigation (just shows the slide; it doesn't start teaching). */}
       <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           disabled={busy || current === 0}
-          onClick={() => onGoTo(current - 1)}
+          onClick={() => go(current - 1)}
           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 transition hover:border-brand-300 disabled:opacity-40"
         >
           <ChevronLeft className="size-3.5" />
           Prev
         </button>
-        <div className="flex flex-1 items-center justify-center gap-1">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              disabled={busy}
-              aria-label={`Go to slide ${i + 1}`}
-              onClick={() => onGoTo(i)}
-              className={cn(
-                "size-1.5 rounded-full transition disabled:cursor-not-allowed",
-                i === current ? "bg-brand-600" : "bg-slate-300 hover:bg-slate-400",
-              )}
-            />
-          ))}
-        </div>
+        <form
+          className="flex items-center gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitJump();
+          }}
+        >
+          <input
+            value={jump}
+            onChange={(e) => setJump(e.target.value.replace(/[^0-9]/g, ""))}
+            placeholder="Go to #"
+            aria-label="Jump to slide number"
+            className="h-7 w-16 rounded-md border border-slate-200 px-2 text-center text-xs outline-none focus-visible:border-brand-400"
+          />
+        </form>
         <button
           type="button"
           disabled={busy || current === slides.length - 1}
-          onClick={() => onGoTo(current + 1)}
+          onClick={() => go(current + 1)}
           className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 transition hover:border-brand-300 disabled:opacity-40"
         >
           Next
           <ChevronRight className="size-3.5" />
         </button>
       </div>
+
+      {/* Teach this slide — the student controls when teaching starts. */}
+      <Button
+        variant="primary"
+        size="sm"
+        disabled={busy}
+        onClick={() => onTeach(current)}
+        className="w-full justify-center"
+      >
+        <GraduationCap className="size-4" />
+        Teach this slide
+      </Button>
 
       {/* The slide's points */}
       <div className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-slate-50 p-2">
@@ -193,5 +236,113 @@ function SlideTextPreview({
         </ul>
       </div>
     </div>
+  );
+}
+
+/** A translucent highlighter the student can draw on the slide to mark things. */
+function SlideHighlighter() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [active, setActive] = useState(false);
+  const drawing = useRef(false);
+  const last = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const resize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const prev = document.createElement("canvas");
+      prev.width = canvas.width;
+      prev.height = canvas.height;
+      prev.getContext("2d")?.drawImage(canvas, 0, 0);
+      canvas.width = Math.max(1, Math.round(rect.width * dpr));
+      canvas.height = Math.max(1, Math.round(rect.height * dpr));
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        if (prev.width && prev.height) ctx.drawImage(prev, 0, 0, rect.width, rect.height);
+      }
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, []);
+
+  const point = (event: React.PointerEvent) => {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  };
+  const onDown = (event: React.PointerEvent) => {
+    if (!active) return;
+    canvasRef.current?.setPointerCapture(event.pointerId);
+    drawing.current = true;
+    last.current = point(event);
+  };
+  const onMove = (event: React.PointerEvent) => {
+    if (!active || !drawing.current) return;
+    const ctx = canvasRef.current?.getContext("2d");
+    const p = point(event);
+    if (ctx && last.current) {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = "rgba(250, 204, 21, 0.45)"; // soft yellow highlighter
+      ctx.lineWidth = 14;
+      ctx.beginPath();
+      ctx.moveTo(last.current.x, last.current.y);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+    last.current = p;
+  };
+  const onUp = () => {
+    drawing.current = false;
+    last.current = null;
+  };
+  const clear = () => {
+    const c = canvasRef.current;
+    const ctx = c?.getContext("2d");
+    if (c && ctx) ctx.clearRect(0, 0, c.width, c.height);
+  };
+
+  return (
+    <>
+      <canvas
+        ref={canvasRef}
+        onPointerDown={onDown}
+        onPointerMove={onMove}
+        onPointerUp={onUp}
+        onPointerLeave={onUp}
+        className={cn(
+          "absolute inset-0 z-10 h-full w-full",
+          active ? "cursor-crosshair touch-none" : "pointer-events-none",
+        )}
+      />
+      <div className="absolute right-1.5 top-1.5 z-20 flex items-center gap-1 rounded-lg border border-slate-200 bg-white/95 p-0.5 shadow-sm backdrop-blur">
+        <button
+          type="button"
+          title="Highlight on the slide"
+          onClick={() => setActive((a) => !a)}
+          className={cn(
+            "grid size-6 place-items-center rounded-md transition",
+            active ? "bg-amber-100 text-amber-700" : "text-slate-500 hover:bg-slate-100",
+          )}
+        >
+          <Highlighter className="size-3.5" />
+        </button>
+        {active ? (
+          <button
+            type="button"
+            title="Clear highlights"
+            onClick={clear}
+            className="grid size-6 place-items-center rounded-md text-slate-500 hover:bg-slate-100"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        ) : null}
+      </div>
+    </>
   );
 }
