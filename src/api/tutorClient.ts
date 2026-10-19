@@ -7,7 +7,12 @@
 // Isolated here so Phase 2 can move the call behind the Spring backend without
 // touching the whiteboard UI.
 
-import type { LessonDepth, LessonStep, TutorChatMessage } from "@/types/tutor";
+import type {
+  LessonDepth,
+  LessonLanguage,
+  LessonStep,
+  TutorChatMessage,
+} from "@/types/tutor";
 
 import { authHeader, bearer, orderedKeys, rotateKey } from "./apiKeys";
 
@@ -101,6 +106,18 @@ RULES:
 - END by CHECKING their understanding: your final beat must ask ONE clear question for the student to answer in their own words (speak it warmly, e.g. "Before we wrap up — can you tell me, in your own words, why...?"). Do not just recap; invite them to show they got it, then stop.
 - Begin your reply with "{" immediately. No preamble, no commentary.`;
 
+const LANGUAGE_HINT: Record<LessonLanguage, string> = {
+  english: "",
+  "roman-urdu":
+    ' LANGUAGE — VERY IMPORTANT: Teach ENTIRELY in Roman Urdu (Urdu written in English/Latin letters, NOT Urdu script). EVERYTHING you SAY (every "say" value) and EVERYTHING you WRITE on the board (every "text", title, bullet, note, label, caption) must be in natural, friendly Roman Urdu. Keep standard technical/English terms in English where that is normal (e.g. "array", "loop", "binary search", "force"), but all the teaching and explanation around them is in Roman Urdu. Example beat: {"say":"Chalo ise asaan tareeqe se samajhte hain. Binary search ka matlab hai sorted list me se cheez ko aadha aadha kar ke dhoondna.","board":{"kind":"title","text":"Binary Search kya hai?"}}.',
+  "urdu-voice":
+    ' LANGUAGE — VERY IMPORTANT: SPEAK in natural Urdu: every "say" value MUST be written in URDU SCRIPT (اردو) so it is read aloud correctly in Urdu. But everything you WRITE on the board (every "text", title, bullet, note, label, caption) must be in ROMAN URDU (Latin letters) mixed with the normal English technical terms, so it is easy to read. So: "say" = Urdu script; board "text" = Roman Urdu + English terms. Example beat: {"say":"چلو اسے آسان طریقے سے سمجھتے ہیں۔ بائنری سرچ کا مطلب ہے کہ sorted list میں سے چیز کو آدھا آدھا کر کے ڈھونڈنا۔","board":{"kind":"title","text":"Binary Search kya hai?"}}.',
+};
+
+function withLanguage(content: string, language: LessonLanguage): string {
+  return language === "english" ? content : content + LANGUAGE_HINT[language];
+}
+
 const DEPTH_HINT: Record<LessonDepth, string> = {
   quick:
     "Keep it focused but still follow the full arc with an image and visuals: a quick analogy, the concept, the key visuals, a short example, then the check.",
@@ -112,6 +129,7 @@ const DEPTH_HINT: Record<LessonDepth, string> = {
 export function buildLessonOpeningMessages(
   topic: string,
   depth: LessonDepth = "standard",
+  language: LessonLanguage = "english",
 ): TutorChatMessage[] {
   return [
     // Reasoning is disabled via the `think: false` request parameter (see
@@ -121,7 +139,10 @@ export function buildLessonOpeningMessages(
     { role: "system", content: SYSTEM_PROMPT },
     {
       role: "user",
-      content: `Teach me this topic on the whiteboard, step by step: "${topic.trim()}". ${DEPTH_HINT[depth]}`,
+      content: withLanguage(
+        `Teach me this topic on the whiteboard, step by step: "${topic.trim()}". ${DEPTH_HINT[depth]}`,
+        language,
+      ),
     },
   ];
 }
@@ -131,15 +152,16 @@ export function buildLessonFromSourceMessages(
   title: string,
   sourceText: string,
   depth: LessonDepth = "standard",
+  language: LessonLanguage = "english",
 ): TutorChatMessage[] {
   return [
     { role: "system", content: SYSTEM_PROMPT },
     {
       role: "user",
-      content: `Teach me from my own material below. Use "${title.trim()}" as the lesson title. Base the lesson on these notes — explain the key ideas in them clearly, in your own words, with your analogy, images, and visuals so I actually understand them (don't just read them back). ${DEPTH_HINT[depth]}
-
---- MY MATERIAL ---
-${sourceText}`,
+      content: withLanguage(
+        `Teach me from my own material below. Use "${title.trim()}" as the lesson title. Base the lesson on these notes — explain the key ideas in them clearly, in your own words, with your analogy, images, and visuals so I actually understand them (don't just read them back). ${DEPTH_HINT[depth]}`,
+        language,
+      ) + `\n\n--- MY MATERIAL ---\n${sourceText}`,
     },
   ];
 }
@@ -152,6 +174,7 @@ export function buildSlideLessonMessages(
   total: number,
   outline: string,
   depth: LessonDepth = "standard",
+  language: LessonLanguage = "english",
 ): TutorChatMessage[] {
   const numbered = slideLines.length
     ? slideLines.map((l, i) => `${i + 1}. ${l}`).join("\n")
@@ -174,7 +197,7 @@ Teach THIS slide DEEPLY and completely:
 - Don't just read the slide back — teach the real concept behind each point, with your own analogy, and draw diagrams/visuals/images on the whiteboard to make it clear.
 - Cover everything on the slide, including any diagram or figure it shows.
 - You can skip a long intro — dive into teaching this slide's content.
-- End by checking the student understands THIS slide. ${DEPTH_HINT[depth]}`,
+- End by checking the student understands THIS slide. ${DEPTH_HINT[depth]}${LANGUAGE_HINT[language]}`,
     },
   ];
 }
@@ -196,13 +219,19 @@ export function assistantTurnFromRaw(raw: string): TutorChatMessage {
   return { role: "assistant", content: raw.trim() };
 }
 
-export function studentQuestionMessage(message: string): TutorChatMessage {
+export function studentQuestionMessage(
+  message: string,
+  language: LessonLanguage = "english",
+): TutorChatMessage {
   return {
     role: "user",
-    content: `The student just said: "${message.trim()}". Respond as their live tutor, briefly, in the same JSON format:
+    content: withLanguage(
+      `The student just said: "${message.trim()}". Respond as their live tutor, briefly, in the same JSON format:
 - If it's a QUESTION, answer it directly in 1-2 spoken sentences (add one short board item only if it truly helps).
 - If it's their ATTEMPT to ANSWER your check question: judge whether they understand the IDEA (not exact keywords). If they've GOT IT, confirm warmly and give a one-line recap. If they're CLOSE, give a gentle hint that nudges them the right way (do not just say wrong) and ask them to try again. If they're OFF, kindly point to the exact gap, re-explain just that part simply (a diagram/example if it helps), and ask them to try once more.
 Do NOT move on until they clearly understand. Do NOT re-teach the whole lesson. Begin with "{".`,
+      language,
+    ),
   };
 }
 
