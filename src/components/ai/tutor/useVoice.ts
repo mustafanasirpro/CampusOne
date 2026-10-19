@@ -37,6 +37,18 @@ function getRecognitionCtor(): SpeechRecognitionCtor | null {
 const TTS_SUPPORTED =
   typeof window !== "undefined" && "speechSynthesis" in window;
 
+/** Find a speech-synthesis voice whose language matches (by 2-letter prefix). */
+function voiceForLang(lang: string): SpeechSynthesisVoice | null {
+  if (!TTS_SUPPORTED) return null;
+  const base = lang.slice(0, 2).toLowerCase();
+  const voices = window.speechSynthesis.getVoices();
+  return (
+    voices.find((v) => v.lang.toLowerCase() === lang.toLowerCase()) ??
+    voices.find((v) => v.lang.toLowerCase().startsWith(base)) ??
+    null
+  );
+}
+
 function wordsOf(text: string): Set<string> {
   return new Set(
     text
@@ -59,6 +71,8 @@ export interface UseVoice {
   cancelSpeech: () => void;
   /** Set the speaking rate (1 = normal). Scales spoken pace with the UI speed. */
   setRate: (rate: number) => void;
+  /** Set recognition + spoken locale (e.g. "ur-PK" for Urdu). */
+  setSpeechLang: (sttLang: string, ttsLang: string) => void;
   startListening: (onResult: (transcript: string) => void) => void;
   stopListening: () => void;
   // --- Live voice conversation (hands-free) ---
@@ -92,6 +106,10 @@ export function useVoice(): UseVoice {
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const preferredVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const rateRef = useRef(1);
+  // Language: recognition locale + spoken locale (so Urdu modes use an Urdu voice
+  // and the mic transcribes Urdu). Defaults to US English.
+  const sttLangRef = useRef("en-US");
+  const ttsLangRef = useRef("en-US");
   // Live conversation: a self-restarting recognition loop, gated by `enabledRef`
   // (the console turns it off while the tutor is talking/thinking, on when it's the
   // student's turn). `onUtteranceRef` receives each completed utterance.
@@ -154,7 +172,15 @@ export function useVoice(): UseVoice {
       try {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
-        if (preferredVoiceRef.current) utterance.voice = preferredVoiceRef.current;
+        // Use a voice matching the teaching language (Urdu for urdu-voice mode),
+        // falling back to the preferred English voice.
+        const ttsLang = ttsLangRef.current;
+        const langVoice =
+          ttsLang.slice(0, 2).toLowerCase() === "en"
+            ? preferredVoiceRef.current
+            : (voiceForLang(ttsLang) ?? preferredVoiceRef.current);
+        if (langVoice) utterance.voice = langVoice;
+        utterance.lang = ttsLang;
         // Clamp to the Web Speech valid range; follows the UI speed control.
         const rate = Math.min(2, Math.max(0.5, rateRef.current));
         utterance.rate = rate;
@@ -191,6 +217,12 @@ export function useVoice(): UseVoice {
     rateRef.current = rate;
   }, []);
 
+  /** Set the recognition + spoken locale (e.g. "ur-PK" for Urdu, "en-US"). */
+  const setSpeechLang = useCallback((sttLang: string, ttsLang: string) => {
+    sttLangRef.current = sttLang;
+    ttsLangRef.current = ttsLang;
+  }, []);
+
   const stopListening = useCallback(() => {
     recognitionRef.current?.stop();
     setListening(false);
@@ -203,7 +235,7 @@ export function useVoice(): UseVoice {
       if (TTS_SUPPORTED) window.speechSynthesis.cancel();
       recognitionRef.current?.abort();
       const recognition = new sttCtor();
-      recognition.lang = "en-US";
+      recognition.lang = sttLangRef.current;
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
@@ -252,7 +284,7 @@ export function useVoice(): UseVoice {
       }
     }
     const rec = new sttCtor();
-    rec.lang = "en-US";
+    rec.lang = sttLangRef.current;
     rec.continuous = true; // stay listening even while the tutor is talking
     rec.interimResults = false;
     rec.maxAlternatives = 1;
@@ -349,6 +381,7 @@ export function useVoice(): UseVoice {
     speak,
     cancelSpeech,
     setRate,
+    setSpeechLang,
     startListening,
     stopListening,
     conversing,
