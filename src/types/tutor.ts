@@ -7,6 +7,15 @@
 
 export type LessonDepth = "quick" | "standard" | "deep";
 
+/**
+ * Teaching language:
+ * - "english"     — speak and write in English (default).
+ * - "roman-urdu"  — speak and write entirely in Roman Urdu (Urdu in Latin letters).
+ * - "urdu-voice"  — SPEAK in Urdu (Urdu script, read aloud by an Urdu voice) but
+ *                   WRITE on the board in Roman Urdu with English technical terms.
+ */
+export type LessonLanguage = "english" | "roman-urdu" | "urdu-voice";
+
 export type BoardBlockKind =
   | "title"
   | "text"
