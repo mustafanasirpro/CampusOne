@@ -521,7 +521,7 @@ export function SettingsPage() {
 
         <Card>
           <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-5 sm:px-6">
-            <span className="grid size-10 place-items-center rounded-xl bg-violet-50 text-violet-600">
+            <span className="grid size-10 place-items-center rounded-xl bg-brand-50 text-brand-600">
               <Palette className="size-4.5" />
             </span>
             <div>
