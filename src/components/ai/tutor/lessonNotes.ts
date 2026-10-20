@@ -37,7 +37,7 @@ function boardLine(item: BoardItem): string | null {
           ? `- Graph: ${item.yLabel ?? "y"} vs ${item.xLabel ?? "x"}`
           : null;
     case "image":
-      return item.text ? `- 🖼️ ${item.text}` : null;
+      return item.text ? `- Image: ${item.text}` : null;
     case "clear":
       return null;
     default:
