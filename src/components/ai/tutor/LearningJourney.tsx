@@ -1,4 +1,12 @@
-import { FileText, Flame, RotateCw, Sparkles, Trash2, Wand2 } from "lucide-react";
+import {
+  ArrowRight,
+  Compass,
+  FileText,
+  Flame,
+  RotateCw,
+  Trash2,
+  Wand2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { suggestNextTopics } from "@/api/tutorClient";
@@ -105,7 +113,7 @@ export function LearningJourney({
     <div className="grid gap-3 rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm">
       <div className="flex flex-wrap items-center gap-2">
         <span className="grid size-8 place-items-center rounded-xl bg-brand-600 text-white">
-          <Sparkles className="size-4" />
+          <Compass className="size-4" />
         </span>
         <div className="mr-auto">
           <h3 className="text-sm font-semibold text-slate-800">
@@ -228,7 +236,7 @@ export function LearningJourney({
             onClick={() => onPick(s)}
             className="tutor-fade-in inline-flex items-center gap-1 rounded-full border border-campus-200 bg-campus-50 px-3 py-1 text-xs font-medium text-campus-700 transition hover:bg-campus-100 disabled:opacity-50"
           >
-            <Sparkles className="size-3" />
+            <ArrowRight className="size-3" />
             {s}
           </button>
         ))}
