@@ -1,4 +1,4 @@
-import { BookOpenCheck, ShieldCheck, Sparkles, UsersRound } from "lucide-react";
+import { BookOpenCheck, GraduationCap, ShieldCheck, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
@@ -32,7 +32,7 @@ export function AuthPageShell({
           <Badge className="border-white/10 bg-white/10 text-brand-100 ring-white/10">
             Built for student life
           </Badge>
-          <h2 className="mt-8 max-w-lg text-4xl font-bold leading-tight tracking-tight">
+          <h2 className="font-display mt-8 max-w-lg text-[2.6rem] font-semibold leading-[1.05] tracking-[-0.01em]">
             Your campus gets easier when everything connects.
           </h2>
           <p className="mt-4 max-w-lg leading-7 text-slate-300">
@@ -45,7 +45,7 @@ export function AuthPageShell({
           {[
             { icon: BookOpenCheck, text: "Course notes and past papers" },
             { icon: UsersRound, text: "Your real campus community" },
-            { icon: Sparkles, text: "Smarter AI study tools" },
+            { icon: GraduationCap, text: "Smarter AI study tools" },
             { icon: ShieldCheck, text: "Student-first, trusted experience" },
           ].map((item) => (
             <div
