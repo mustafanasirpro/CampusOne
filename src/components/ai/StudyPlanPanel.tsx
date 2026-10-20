@@ -1,4 +1,4 @@
-import { CalendarRange, WandSparkles } from "lucide-react";
+import { CalendarRange, PenLine } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { ApiError } from "@/api/apiClient";
@@ -118,7 +118,7 @@ export function StudyPlanPanel() {
               loading={isLoading}
               type="submit"
             >
-              <WandSparkles className="size-4" />
+              <PenLine className="size-4" />
               Generate study plan
             </Button>
           </form>
