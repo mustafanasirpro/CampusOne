@@ -704,7 +704,7 @@ export function useTutor(): UseTutor {
           {
             id: drawId,
             role: "student",
-            text: question.trim() || "✍️ (about what I drew on the board)",
+            text: question.trim() || "About what I drew on the board",
           },
         ]);
         setPhase("answering");
