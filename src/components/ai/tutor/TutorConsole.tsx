@@ -23,7 +23,6 @@ import {
   RotateCcw,
   ScanSearch,
   Send,
-  Sparkles,
   Telescope,
   TriangleAlert,
   Volume2,
@@ -603,8 +602,8 @@ export function TutorConsole() {
               </Button>
             ) : null}
             {docMode && phase === "done" && currentSlide === docSlides.length - 1 ? (
-              <span className="text-sm font-medium text-campus-600">
-                🎉 You've finished the document!
+              <span className="text-sm font-medium text-campus-700">
+                You&apos;ve finished the document.
               </span>
             ) : null}
             {phase === "error" ? (
@@ -806,7 +805,7 @@ function StartPanel({
               onChange={(event) => onChange(event.target.value)}
             />
             <Button type="submit" disabled={disabled || !value.trim()}>
-              <Sparkles className="size-4" />
+              <GraduationCap className="size-4" />
               Start lesson
             </Button>
           </form>
