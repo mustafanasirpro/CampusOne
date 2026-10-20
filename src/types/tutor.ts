@@ -8,13 +8,14 @@
 export type LessonDepth = "quick" | "standard" | "deep";
 
 /**
- * Teaching language:
- * - "english"     — speak and write in English (default).
- * - "roman-urdu"  — speak and write entirely in Roman Urdu (Urdu in Latin letters).
- * - "urdu-voice"  — SPEAK in Urdu (Urdu script, read aloud by an Urdu voice) but
- *                   WRITE on the board in Roman Urdu with English technical terms.
+ * Teaching language (what the tutor SAYS vs what it WRITES on the board):
+ * - "english"    — speak English,    write English (default).
+ * - "urdu"       — speak Urdu (Urdu script, read aloud by an Urdu voice),
+ *                  write Roman Urdu on the board.
+ * - "roman-urdu" — speak Roman Urdu (read by a normal English voice, so it needs
+ *                  no Urdu voice and works on any device), write English on the board.
  */
-export type LessonLanguage = "english" | "roman-urdu" | "urdu-voice";
+export type LessonLanguage = "english" | "urdu" | "roman-urdu";
 
 export type BoardBlockKind =
   | "title"
