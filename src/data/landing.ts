@@ -2,12 +2,12 @@ import {
   Bot,
   BriefcaseBusiness,
   CalendarDays,
+  Compass,
   FileText,
   MessageSquareText,
   SearchCheck,
   ShieldCheck,
   ShoppingBag,
-  Sparkles,
   UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -86,7 +86,7 @@ export const campusOneBenefits: CampusOneBenefit[] = [
     title: "Designed for how students work",
     description:
       "Fast, mobile-friendly, and focused enough to use between classes.",
-    icon: Sparkles,
+    icon: Compass,
   },
 ];
 
