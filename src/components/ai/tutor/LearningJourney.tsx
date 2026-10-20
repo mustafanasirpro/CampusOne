@@ -5,7 +5,6 @@ import {
   Flame,
   RotateCw,
   Trash2,
-  Wand2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -224,7 +223,7 @@ export function LearningJourney({
           {loadingNext ? (
             <span className="inline-block size-3 animate-spin rounded-full border-2 border-brand-300 border-t-brand-600" />
           ) : (
-            <Wand2 className="size-3.5" />
+            <Compass className="size-3.5" />
           )}
           {loadingNext ? "Thinking…" : "Suggest what to learn next"}
         </button>

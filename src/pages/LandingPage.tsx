@@ -40,7 +40,7 @@ function DashboardMockup() {
         <div className="overflow-hidden rounded-[1.25rem] bg-slate-50">
           <div className="flex h-11 items-center border-b border-slate-200 bg-white px-4">
             <div className="flex gap-1.5">
-              <span className="size-2.5 rounded-full bg-red-400" />
+              <span className="size-2.5 rounded-full bg-brand-400" />
               <span className="size-2.5 rounded-full bg-amber-400" />
               <span className="size-2.5 rounded-full bg-emerald-400" />
             </div>
