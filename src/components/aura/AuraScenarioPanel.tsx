@@ -133,7 +133,7 @@ export function AuraScenarioPanel({
           <p className="text-sm text-amber-700">Select the published version to plan an emergency repair.</p>
         ) : null}
         {whatIfResults.at(0) ? (
-          <div className="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-900">
+          <div className="rounded-xl bg-campus-50 p-3 text-sm text-campus-900">
             <p className="font-semibold">Latest what-if · {whatIfResults[0].scenarioType.replaceAll("_", " ")}</p>
             <p>{whatIfResults[0].affectedSessions} directly affected session{whatIfResults[0].affectedSessions === 1 ? "" : "s"}</p>
             <p>
