@@ -8,9 +8,9 @@ import {
   Clock3,
   Download,
   FileText,
+  GraduationCap,
   MessageCircle,
   Search,
-  Sparkles,
   TrendingUp,
   UsersRound,
 } from "lucide-react";
@@ -18,7 +18,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { Avatar, Badge, Card, CardContent, Reveal } from "@/components/common";
-import { CampusOneLogo } from "@/components/layout";
+import { CampusOneLogo, CampusOneMark } from "@/components/layout";
 import {
   campusOneBenefits,
   landingFaqs,
@@ -53,9 +53,7 @@ function DashboardMockup() {
           <div className="flex min-h-[390px] sm:min-h-[460px]">
             <aside className="hidden w-36 shrink-0 border-r border-slate-200 bg-white p-3 sm:block lg:w-44">
               <div className="flex items-center gap-2 px-1 py-2">
-                <span className="grid size-7 place-items-center rounded-lg bg-brand-600 text-white">
-                  <Sparkles className="size-3.5" />
-                </span>
+                <CampusOneMark className="size-7 shrink-0" />
                 <span className="text-[10px] font-bold text-slate-900">
                   CampusOne
                 </span>
@@ -171,7 +169,6 @@ function DashboardMockup() {
                       <span className="grid size-7 place-items-center rounded-lg bg-white/15">
                         <Bot className="size-3.5" />
                       </span>
-                      <Sparkles className="size-3.5 text-brand-200" />
                     </div>
                     <p className="mt-3 text-[10px] font-bold">
                       Ask CampusOne AI
@@ -217,7 +214,7 @@ function DashboardMockup() {
 
       <div className="animate-campus-float absolute -right-3 top-20 hidden items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl [animation-delay:1s] md:flex">
         <span className="grid size-9 place-items-center rounded-xl bg-amber-50 text-amber-600">
-          <Sparkles className="size-4" />
+          <GraduationCap className="size-4" />
         </span>
         <div>
           <p className="text-xs font-bold text-slate-900">Gamification</p>
@@ -240,23 +237,22 @@ export function LandingPage() {
           className="absolute inset-0 -z-20"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 18% 15%, rgba(99,102,241,.13), transparent 30%), radial-gradient(circle at 82% 28%, rgba(16,185,129,.09), transparent 28%)",
+              "radial-gradient(circle at 16% 12%, rgba(125,40,38,.10), transparent 34%), radial-gradient(circle at 84% 26%, rgba(169,127,55,.10), transparent 32%), radial-gradient(circle at 60% 90%, rgba(137,136,97,.08), transparent 36%)",
           }}
         />
-        <div className="absolute left-1/2 top-0 -z-10 h-px w-[80%] -translate-x-1/2 bg-gradient-to-r from-transparent via-brand-300 to-transparent" />
+        <div className="absolute left-1/2 top-0 -z-10 h-px w-[80%] -translate-x-1/2 bg-gradient-to-r from-transparent via-amber-300/70 to-transparent" />
 
         <div className="mx-auto max-w-7xl">
           <Reveal className="mx-auto max-w-4xl text-center">
             <Badge
-              className="mx-auto gap-2 border border-brand-200/70 bg-brand-50/80 px-3.5 py-1.5 text-brand-700 shadow-sm"
+              className="mx-auto border border-brand-200/70 bg-brand-50/80 px-3.5 py-1.5 text-brand-700 shadow-sm"
               variant="brand"
             >
-              <Sparkles className="size-3.5" />
               The digital campus, reimagined
             </Badge>
-            <h1 className="mx-auto mt-7 max-w-4xl text-4xl font-bold leading-[1.08] tracking-[-0.04em] text-slate-950 sm:text-6xl lg:text-7xl">
+            <h1 className="font-display mx-auto mt-7 max-w-4xl text-5xl font-semibold leading-[1.04] tracking-[-0.01em] text-slate-900 sm:text-7xl lg:text-[5.25rem]">
               Everything your campus needs,{" "}
-              <span className="bg-gradient-to-r from-brand-600 to-campus-600 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-brand-700 via-brand-600 to-campus-700 bg-clip-text italic text-transparent">
                 in one place.
               </span>
             </h1>
@@ -374,7 +370,7 @@ export function LandingPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="grid size-8 place-items-center rounded-lg bg-brand-500/20 text-brand-200">
-                        <Sparkles className="size-4" />
+                        <Bot className="size-4" />
                       </span>
                       <div>
                         <p className="text-xs font-semibold text-white">
@@ -495,8 +491,8 @@ export function LandingPage() {
           <div className="absolute -left-24 top-0 size-72 rounded-full bg-brand-600/30 blur-3xl" />
           <div className="absolute -right-24 bottom-0 size-72 rounded-full bg-campus-500/20 blur-3xl" />
           <div className="relative">
-            <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-white/10 text-brand-200">
-              <Sparkles className="size-5" />
+            <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-white/10 text-amber-200">
+              <GraduationCap className="size-5" />
             </span>
             <h2 className="mx-auto mt-6 max-w-2xl text-3xl font-bold tracking-tight text-white sm:text-5xl">
               Your campus is already connected. Make it useful.
