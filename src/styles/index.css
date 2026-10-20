@@ -31,6 +31,34 @@
   --color-campus-800: #41422f;
   --color-campus-900: #343723;
 
+  /* Success / positive — a warm fern green (overrides emerald/green/teal so
+     success states read "green" but stay within the luxury scheme). */
+  --color-emerald-50: #f0f4ea;
+  --color-emerald-100: #dde7cd;
+  --color-emerald-200: #c2d2a5;
+  --color-emerald-300: #a1b67a;
+  --color-emerald-400: #829a56;
+  --color-emerald-500: #67803f;
+  --color-emerald-600: #51682f;
+  --color-emerald-700: #405227;
+  --color-emerald-800: #344121;
+  --color-emerald-900: #2b351d;
+  --color-green-50: #f0f4ea;
+  --color-green-100: #dde7cd;
+  --color-green-200: #c2d2a5;
+  --color-green-300: #a1b67a;
+  --color-green-400: #829a56;
+  --color-green-500: #67803f;
+  --color-green-600: #51682f;
+  --color-green-700: #405227;
+  --color-green-800: #344121;
+  --color-green-900: #2b351d;
+  --color-teal-50: #f0f4ea;
+  --color-teal-100: #dde7cd;
+  --color-teal-500: #67803f;
+  --color-teal-600: #51682f;
+  --color-teal-700: #405227;
+
   /* Gold — accents / highlights (maps onto `amber`) */
   --color-amber-50: #faf5ea;
   --color-amber-100: #f2e7cd;
