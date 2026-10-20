@@ -306,7 +306,7 @@ export function AiChatWorkspace() {
         ) : activeSession ? (
           <>
             <header className="flex items-center gap-3 border-b border-slate-200 bg-white p-4">
-              <span className="grid size-10 place-items-center rounded-xl bg-violet-100 text-violet-700">
+              <span className="grid size-10 place-items-center rounded-xl bg-brand-100 text-brand-700">
                 <Bot className="size-5" />
               </span>
               <div className="min-w-0">
