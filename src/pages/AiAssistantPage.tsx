@@ -35,7 +35,7 @@ export function AiAssistantPage() {
         title="AI Study Assistant"
       />
 
-      <Card className="overflow-hidden border-0 bg-gradient-to-r from-slate-950 via-brand-950 to-violet-950 text-white shadow-xl">
+      <Card className="overflow-hidden border-0 bg-gradient-to-r from-slate-950 via-brand-900 to-campus-900 text-white shadow-xl">
         <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center">
           <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-brand-200 ring-1 ring-white/10">
             <Bot className="size-7" />
