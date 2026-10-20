@@ -24,7 +24,7 @@ export function ModeratorStatusCard({
             <ShieldX className="size-6" />
           </span>
           <div>
-            <h2 className="font-semibold text-amber-950">
+            <h2 className="font-semibold text-amber-900">
               This area is available to admins only.
             </h2>
             <p className="mt-1 text-sm leading-6 text-amber-800">
@@ -38,7 +38,7 @@ export function ModeratorStatusCard({
   }
 
   return (
-    <Card className="overflow-hidden border-0 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-950 text-white shadow-xl">
+    <Card className="overflow-hidden border-0 bg-gradient-to-r from-slate-950 via-slate-900 to-brand-900 text-white shadow-xl">
       <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center">
         <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-brand-200 ring-1 ring-white/10">
           <ShieldCheck className="size-7" />
