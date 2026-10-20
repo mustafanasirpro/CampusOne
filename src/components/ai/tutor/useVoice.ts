@@ -73,6 +73,8 @@ export interface UseVoice {
   setRate: (rate: number) => void;
   /** Set recognition + spoken locale (e.g. "ur-PK" for Urdu). */
   setSpeechLang: (sttLang: string, ttsLang: string) => void;
+  /** Whether a TTS voice exists for a language prefix (e.g. "ur"). */
+  hasVoiceFor: (langPrefix: string) => boolean;
   startListening: (onResult: (transcript: string) => void) => void;
   stopListening: () => void;
   // --- Live voice conversation (hands-free) ---
@@ -172,7 +174,7 @@ export function useVoice(): UseVoice {
       try {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
-        // Use a voice matching the teaching language (Urdu for urdu-voice mode),
+        // Use a voice matching the teaching language (Urdu for Urdu mode),
         // falling back to the preferred English voice.
         const ttsLang = ttsLangRef.current;
         const langVoice =
@@ -221,6 +223,10 @@ export function useVoice(): UseVoice {
   const setSpeechLang = useCallback((sttLang: string, ttsLang: string) => {
     sttLangRef.current = sttLang;
     ttsLangRef.current = ttsLang;
+  }, []);
+
+  const hasVoiceFor = useCallback((langPrefix: string) => {
+    return voiceForLang(langPrefix) != null;
   }, []);
 
   const stopListening = useCallback(() => {
@@ -382,6 +388,7 @@ export function useVoice(): UseVoice {
     cancelSpeech,
     setRate,
     setSpeechLang,
+    hasVoiceFor,
     startListening,
     stopListening,
     conversing,
