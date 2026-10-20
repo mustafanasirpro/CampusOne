@@ -1,4 +1,4 @@
-import { Check, RefreshCw, Sparkles, X } from "lucide-react";
+import { Check, RefreshCw, ScanSearch, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { ApiError } from "@/api/apiClient";
@@ -102,7 +102,7 @@ export function AuraResolutionPanel({ termId }: { termId: string }) {
                     <div className="flex flex-wrap gap-2">
                       {resolutionCase.status === "OPEN" ? (
                         <Button loading={pending === `analyze-${resolutionCase.id}`} onClick={() => void act(`analyze-${resolutionCase.id}`, () => analyzeAuraResolutionCase(resolutionCase.id))}>
-                          <Sparkles className="size-4" /> Analyze
+                          <ScanSearch className="size-4" /> Analyze
                         </Button>
                       ) : null}
                       {resolutionCase.status === "SUGGESTED" && safe ? (
