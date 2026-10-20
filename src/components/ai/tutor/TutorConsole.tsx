@@ -68,20 +68,26 @@ const LANGUAGES: {
   stt: string;
   tts: string;
 }[] = [
-  { value: "english", label: "English", hint: "Speak & write in English", stt: "en-US", tts: "en-US" },
   {
-    value: "roman-urdu",
-    label: "Roman Urdu",
-    hint: "Speak & write in Roman Urdu",
-    stt: "ur-PK",
+    value: "english",
+    label: "English",
+    hint: "Speaks English, writes English",
+    stt: "en-US",
     tts: "en-US",
   },
   {
-    value: "urdu-voice",
-    label: "Urdu voice",
-    hint: "Speaks Urdu, writes Roman Urdu + English terms",
+    value: "urdu",
+    label: "Urdu",
+    hint: "Speaks Urdu, writes Roman Urdu (needs an Urdu voice — e.g. Edge)",
     stt: "ur-PK",
     tts: "ur-PK",
+  },
+  {
+    value: "roman-urdu",
+    label: "Roman Urdu",
+    hint: "Speaks Roman Urdu, writes English — works on every device",
+    stt: "ur-PK",
+    tts: "en-US",
   },
 ];
 
@@ -231,10 +237,13 @@ export function TutorConsole() {
     voice.setRate(value); // keep spoken pace in sync with the UI speed
   };
 
+  const [urduVoiceMissing, setUrduVoiceMissing] = useState(false);
   const handleLanguage = (value: LessonLanguage) => {
     setLanguage(value);
     const opt = LANGUAGES.find((l) => l.value === value) ?? LANGUAGES[0];
     voice.setSpeechLang(opt.stt, opt.tts); // mic + spoken voice follow the language
+    // "Urdu" (spoken Urdu) needs an Urdu TTS voice; warn if this device has none.
+    setUrduVoiceMissing(value === "urdu" && !voice.hasVoiceFor("ur"));
   };
 
   const handleSaveNotes = () => {
@@ -515,6 +524,7 @@ export function TutorConsole() {
             onManageKeys={() => setSetupOpen(true)}
             language={language}
             onLanguageChange={handleLanguage}
+            urduVoiceMissing={urduVoiceMissing}
           />
           <LearningJourney
             disabled={!modelReady}
@@ -696,6 +706,7 @@ function StartPanel({
   onManageKeys,
   language,
   onLanguageChange,
+  urduVoiceMissing,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -712,6 +723,7 @@ function StartPanel({
   onManageKeys: () => void;
   language: LessonLanguage;
   onLanguageChange: (l: LessonLanguage) => void;
+  urduVoiceMissing: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [startMode, setStartMode] = useState<"topic" | "document">("topic");
@@ -894,6 +906,19 @@ function StartPanel({
           </button>
         ))}
       </div>
+
+      {urduVoiceMissing ? (
+        <p className="flex items-start gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+          <span>
+            This browser has no Urdu voice, so <strong>Urdu</strong> mode won&apos;t
+            speak aloud here. Open the tutor in <strong>Microsoft Edge</strong> (it
+            has a free built-in Urdu voice on every device), or use{" "}
+            <strong>Roman Urdu</strong> — it speaks on any device (and writes English
+            on the board).
+          </span>
+        </p>
+      ) : null}
     </div>
   );
 }
