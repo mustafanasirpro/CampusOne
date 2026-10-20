@@ -18,7 +18,7 @@ export function AiMessageBubble({ message }: { message: AiMessage }) {
           "grid size-9 shrink-0 place-items-center rounded-xl",
           user
             ? "bg-brand-600 text-white"
-            : "bg-violet-100 text-violet-700",
+            : "bg-brand-100 text-brand-700",
         )}
       >
         {user ? <UserRound className="size-4" /> : <Bot className="size-4" />}
