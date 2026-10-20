@@ -78,7 +78,7 @@ export function AuthPageShell({
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-600">
             {eyebrow}
           </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+          <h1 className="font-display mt-3 text-[2.1rem] font-semibold tracking-[-0.01em] text-slate-900 sm:text-[2.6rem]">
             {title}
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-500 sm:text-base">
