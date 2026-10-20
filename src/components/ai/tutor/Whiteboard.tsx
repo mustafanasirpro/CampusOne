@@ -1,3 +1,4 @@
+import { ImageOff, Pin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/utils/cn";
@@ -150,8 +151,8 @@ function BoardBlock({ item }: { item: BoardItem }) {
 
     case "note":
       return (
-        <div className="tutor-fade-in flex gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 font-handwritten text-base text-amber-900">
-          <span aria-hidden>📌</span>
+        <div className="tutor-fade-in flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 font-handwritten text-base text-amber-900">
+          <Pin className="mt-1 size-4 shrink-0 -rotate-45 text-amber-600" />
           <span>{item.text}</span>
         </div>
       );
@@ -361,7 +362,7 @@ function BoardImage({
   if (!current) {
     return (
       <div className="tutor-fade-in my-1 flex items-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-        <span aria-hidden>🖼️</span>
+        <ImageOff className="size-4 shrink-0 text-slate-400" />
         <span>{caption || query}</span>
       </div>
     );
