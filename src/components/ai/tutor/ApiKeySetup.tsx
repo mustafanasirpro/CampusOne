@@ -1,10 +1,10 @@
 import {
   ArrowRight,
   Check,
+  GraduationCap,
   KeyRound,
   Lock,
   Plus,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
@@ -175,7 +175,7 @@ export function ApiKeySetup({ onDone }: { onDone: () => void }) {
           Keys are saved only in this browser (localStorage). Clear them anytime.
         </p>
         <Button onClick={onDone} disabled={!groqReady}>
-          <Sparkles className="size-4" />
+          <GraduationCap className="size-4" />
           {groqReady ? "Start learning" : "Add your Groq key to start"}
         </Button>
       </div>
