@@ -1,32 +1,88 @@
 @import "tailwindcss";
 
+/* ──────────────────────────────────────────────────────────────────────────
+   CampusOne brand palette — a warm, editorial luxury scheme:
+   maroon (Coral), olive→juniper green, gold, on warm ivory neutrals.
+   We redefine `brand`, `campus`, `amber`, AND the neutral `slate`/`gray`
+   scales so the whole product inherits the warm, unified theme.
+   ────────────────────────────────────────────────────────────────────────── */
 @theme {
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-200: #c7d2fe;
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
-  --color-brand-800: #3730a3;
-  --color-brand-900: #312e81;
-  --color-campus-50: #ecfdf5;
-  --color-campus-500: #10b981;
-  --color-campus-600: #059669;
+  /* Maroon — primary (Coral #7D2826) */
+  --color-brand-50: #faf2f1;
+  --color-brand-100: #f3e0de;
+  --color-brand-200: #e6bdb9;
+  --color-brand-300: #d2928c;
+  --color-brand-400: #b85f58;
+  --color-brand-500: #9c3f39;
+  --color-brand-600: #7d2826;
+  --color-brand-700: #682320;
+  --color-brand-800: #541d1b;
+  --color-brand-900: #3f1716;
+
+  /* Green — secondary (Leaf #898861 → Juniper #343723) */
+  --color-campus-50: #f4f4ec;
+  --color-campus-100: #e8e8d8;
+  --color-campus-200: #d2d1b9;
+  --color-campus-300: #b6b592;
+  --color-campus-400: #9d9c75;
+  --color-campus-500: #898861;
+  --color-campus-600: #6c6b49;
+  --color-campus-700: #53533a;
+  --color-campus-800: #41422f;
+  --color-campus-900: #343723;
+
+  /* Gold — accents / highlights (maps onto `amber`) */
+  --color-amber-50: #faf5ea;
+  --color-amber-100: #f2e7cd;
+  --color-amber-200: #e6d0a0;
+  --color-amber-300: #d4b26f;
+  --color-amber-400: #c2994c;
+  --color-amber-500: #a97f37;
+  --color-amber-600: #8a662f;
+  --color-amber-700: #6d5028;
+  --color-amber-800: #574021;
+  --color-amber-900: #47351e;
+
+  /* Warm ivory/greige neutrals (override the cool default `slate`) */
+  --color-slate-50: #faf8f1;
+  --color-slate-100: #f3efe4;
+  --color-slate-200: #e7e1d1;
+  --color-slate-300: #d5cdb8;
+  --color-slate-400: #b2aa92;
+  --color-slate-500: #89816b;
+  --color-slate-600: #655f4e;
+  --color-slate-700: #4c4738;
+  --color-slate-800: #353228;
+  --color-slate-900: #221f18;
+  --color-slate-950: #15130d;
+
+  /* Keep `gray` in step with the warm neutrals for stray usages. */
+  --color-gray-50: #faf8f1;
+  --color-gray-100: #f3efe4;
+  --color-gray-200: #e7e1d1;
+  --color-gray-300: #d5cdb8;
+  --color-gray-400: #b2aa92;
+  --color-gray-500: #89816b;
+  --color-gray-600: #655f4e;
+  --color-gray-700: #4c4738;
+  --color-gray-800: #353228;
+  --color-gray-900: #221f18;
+
   --font-sans:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
+  --font-display:
+    "Cormorant Garamond", "Hoefler Text", Garamond, "Times New Roman", serif;
   --font-handwritten:
     "Segoe Print", "Bradley Hand", "Comic Sans MS", "Comic Neue", "Chalkboard SE",
     ui-rounded, var(--font-sans);
   --shadow-card:
-    0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px rgb(15 23 42 / 0.06);
+    0 1px 2px rgb(52 55 35 / 0.05), 0 10px 30px rgb(52 55 35 / 0.08);
 }
 
 :root {
-  color: #0f172a;
-  background: #f8fafc;
+  color: #2b2820;
+  background: #f2ede0;
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -69,18 +125,24 @@ button:disabled,
 }
 
 ::selection {
-  color: #312e81;
-  background: #e0e7ff;
+  color: #3f1716;
+  background: #e6bdb9;
 }
 
 * {
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: #d5cdb8 transparent;
   scrollbar-width: thin;
 }
 
 :focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #7d2826;
   outline-offset: 2px;
+}
+
+/* Serif display face for the logo and major headings. */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.005em;
 }
 
 .reveal {
