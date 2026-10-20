@@ -109,16 +109,16 @@ function ContentBlock({ block }: { block: AIContentBlock }) {
   }
 
   return (
-    <div className="flex gap-3 rounded-2xl border border-violet-100 bg-violet-50/70 p-4">
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700">
+    <div className="flex gap-3 rounded-2xl border border-brand-100 bg-brand-50/70 p-4">
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-brand-100 text-brand-700">
         <Sigma className="size-4" />
       </span>
       <div>
-        <p className="font-mono text-sm font-semibold text-violet-950">
+        <p className="font-mono text-sm font-semibold text-brand-900">
           {block.expression}
         </p>
         {block.explanation ? (
-          <p className="mt-1 text-xs leading-5 text-violet-700">
+          <p className="mt-1 text-xs leading-5 text-brand-700">
             {block.explanation}
           </p>
         ) : null}
@@ -142,7 +142,7 @@ export function AIResponseCard({
 }: AIResponseCardProps) {
   return (
     <div className="flex gap-3">
-      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-600 to-violet-600 text-white shadow-md shadow-brand-600/15">
+      <span className="grid size-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-600 to-campus-700 text-white shadow-md shadow-brand-600/15">
         <Bot className="size-4" />
       </span>
       <div className="min-w-0 max-w-[calc(100%-2.75rem)] flex-1">
