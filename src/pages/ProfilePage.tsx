@@ -8,7 +8,6 @@ import {
   MessageSquareText,
   Pencil,
   Share2,
-  Sparkles,
   Trophy,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -158,7 +157,7 @@ export function ProfilePage() {
       },
       {
         description: "Calculated from earned XP",
-        icon: Sparkles,
+        icon: Award,
         label: "Level",
         value: gamification?.level ?? 1,
       },
@@ -338,7 +337,7 @@ export function ProfilePage() {
           ) : null}
           <div className="relative flex h-full items-start justify-between p-5 sm:p-7">
             <Badge className="gap-1.5 bg-white/10 text-brand-100 ring-white/10">
-              <Sparkles className="size-3.5" />
+              <Award className="size-3.5" />
               CampusOne student profile
             </Badge>
             <Badge className="bg-white/10 text-white ring-white/10">
@@ -526,7 +525,7 @@ export function ProfilePage() {
             <EmptyState
               className="mt-4 min-h-52"
               description="Your XP transactions will appear here after eligible contributions."
-              icon={<Sparkles className="size-6" />}
+              icon={<Award className="size-6" />}
               title="No XP activity yet"
             />
           )}
