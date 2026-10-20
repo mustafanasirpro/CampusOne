@@ -50,7 +50,7 @@ const workspaceCards = [
     icon: ShoppingBag,
     label: "Marketplace",
     path: paths.marketplace,
-    tone: "bg-violet-50 text-violet-700",
+    tone: "bg-brand-50 text-brand-700",
   },
   {
     description: "Report lost or found items and review safe matches.",
@@ -71,7 +71,7 @@ const workspaceCards = [
     icon: BriefcaseBusiness,
     label: "Internships",
     path: paths.internships,
-    tone: "bg-sky-50 text-sky-700",
+    tone: "bg-campus-50 text-campus-700",
   },
   {
     description: "Review replies, reminders, and important account updates.",
@@ -99,7 +99,7 @@ const workspaceCards = [
     icon: Bot,
     label: "AI Assistant",
     path: paths.assistant,
-    tone: "bg-fuchsia-50 text-fuchsia-700",
+    tone: "bg-amber-50 text-amber-700",
   },
   {
     description: "Submit reports and access moderation tools when authorized.",
