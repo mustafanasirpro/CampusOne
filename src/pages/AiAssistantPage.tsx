@@ -1,4 +1,4 @@
-import { ArrowRight, Bot, GraduationCap, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Bot, GraduationCap, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -41,10 +41,7 @@ export function AiAssistantPage() {
             <Bot className="size-7" />
           </span>
           <div className="flex-1">
-            <h2 className="flex items-center gap-2 text-lg font-semibold">
-              Local study intelligence
-              <Sparkles className="size-4 text-amber-300" />
-            </h2>
+            <h2 className="text-lg font-semibold">Local study intelligence</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
               Every response is created inside your secure CampusOne workspace,
               so you can study with confidence.
