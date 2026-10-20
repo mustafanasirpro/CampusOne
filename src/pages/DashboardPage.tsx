@@ -11,7 +11,6 @@ import {
   Search,
   ShieldCheck,
   ShoppingBag,
-  Sparkles,
   Trophy,
   UserRound,
 } from "lucide-react";
@@ -239,7 +238,7 @@ export function DashboardPage() {
               className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-5 text-sm font-semibold text-white transition hover:bg-white/15"
               to={paths.assistant}
             >
-              <Sparkles className="size-4" />
+              <Bot className="size-4" />
               Open AI Assistant
             </Link>
           </div>
