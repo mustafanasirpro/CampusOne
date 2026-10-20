@@ -1,4 +1,4 @@
-import { Flame, Sparkles, Trophy } from "lucide-react";
+import { Award, Flame, Trophy } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Avatar, Card, CardContent } from "@/components/common";
@@ -31,7 +31,7 @@ export function GamificationProfileCard({
         <div className="grid grid-cols-3 gap-3">
           <Stat icon={<Flame className="size-5" />} label="Current streak" value={profile.currentStreak} />
           <Stat icon={<Trophy className="size-5" />} label="Longest streak" value={profile.longestStreak} />
-          <Stat icon={<Sparkles className="size-5" />} label="Badges" value={profile.badges.length} />
+          <Stat icon={<Award className="size-5" />} label="Badges" value={profile.badges.length} />
         </div>
       </CardContent>
     </Card>
