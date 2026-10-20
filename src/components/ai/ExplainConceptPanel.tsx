@@ -1,4 +1,4 @@
-import { BrainCircuit, Eraser, WandSparkles } from "lucide-react";
+import { BrainCircuit, Eraser, Lightbulb } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { ApiError } from "@/api/apiClient";
@@ -76,7 +76,7 @@ export function ExplainConceptPanel() {
                 loading={isLoading}
                 type="submit"
               >
-                <WandSparkles className="size-4" />
+                <Lightbulb className="size-4" />
                 Explain concept
               </Button>
               <Button
