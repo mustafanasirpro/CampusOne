@@ -1,4 +1,4 @@
-import { WandSparkles } from "lucide-react";
+import { PenLine } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { ApiError } from "@/api/apiClient";
@@ -142,7 +142,7 @@ export function TextGeneratorPanel({ kind }: { kind: GeneratorKind }) {
               loading={isLoading}
               type="submit"
             >
-              <WandSparkles className="size-4" />
+              <PenLine className="size-4" />
               {config.button}
             </Button>
           </form>
