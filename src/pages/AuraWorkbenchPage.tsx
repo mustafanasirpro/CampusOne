@@ -3,9 +3,9 @@ import {
   AlertTriangle,
   CalendarClock,
   CheckCircle2,
+  Layers,
   Play,
   RefreshCw,
-  Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -701,7 +701,7 @@ export function AuraWorkbenchPage() {
       {selectedTermId ? <AuraImportPanel termId={selectedTermId} /> : null}
 
       <section className="grid gap-4 xl:grid-cols-4">
-        <MetricCard icon={Sparkles} label="Versions" value={metrics?.versions ?? 0} />
+        <MetricCard icon={Layers} label="Versions" value={metrics?.versions ?? 0} />
         <MetricCard
           icon={CheckCircle2}
           label="Published"
@@ -777,7 +777,7 @@ export function AuraWorkbenchPage() {
             ) : (
               <EmptyState
                 description="Generate a timetable to create the first version."
-                icon={<Sparkles className="size-6" />}
+                icon={<Layers className="size-6" />}
                 title="No timetable versions"
               />
             )}
