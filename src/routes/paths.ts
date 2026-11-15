@@ -46,6 +46,8 @@ export const paths = {
   tutorStandalone: "/tutor",
   timetable: "/timetable",
   instructorTimetable: "/instructor-timetable",
+  classSchedule: "/class-schedule",
+  classSchedulePublic: "/schedule",
   admin: "/admin",
   adminAura: "/admin/aura",
   settings: "/settings",

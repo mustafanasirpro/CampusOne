@@ -195,6 +195,11 @@ const InstructorTimetablePage = lazy(async () => {
   return { default: module.InstructorTimetablePage };
 });
 
+const ClassTimetablePage = lazy(async () => {
+  const module = await import("@/pages/ClassTimetablePage");
+  return { default: module.ClassTimetablePage };
+});
+
 const ForgotPasswordPage = lazy(async () => {
   const module = await import("@/pages/ForgotPasswordPage");
   return { default: module.ForgotPasswordPage };
@@ -221,6 +226,18 @@ export const router = createBrowserRouter([
       <div className="min-h-screen bg-slate-50">
         <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
           {lazyRoute(<TutorPage />, paths.tutorStandalone)}
+        </div>
+      </div>
+    ),
+  },
+  {
+    // Login-free class schedule — students can check their section without an
+    // account; the data is served statically (admin-published PDF import).
+    path: paths.classSchedulePublic,
+    element: (
+      <div className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+          {lazyRoute(<ClassTimetablePage />, paths.classSchedulePublic)}
         </div>
       </div>
     ),
@@ -448,6 +465,10 @@ export const router = createBrowserRouter([
               <InstructorTimetablePage />,
               paths.instructorTimetable,
             ),
+          },
+          {
+            path: paths.classSchedule,
+            element: lazyRoute(<ClassTimetablePage />, paths.classSchedule),
           },
           {
             path: paths.settings,
