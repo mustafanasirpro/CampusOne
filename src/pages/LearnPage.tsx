@@ -33,6 +33,7 @@ import {
 import { feedbackFor, gradeQuiz } from "@/features/learn/quiz";
 import { getQuiz } from "@/features/learn/quizzes";
 import { listenForConsole, runInIframe } from "@/features/learn/sandboxRunner";
+import { getSqlChallenges } from "@/features/learn/sqlChallenges";
 import { tables as sqlTables } from "@/features/learn/sqlData";
 import { runSql } from "@/features/learn/sqlEngine";
 import { cn } from "@/utils/cn";
@@ -88,6 +89,13 @@ interface ChallengeResult {
   error?: string;
   results: Array<{ name: string; pass: boolean; expected: unknown; actual: unknown; errored: boolean }>;
 }
+interface SqlChallenge {
+  id: string;
+  title: string;
+  prompt: string;
+  starter: string;
+  solution: string;
+}
 
 const TRACKS = tracks as Track[];
 type Pane = "html" | "css" | "js";
@@ -117,9 +125,12 @@ export function LearnPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const quiz = getQuiz(trackId) as Quiz | null;
-  const trackChallenges = getChallenges(trackId) as Challenge[];
-  const stats = trackStats(progress, trackId, track.lessons.length, trackChallenges.length);
   const isSql = track.kind === "sql";
+  const trackChallenges = getChallenges(trackId) as Challenge[];
+  const sqlChallenges = (isSql ? getSqlChallenges() : []) as SqlChallenge[];
+  const challengeCount = isSql ? sqlChallenges.length : trackChallenges.length;
+  const hasChallenges = challengeCount > 0;
+  const stats = trackStats(progress, trackId, track.lessons.length, challengeCount);
 
   // Switching lesson/track loads that example into the editor (event-driven so
   // we never reset state from inside an effect).
@@ -244,7 +255,7 @@ export function LearnPage() {
               Take the quiz
             </button>
           ) : null}
-          {trackChallenges.length ? (
+          {hasChallenges ? (
             <button
               className={cn(
                 "flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold transition",
@@ -256,7 +267,7 @@ export function LearnPage() {
               type="button"
             >
               <Target className="size-4 shrink-0" />
-              Code challenges
+              {isSql ? "Query challenges" : "Code challenges"}
             </button>
           ) : null}
         </aside>
@@ -268,6 +279,13 @@ export function LearnPage() {
               key={trackId}
               onComplete={() => setProgress(markQuiz(trackId))}
               quiz={quiz}
+            />
+          ) : mode === "challenge" && isSql && sqlChallenges.length ? (
+            <SqlChallengePanel
+              challenges={sqlChallenges}
+              isDone={(id) => isChallengeDone(progress, trackId, id)}
+              key={trackId}
+              onSolved={(id) => setProgress(markChallenge(trackId, id))}
             />
           ) : mode === "challenge" && trackChallenges.length ? (
             <ChallengePanel
@@ -779,5 +797,114 @@ function ResultTable({ columns, rows }: { columns: string[]; rows: unknown[][] }
         </tbody>
       </table>
     </div>
+  );
+}
+
+function sameResult(
+  a: { columns?: string[]; rows?: unknown[][] },
+  b: { columns?: string[]; rows?: unknown[][] },
+) {
+  const norm = (r: { rows?: unknown[][] }) =>
+    JSON.stringify([...(r.rows ?? [])].map((row) => JSON.stringify(row)).sort());
+  return (a.columns?.length ?? 0) === (b.columns?.length ?? 0) && norm(a) === norm(b);
+}
+
+function SqlChallengePanel({
+  challenges,
+  isDone,
+  onSolved,
+}: {
+  challenges: SqlChallenge[];
+  isDone: (id: string) => boolean;
+  onSolved: (id: string) => void;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div>
+        <p className="text-sm font-medium text-brand-600">Write a query to get the data</p>
+        <h2 className="font-display text-2xl font-semibold text-slate-900">Query challenges</h2>
+      </div>
+      {challenges.map((challenge) => (
+        <SqlChallengeCard
+          challenge={challenge}
+          done={isDone(challenge.id)}
+          key={challenge.id}
+          onSolved={() => onSolved(challenge.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SqlChallengeCard({
+  challenge,
+  done,
+  onSolved,
+}: {
+  challenge: SqlChallenge;
+  done: boolean;
+  onSolved: () => void;
+}) {
+  const [query, setQuery] = useState(challenge.starter);
+  const [state, setState] = useState<{
+    columns?: string[];
+    rows?: unknown[][];
+    error?: string;
+    passed?: boolean;
+  } | null>(null);
+
+  const check = () => {
+    const got = runSql(query, sqlTables);
+    if (got.error) {
+      setState({ error: got.error });
+      return;
+    }
+    const expected = runSql(challenge.solution, sqlTables);
+    const passed = sameResult(got, expected);
+    setState({ columns: got.columns, rows: got.rows, passed });
+    if (passed) onSolved();
+  };
+
+  return (
+    <Card>
+      <CardContent className="grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="flex items-center gap-2 font-semibold text-slate-900">
+            <Target className="size-4 text-brand-600" />
+            {challenge.title}
+            {done ? <Badge variant="success">Solved</Badge> : null}
+          </p>
+          <Button onClick={check}>
+            <Play className="size-4" /> Run &amp; check
+          </Button>
+        </div>
+        <p className="text-sm text-slate-600">{challenge.prompt}</p>
+        <textarea
+          aria-label={`${challenge.title} query`}
+          className="h-24 w-full resize-none rounded-xl bg-slate-900 p-4 font-mono text-sm text-slate-100 outline-none"
+          onChange={(event) => setQuery(event.target.value)}
+          spellCheck={false}
+          value={query}
+        />
+        {state?.error ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            {state.error}
+          </div>
+        ) : state ? (
+          <div className="grid gap-2">
+            <ResultTable columns={state.columns ?? []} rows={state.rows ?? []} />
+            {state.passed ? (
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
+                <CheckCircle2 className="size-4" /> Correct — challenge solved!
+              </p>
+            ) : (
+              <p className="flex items-center gap-1.5 text-sm font-medium text-rose-600">
+                <XCircle className="size-4" /> Not quite — that result doesn&apos;t match. Keep trying.
+              </p>
+            )}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
