@@ -200,6 +200,11 @@ const ClassTimetablePage = lazy(async () => {
   return { default: module.ClassTimetablePage };
 });
 
+const LearnPage = lazy(async () => {
+  const module = await import("@/pages/LearnPage");
+  return { default: module.LearnPage };
+});
+
 const ForgotPasswordPage = lazy(async () => {
   const module = await import("@/pages/ForgotPasswordPage");
   return { default: module.ForgotPasswordPage };
@@ -238,6 +243,17 @@ export const router = createBrowserRouter([
       <div className="min-h-screen bg-slate-50">
         <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
           {lazyRoute(<ClassTimetablePage />, paths.classSchedulePublic)}
+        </div>
+      </div>
+    ),
+  },
+  {
+    // Login-free Learn playground — like W3Schools, no account needed to learn.
+    path: paths.learnPublic,
+    element: (
+      <div className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+          {lazyRoute(<LearnPage />, paths.learnPublic)}
         </div>
       </div>
     ),
@@ -469,6 +485,10 @@ export const router = createBrowserRouter([
           {
             path: paths.classSchedule,
             element: lazyRoute(<ClassTimetablePage />, paths.classSchedule),
+          },
+          {
+            path: paths.learn,
+            element: lazyRoute(<LearnPage />, paths.learn),
           },
           {
             path: paths.settings,

@@ -48,6 +48,8 @@ export const paths = {
   instructorTimetable: "/instructor-timetable",
   classSchedule: "/class-schedule",
   classSchedulePublic: "/schedule",
+  learn: "/learn",
+  learnPublic: "/learn-lab",
   admin: "/admin",
   adminAura: "/admin/aura",
   settings: "/settings",

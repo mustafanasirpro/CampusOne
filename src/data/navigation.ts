@@ -1,6 +1,7 @@
 import {
   Bot,
   Bell,
+  BookOpen,
   BriefcaseBusiness,
   CalendarDays,
   CalendarClock,
@@ -39,6 +40,7 @@ export const primaryNavigation: NavigationItem[] = [
   { label: "Events", path: paths.events, icon: CalendarDays },
   { label: "My Timetable", path: paths.timetable, icon: CalendarClock },
   { label: "Class Schedule", path: paths.classSchedule, icon: CalendarRange },
+  { label: "Learn", path: paths.learn, icon: BookOpen },
   { label: "Notifications", path: paths.notifications, icon: Bell },
   { label: "Search", path: paths.search, icon: Search },
   { label: "Leaderboard", path: paths.leaderboard, icon: Trophy },
