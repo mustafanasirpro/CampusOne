@@ -1,10 +1,21 @@
-import { BookOpen, Code2, Play, RotateCcw, Terminal } from "lucide-react";
+import {
+  BookOpen,
+  CheckCircle2,
+  ClipboardList,
+  Code2,
+  Play,
+  RotateCcw,
+  Terminal,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge, Button, Card, CardContent, PageHeader } from "@/components/common";
 // Core logic lives in plain JavaScript modules (see src/features/learn/*.js).
 import { tracks } from "@/features/learn/curriculum";
 import { handleEditorKeydown } from "@/features/learn/editor";
+import { feedbackFor, gradeQuiz } from "@/features/learn/quiz";
+import { getQuiz } from "@/features/learn/quizzes";
 import { listenForConsole, runInIframe } from "@/features/learn/sandboxRunner";
 import { cn } from "@/utils/cn";
 import { useDocumentTitle } from "@/utils/useDocumentTitle";
@@ -32,9 +43,20 @@ interface Track {
   tagline: string;
   lessons: Lesson[];
 }
+interface QuizQuestion {
+  q: string;
+  options: string[];
+  answer: number;
+  explain: string;
+}
+interface Quiz {
+  title: string;
+  questions: QuizQuestion[];
+}
 
 const TRACKS = tracks as Track[];
 type Pane = "html" | "css" | "js";
+type Mode = "lesson" | "quiz";
 interface ConsoleEntry {
   level: string;
   text: string;
@@ -54,11 +76,15 @@ export function LearnPage() {
   const [code, setCode] = useState<Example>(lesson.example);
   const [pane, setPane] = useState<Pane>("html");
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
+  const [mode, setMode] = useState<Mode>("lesson");
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const quiz = getQuiz(trackId) as Quiz | null;
 
   // Switching lesson/track loads that example into the editor (event-driven so
   // we never reset state from inside an effect).
   const openLesson = (nextLesson: Lesson) => {
+    setMode("lesson");
     setLessonId(nextLesson.id);
     setCode(nextLesson.example);
     setPane("html");
@@ -126,7 +152,7 @@ export function LearnPage() {
             <button
               className={cn(
                 "flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium transition",
-                l.id === lessonId
+                mode === "lesson" && l.id === lessonId
                   ? "bg-brand-50 text-brand-700"
                   : "text-slate-600 hover:bg-slate-50",
               )}
@@ -138,10 +164,29 @@ export function LearnPage() {
               {l.title}
             </button>
           ))}
+          {quiz ? (
+            <button
+              className={cn(
+                "mt-1 flex items-center gap-2 rounded-xl border-t border-slate-100 px-3 py-2 text-left text-sm font-semibold transition",
+                mode === "quiz"
+                  ? "bg-brand-50 text-brand-700"
+                  : "text-slate-600 hover:bg-slate-50",
+              )}
+              onClick={() => setMode("quiz")}
+              type="button"
+            >
+              <ClipboardList className="size-4 shrink-0" />
+              Take the quiz
+            </button>
+          ) : null}
         </aside>
 
-        {/* Lesson content + editor */}
+        {/* Lesson content + editor, or the quiz */}
         <div className="grid gap-5">
+          {mode === "quiz" && quiz ? (
+            <QuizPanel key={trackId} quiz={quiz} />
+          ) : (
+          <>
           <div>
             <p className="text-sm font-medium text-brand-600">{track.tagline}</p>
             <h2 className="font-display text-2xl font-semibold text-slate-900">{lesson.title}</h2>
@@ -276,8 +321,132 @@ export function LearnPage() {
             <Badge variant="neutral">Powered by JavaScript</Badge>
             <span>The editor engine lives in src/features/learn/*.js</span>
           </div>
+          </>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function QuizPanel({ quiz }: { quiz: Quiz }) {
+  const [answers, setAnswers] = useState<Array<number | null>>(
+    () => quiz.questions.map(() => null),
+  );
+  const [submitted, setSubmitted] = useState(false);
+
+  const result = useMemo(
+    () => (submitted ? gradeQuiz(quiz.questions, answers) : null),
+    [submitted, quiz.questions, answers],
+  );
+  const answeredCount = answers.filter((a) => a !== null).length;
+
+  const choose = (questionIndex: number, optionIndex: number) => {
+    if (submitted) return;
+    setAnswers((prev) => prev.map((value, i) => (i === questionIndex ? optionIndex : value)));
+  };
+  const retake = () => {
+    setAnswers(quiz.questions.map(() => null));
+    setSubmitted(false);
+  };
+
+  return (
+    <div className="grid gap-4">
+      <div>
+        <p className="text-sm font-medium text-brand-600">Check your understanding</p>
+        <h2 className="font-display text-2xl font-semibold text-slate-900">{quiz.title}</h2>
+      </div>
+
+      {result ? (
+        <Card className="border-brand-200 bg-brand-50/50">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-display text-3xl font-semibold text-brand-700">
+                {result.score} / {result.total}
+              </p>
+              <p className="text-sm text-slate-600">
+                {result.percent}% · {feedbackFor(result.percent)}
+              </p>
+            </div>
+            <Button onClick={retake} variant="outline">
+              <RotateCcw className="size-4" /> Retake quiz
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <div className="grid gap-3">
+        {quiz.questions.map((question, qIndex) => {
+          const chosen = answers[qIndex];
+          const correctIndex = question.answer;
+          return (
+            <Card key={qIndex}>
+              <CardContent className="grid gap-3">
+                <p className="font-semibold text-slate-900">
+                  {qIndex + 1}. {question.q}
+                </p>
+                <div className="grid gap-2">
+                  {question.options.map((option, oIndex) => {
+                    const isChosen = chosen === oIndex;
+                    const showCorrect = submitted && oIndex === correctIndex;
+                    const showWrong = submitted && isChosen && oIndex !== correctIndex;
+                    return (
+                      <button
+                        className={cn(
+                          "flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition",
+                          showCorrect
+                            ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                            : showWrong
+                              ? "border-rose-300 bg-rose-50 text-rose-700"
+                              : isChosen
+                                ? "border-brand-300 bg-brand-50 text-brand-700"
+                                : "border-slate-200 text-slate-600 hover:bg-slate-50",
+                        )}
+                        disabled={submitted}
+                        key={oIndex}
+                        onClick={() => choose(qIndex, oIndex)}
+                        type="button"
+                      >
+                        {showCorrect ? (
+                          <CheckCircle2 className="size-4 shrink-0" />
+                        ) : showWrong ? (
+                          <XCircle className="size-4 shrink-0" />
+                        ) : (
+                          <span
+                            className={cn(
+                              "grid size-4 shrink-0 place-items-center rounded-full border text-[10px]",
+                              isChosen ? "border-brand-500 bg-brand-500 text-white" : "border-slate-300",
+                            )}
+                          >
+                            {String.fromCharCode(65 + oIndex)}
+                          </span>
+                        )}
+                        {option}
+                      </button>
+                    );
+                  })}
+                </div>
+                {submitted ? (
+                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    {question.explain}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {!submitted ? (
+        <div className="flex items-center gap-3">
+          <Button disabled={answeredCount < quiz.questions.length} onClick={() => setSubmitted(true)}>
+            Submit answers
+          </Button>
+          <span className="text-sm text-slate-500">
+            {answeredCount} / {quiz.questions.length} answered
+          </span>
+        </div>
+      ) : null}
     </div>
   );
 }
