@@ -1,10 +1,12 @@
 import {
   BookOpen,
+  Check,
   CheckCircle2,
   ClipboardList,
   Code2,
   Play,
   RotateCcw,
+  Target,
   Terminal,
   XCircle,
 } from "lucide-react";
@@ -12,8 +14,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge, Button, Card, CardContent, PageHeader } from "@/components/common";
 // Core logic lives in plain JavaScript modules (see src/features/learn/*.js).
+import { getChallenges } from "@/features/learn/challenges";
+import { runChallenge, listenForChallenge } from "@/features/learn/challengeRunner";
 import { tracks } from "@/features/learn/curriculum";
 import { handleEditorKeydown } from "@/features/learn/editor";
+import {
+  isChallengeDone,
+  isLessonDone,
+  isQuizDone,
+  loadProgress,
+  markChallenge,
+  markLesson,
+  markQuiz,
+  trackStats,
+} from "@/features/learn/progress";
 import { feedbackFor, gradeQuiz } from "@/features/learn/quiz";
 import { getQuiz } from "@/features/learn/quizzes";
 import { listenForConsole, runInIframe } from "@/features/learn/sandboxRunner";
@@ -53,10 +67,25 @@ interface Quiz {
   title: string;
   questions: QuizQuestion[];
 }
+interface Challenge {
+  id: string;
+  title: string;
+  prompt: string;
+  fn: string;
+  starter: string;
+  cases: Array<{ args: unknown[]; expected: unknown }>;
+}
+interface ChallengeResult {
+  passed: boolean;
+  hasFn: boolean;
+  error?: string;
+  results: Array<{ name: string; pass: boolean; expected: unknown; actual: unknown; errored: boolean }>;
+}
 
 const TRACKS = tracks as Track[];
 type Pane = "html" | "css" | "js";
-type Mode = "lesson" | "quiz";
+type Mode = "lesson" | "quiz" | "challenge";
+type Progress = ReturnType<typeof loadProgress>;
 interface ConsoleEntry {
   level: string;
   text: string;
@@ -77,9 +106,12 @@ export function LearnPage() {
   const [pane, setPane] = useState<Pane>("html");
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
   const [mode, setMode] = useState<Mode>("lesson");
+  const [progress, setProgress] = useState<Progress>(() => loadProgress());
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   const quiz = getQuiz(trackId) as Quiz | null;
+  const trackChallenges = getChallenges(trackId) as Challenge[];
+  const stats = trackStats(progress, trackId, track.lessons.length, trackChallenges.length);
 
   // Switching lesson/track loads that example into the editor (event-driven so
   // we never reset state from inside an effect).
@@ -145,25 +177,45 @@ export function LearnPage() {
       <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
         {/* Lesson sidebar */}
         <aside className="grid h-fit gap-1 rounded-2xl border border-slate-200 bg-white p-2">
-          <p className="px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
-            {track.label} tutorial
-          </p>
-          {track.lessons.map((l) => (
-            <button
-              className={cn(
-                "flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium transition",
-                mode === "lesson" && l.id === lessonId
-                  ? "bg-brand-50 text-brand-700"
-                  : "text-slate-600 hover:bg-slate-50",
-              )}
-              key={l.id}
-              onClick={() => openLesson(l)}
-              type="button"
-            >
-              <BookOpen className="size-4 shrink-0" />
-              {l.title}
-            </button>
-          ))}
+          <div className="px-3 pb-1 pt-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+              {track.label} tutorial
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-brand-500 transition-all"
+                  style={{ width: `${stats.percent}%` }}
+                />
+              </div>
+              <span className="text-[11px] font-medium text-slate-500">
+                {stats.done}/{stats.total}
+              </span>
+            </div>
+          </div>
+          {track.lessons.map((l) => {
+            const done = isLessonDone(progress, trackId, l.id);
+            return (
+              <button
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-medium transition",
+                  mode === "lesson" && l.id === lessonId
+                    ? "bg-brand-50 text-brand-700"
+                    : "text-slate-600 hover:bg-slate-50",
+                )}
+                key={l.id}
+                onClick={() => openLesson(l)}
+                type="button"
+              >
+                {done ? (
+                  <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                ) : (
+                  <BookOpen className="size-4 shrink-0" />
+                )}
+                <span className="flex-1 truncate">{l.title}</span>
+              </button>
+            );
+          })}
           {quiz ? (
             <button
               className={cn(
@@ -175,8 +227,27 @@ export function LearnPage() {
               onClick={() => setMode("quiz")}
               type="button"
             >
-              <ClipboardList className="size-4 shrink-0" />
+              {isQuizDone(progress, trackId) ? (
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+              ) : (
+                <ClipboardList className="size-4 shrink-0" />
+              )}
               Take the quiz
+            </button>
+          ) : null}
+          {trackChallenges.length ? (
+            <button
+              className={cn(
+                "flex items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold transition",
+                mode === "challenge"
+                  ? "bg-brand-50 text-brand-700"
+                  : "text-slate-600 hover:bg-slate-50",
+              )}
+              onClick={() => setMode("challenge")}
+              type="button"
+            >
+              <Target className="size-4 shrink-0" />
+              Code challenges
             </button>
           ) : null}
         </aside>
@@ -184,12 +255,32 @@ export function LearnPage() {
         {/* Lesson content + editor, or the quiz */}
         <div className="grid gap-5">
           {mode === "quiz" && quiz ? (
-            <QuizPanel key={trackId} quiz={quiz} />
+            <QuizPanel
+              key={trackId}
+              onComplete={() => setProgress(markQuiz(trackId))}
+              quiz={quiz}
+            />
+          ) : mode === "challenge" && trackChallenges.length ? (
+            <ChallengePanel
+              challenges={trackChallenges}
+              isDone={(id) => isChallengeDone(progress, trackId, id)}
+              key={trackId}
+              onSolved={(id) => setProgress(markChallenge(trackId, id))}
+            />
           ) : (
           <>
-          <div>
-            <p className="text-sm font-medium text-brand-600">{track.tagline}</p>
-            <h2 className="font-display text-2xl font-semibold text-slate-900">{lesson.title}</h2>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-brand-600">{track.tagline}</p>
+              <h2 className="font-display text-2xl font-semibold text-slate-900">{lesson.title}</h2>
+            </div>
+            <Button
+              onClick={() => setProgress(markLesson(trackId, lesson.id, !isLessonDone(progress, trackId, lesson.id)))}
+              variant={isLessonDone(progress, trackId, lesson.id) ? "ghost" : "outline"}
+            >
+              <Check className="size-4" />
+              {isLessonDone(progress, trackId, lesson.id) ? "Completed" : "Mark as complete"}
+            </Button>
           </div>
 
           <div className="grid gap-3">
@@ -329,7 +420,7 @@ export function LearnPage() {
   );
 }
 
-function QuizPanel({ quiz }: { quiz: Quiz }) {
+function QuizPanel({ quiz, onComplete }: { quiz: Quiz; onComplete: () => void }) {
   const [answers, setAnswers] = useState<Array<number | null>>(
     () => quiz.questions.map(() => null),
   );
@@ -439,7 +530,14 @@ function QuizPanel({ quiz }: { quiz: Quiz }) {
 
       {!submitted ? (
         <div className="flex items-center gap-3">
-          <Button disabled={answeredCount < quiz.questions.length} onClick={() => setSubmitted(true)}>
+          <Button
+            disabled={answeredCount < quiz.questions.length}
+            onClick={() => {
+              const graded = gradeQuiz(quiz.questions, answers);
+              setSubmitted(true);
+              if (graded.passed) onComplete();
+            }}
+          >
             Submit answers
           </Button>
           <span className="text-sm text-slate-500">
@@ -448,5 +546,134 @@ function QuizPanel({ quiz }: { quiz: Quiz }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ChallengePanel({
+  challenges,
+  isDone,
+  onSolved,
+}: {
+  challenges: Challenge[];
+  isDone: (id: string) => boolean;
+  onSolved: (id: string) => void;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div>
+        <p className="text-sm font-medium text-brand-600">Write code to pass the tests</p>
+        <h2 className="font-display text-2xl font-semibold text-slate-900">Code challenges</h2>
+      </div>
+      {challenges.map((challenge) => (
+        <ChallengeCard
+          challenge={challenge}
+          done={isDone(challenge.id)}
+          key={challenge.id}
+          onSolved={() => onSolved(challenge.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ChallengeCard({
+  challenge,
+  done,
+  onSolved,
+}: {
+  challenge: Challenge;
+  done: boolean;
+  onSolved: () => void;
+}) {
+  const [code, setCode] = useState(challenge.starter);
+  const [result, setResult] = useState<ChallengeResult | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const onSolvedRef = useRef(onSolved);
+  useEffect(() => {
+    onSolvedRef.current = onSolved;
+  }, [onSolved]);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return undefined;
+    return listenForChallenge(iframe, (res: ChallengeResult) => {
+      setResult(res);
+      if (res.passed) onSolvedRef.current();
+    });
+  }, []);
+
+  const check = () => {
+    setResult(null);
+    runChallenge(iframeRef.current, code, challenge);
+  };
+
+  return (
+    <Card>
+      <CardContent className="grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="flex items-center gap-2 font-semibold text-slate-900">
+            <Target className="size-4 text-brand-600" />
+            {challenge.title}
+            {done ? <Badge variant="success">Solved</Badge> : null}
+          </p>
+          <Button onClick={check}>
+            <Play className="size-4" /> Run &amp; check
+          </Button>
+        </div>
+        <p className="text-sm text-slate-600">{challenge.prompt}</p>
+        <textarea
+          aria-label={`${challenge.title} solution`}
+          className="h-40 w-full resize-none rounded-xl bg-slate-900 p-4 font-mono text-sm text-slate-100 outline-none"
+          onChange={(event) => setCode(event.target.value)}
+          onKeyDown={(event) => {
+            const next = handleEditorKeydown(event);
+            if (typeof next === "string") setCode(next);
+          }}
+          spellCheck={false}
+          value={code}
+        />
+        {result ? (
+          <div
+            className={cn(
+              "grid gap-1.5 rounded-xl border p-3",
+              result.passed ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50",
+            )}
+          >
+            {!result.hasFn ? (
+              <p className="text-sm font-medium text-rose-600">
+                Define a function named <code>{challenge.fn}(...)</code>.
+              </p>
+            ) : null}
+            {result.error ? (
+              <p className="text-sm font-medium text-rose-600">Error: {result.error}</p>
+            ) : null}
+            {result.results.map((r, index) => (
+              <div className="flex items-center gap-2 font-mono text-xs" key={index}>
+                {r.pass ? (
+                  <CheckCircle2 className="size-3.5 shrink-0 text-emerald-600" />
+                ) : (
+                  <XCircle className="size-3.5 shrink-0 text-rose-500" />
+                )}
+                <span className={r.pass ? "text-slate-600" : "text-rose-600"}>
+                  {r.name} → {JSON.stringify(r.actual)}
+                  {r.pass ? "" : ` (expected ${JSON.stringify(r.expected)})`}
+                </span>
+              </div>
+            ))}
+            {result.passed ? (
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
+                <CheckCircle2 className="size-4" /> All tests passed — challenge solved!
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        <iframe
+          className="hidden"
+          ref={iframeRef}
+          sandbox="allow-scripts"
+          title={`challenge-runner-${challenge.id}`}
+        />
+      </CardContent>
+    </Card>
   );
 }
