@@ -88,6 +88,41 @@ export const quizzes = {
       },
     ],
   },
+  sql: {
+    title: "SQL Quiz",
+    questions: [
+      {
+        q: "Which statement reads data from a table?",
+        options: ["READ", "SELECT", "GET", "FETCH"],
+        answer: 1,
+        explain: "SELECT retrieves rows from a table.",
+      },
+      {
+        q: "What does * mean in SELECT * FROM students?",
+        options: ["All rows", "All columns", "Multiply", "The first column"],
+        answer: 1,
+        explain: "* selects every column; WHERE is what limits the rows.",
+      },
+      {
+        q: "Which clause filters rows by a condition?",
+        options: ["ORDER BY", "GROUP BY", "WHERE", "LIMIT"],
+        answer: 2,
+        explain: "WHERE keeps only rows matching the condition.",
+      },
+      {
+        q: "How do you sort results highest-first by gpa?",
+        options: ["ORDER BY gpa DESC", "SORT gpa", "ORDER gpa UP", "GROUP BY gpa"],
+        answer: 0,
+        explain: "ORDER BY gpa DESC sorts descending (highest first).",
+      },
+      {
+        q: "Which returns the number of rows?",
+        options: ["TOTAL()", "COUNT(*)", "ROWS()", "NUM(*)"],
+        answer: 1,
+        explain: "COUNT(*) counts the rows in the result.",
+      },
+    ],
+  },
   javascript: {
     title: "JavaScript Quiz",
     questions: [

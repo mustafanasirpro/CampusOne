@@ -4,8 +4,10 @@ import {
   CheckCircle2,
   ClipboardList,
   Code2,
+  Database,
   Play,
   RotateCcw,
+  Table,
   Target,
   Terminal,
   XCircle,
@@ -31,6 +33,8 @@ import {
 import { feedbackFor, gradeQuiz } from "@/features/learn/quiz";
 import { getQuiz } from "@/features/learn/quizzes";
 import { listenForConsole, runInIframe } from "@/features/learn/sandboxRunner";
+import { tables as sqlTables } from "@/features/learn/sqlData";
+import { runSql } from "@/features/learn/sqlEngine";
 import { cn } from "@/utils/cn";
 import { useDocumentTitle } from "@/utils/useDocumentTitle";
 
@@ -49,14 +53,17 @@ interface Lesson {
   id: string;
   title: string;
   blocks: LessonBlock[];
-  example: Example;
+  example?: Example;
+  sql?: string;
 }
 interface Track {
   id: string;
   label: string;
   tagline: string;
+  kind?: string;
   lessons: Lesson[];
 }
+const EMPTY_EXAMPLE: Example = { html: "", css: "", js: "" };
 interface QuizQuestion {
   q: string;
   options: string[];
@@ -102,7 +109,7 @@ export function LearnPage() {
     [track, lessonId],
   );
 
-  const [code, setCode] = useState<Example>(lesson.example);
+  const [code, setCode] = useState<Example>(lesson.example ?? EMPTY_EXAMPLE);
   const [pane, setPane] = useState<Pane>("html");
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
   const [mode, setMode] = useState<Mode>("lesson");
@@ -112,13 +119,14 @@ export function LearnPage() {
   const quiz = getQuiz(trackId) as Quiz | null;
   const trackChallenges = getChallenges(trackId) as Challenge[];
   const stats = trackStats(progress, trackId, track.lessons.length, trackChallenges.length);
+  const isSql = track.kind === "sql";
 
   // Switching lesson/track loads that example into the editor (event-driven so
   // we never reset state from inside an effect).
   const openLesson = (nextLesson: Lesson) => {
     setMode("lesson");
     setLessonId(nextLesson.id);
-    setCode(nextLesson.example);
+    setCode(nextLesson.example ?? EMPTY_EXAMPLE);
     setPane("html");
     setConsoleEntries([]);
   };
@@ -139,6 +147,7 @@ export function LearnPage() {
     runInIframe(iframeRef.current, code);
   };
   useEffect(() => {
+    if (isSql) return undefined;
     const id = window.setTimeout(run, 60);
     return () => window.clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -313,7 +322,10 @@ export function LearnPage() {
             })}
           </div>
 
-          {/* Try it Yourself */}
+          {/* Try it Yourself, or the SQL playground for the database track */}
+          {isSql ? (
+            <SqlRunner initialQuery={lesson.sql ?? ""} key={lesson.id} />
+          ) : (
           <Card>
             <CardContent className="grid gap-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -322,7 +334,7 @@ export function LearnPage() {
                   Try it Yourself
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button onClick={() => setCode(lesson.example)} variant="ghost">
+                  <Button onClick={() => setCode(lesson.example ?? EMPTY_EXAMPLE)} variant="ghost">
                     <RotateCcw className="size-4" /> Reset
                   </Button>
                   <Button onClick={run}>
@@ -407,6 +419,7 @@ export function LearnPage() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <Badge variant="neutral">Powered by JavaScript</Badge>
@@ -675,5 +688,96 @@ function ChallengeCard({
         />
       </CardContent>
     </Card>
+  );
+}
+
+function SqlRunner({ initialQuery }: { initialQuery: string }) {
+  const [query, setQuery] = useState(initialQuery);
+  const [state, setState] = useState<{ columns?: string[]; rows?: unknown[][]; error?: string }>(
+    () => runSql(initialQuery, sqlTables),
+  );
+  const [showTables, setShowTables] = useState(false);
+
+  return (
+    <Card>
+      <CardContent className="grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 font-semibold text-slate-900">
+            <Database className="size-4 text-brand-600" />
+            SQL playground
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setShowTables((value) => !value)} variant="ghost">
+              <Table className="size-4" /> {showTables ? "Hide tables" : "Tables"}
+            </Button>
+            <Button onClick={() => setState(runSql(query, sqlTables))}>
+              <Play className="size-4" /> Run query
+            </Button>
+          </div>
+        </div>
+
+        <textarea
+          aria-label="SQL query"
+          className="h-28 w-full resize-none rounded-xl bg-slate-900 p-4 font-mono text-sm text-slate-100 outline-none"
+          onChange={(event) => setQuery(event.target.value)}
+          spellCheck={false}
+          value={query}
+        />
+
+        {state.error ? (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            {state.error}
+          </div>
+        ) : (
+          <ResultTable columns={state.columns ?? []} rows={state.rows ?? []} />
+        )}
+
+        {showTables ? (
+          <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Sample database
+            </p>
+            {Object.entries(sqlTables).map(([name, t]) => (
+              <div key={name}>
+                <p className="mb-1 text-sm font-semibold text-slate-800">{name}</p>
+                <ResultTable columns={t.columns} rows={t.rows} />
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ResultTable({ columns, rows }: { columns: string[]; rows: unknown[][] }) {
+  if (!rows.length) {
+    return <p className="text-sm text-slate-500">No rows returned.</p>;
+  }
+  return (
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <table className="min-w-full text-sm">
+        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            {columns.map((c) => (
+              <th className="px-3 py-2 font-semibold" key={c}>
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {row.map((cell, cellIndex) => (
+                <td className="px-3 py-2 text-slate-700" key={cellIndex}>
+                  {String(cell)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

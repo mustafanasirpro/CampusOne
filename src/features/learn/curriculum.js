@@ -285,6 +285,72 @@ export const tracks = [
       },
     ],
   },
+  {
+    id: "sql",
+    label: "SQL",
+    kind: "sql",
+    tagline: "Query CampusOne's data with SQL",
+    lessons: [
+      {
+        id: "sql-intro",
+        title: "SQL Introduction",
+        blocks: [
+          { kind: "text", text: "SQL (Structured Query Language) is how you ask a database questions. CampusOne stores students, courses and enrollments in tables — SQL reads and filters them." },
+          { kind: "text", text: "The SELECT statement reads data. * means \"every column\":" },
+          { kind: "code", lang: "sql", code: "SELECT * FROM students;" },
+          { kind: "tip", text: "Press \"Run query\" to execute it against the sample tables and see the rows. Open \"Tables\" to view the data you can query." },
+        ],
+        sql: "SELECT * FROM students;",
+      },
+      {
+        id: "sql-columns",
+        title: "Choosing columns",
+        blocks: [
+          { kind: "text", text: "Instead of *, list the columns you want. This returns just the name and GPA of every student." },
+          { kind: "code", lang: "sql", code: "SELECT name, gpa FROM students;" },
+        ],
+        sql: "SELECT name, gpa FROM students;",
+      },
+      {
+        id: "sql-where",
+        title: "Filtering with WHERE",
+        blocks: [
+          { kind: "text", text: "WHERE keeps only the rows that match a condition. Operators include =, >, <, >=, <= and LIKE. Combine conditions with AND." },
+          { kind: "code", lang: "sql", code: "SELECT name, gpa FROM students\nWHERE gpa >= 3.5;" },
+          { kind: "tip", text: "Try changing 3.5 to 3.0, or add: AND program = 'BCS'." },
+        ],
+        sql: "SELECT name, gpa FROM students\nWHERE gpa >= 3.5;",
+      },
+      {
+        id: "sql-order",
+        title: "Sorting with ORDER BY",
+        blocks: [
+          { kind: "text", text: "ORDER BY sorts the results. Add DESC for highest-first, and LIMIT to keep only the top rows — here, the top 3 students by GPA." },
+          { kind: "code", lang: "sql", code: "SELECT name, gpa FROM students\nORDER BY gpa DESC\nLIMIT 3;" },
+        ],
+        sql: "SELECT name, gpa FROM students\nORDER BY gpa DESC\nLIMIT 3;",
+      },
+      {
+        id: "sql-aggregate",
+        title: "Counting & averaging",
+        blocks: [
+          { kind: "text", text: "Aggregate functions summarise many rows into one value: COUNT(*) counts rows, AVG() averages a column, and SUM/MIN/MAX also work." },
+          { kind: "code", lang: "sql", code: "SELECT COUNT(*) FROM students;\nSELECT AVG(gpa) FROM students;" },
+        ],
+        sql: "SELECT AVG(gpa) FROM students;",
+      },
+      {
+        id: "sql-groupby",
+        title: "Grouping with GROUP BY",
+        blocks: [
+          { kind: "text", text: "GROUP BY splits rows into groups and runs an aggregate per group. This counts how many students are in each program." },
+          { kind: "code", lang: "sql", code: "SELECT program, COUNT(*) FROM students\nGROUP BY program;" },
+          { kind: "tip", text: "Swap COUNT(*) for AVG(gpa) to compare average GPA per program." },
+        ],
+        sql: "SELECT program, COUNT(*) FROM students\nGROUP BY program;",
+      },
+    ],
+  },
 ];
 
 /** Finds a track by id. */
